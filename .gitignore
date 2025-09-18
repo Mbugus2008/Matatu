@@ -42,3 +42,29 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub-cache/
+build/
+
+# Android
+*.apk
+*.aab
+.gradle/
+local.properties
+*.keystore
+
+# iOS
+Pods/
+DerivedData/
+*.xcuserstate
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
