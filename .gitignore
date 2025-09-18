@@ -68,3 +68,9 @@ DerivedData/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Ignore Enwealth DB files
+trimline_citihoppa/android/app/src/main/res/mipmap-xhdpi/Enwealth/
+*.mdf
+*.ndf
+*.ldf
