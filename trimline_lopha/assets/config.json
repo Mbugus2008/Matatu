@@ -1,0 +1,22 @@
+{"clients": [
+  {
+  "apiBaseUrl": "http://5.189.167.52:4005/City/api/",
+  "clientId": "01",
+  "clientName": "CityHoppa",
+  "logo":"android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+  "theme": {
+    "primaryColor": "#FF5722",
+    "accentColor": "#03A9F4"
+  }},
+ {
+  "apiBaseUrl": "http://5.189.167.52:4005/KMOS/api/",
+  "clientId": "02",
+  "clientName": "KMOS",
+  "logo":"assets/KMOS Logo.png",
+  "theme": {
+    "primaryColor": "#FF5722",
+    "accentColor": "#03A9F4"
+  }}
+
+]
+}
