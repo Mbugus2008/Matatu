@@ -10,6 +10,7 @@ import 'package:t_matatu/models/Header.dart';
 import 'package:t_matatu/models/Tamounts.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/Utils/util.dart';
+import 'package:t_matatu/models/accounttypes.dart';
 import 'package:t_matatu/models/summary/Tsummary.dart';
 import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
@@ -51,6 +52,7 @@ class Cityhoppa extends  BaseClients {
       Get.put(DepotController());
     }
     Tamounts().getttypesamounts();
+    Account_Types().get_account_Types();
     await Vehicles().Daily_Contributions(getdate());
     await MainController().getvehiclecrew();
   }

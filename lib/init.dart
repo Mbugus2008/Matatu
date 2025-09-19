@@ -65,7 +65,7 @@ Future<void> initializedata() async {
     Vehicles().getvehicles();
     Member().getmembers(); 
     TranTypes().getttypes();
-     Account_Types().get_account_Types();
+     
      SettingsController().fetchWorkingDate();
   } catch (e, stackTrace) {
     print('Initialization error: $e');
