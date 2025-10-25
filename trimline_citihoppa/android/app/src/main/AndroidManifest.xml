@@ -17,7 +17,8 @@
     <application
         android:label="citihoppa"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:extractNativeLibs="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -57,3 +58,4 @@
         </intent>
     </queries>
 </manifest>
+

@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/init.dart';
-import 'package:t_matatu/models/Hires.dart';
+import 'package:t_matatu/hires/Hires.dart';
 import 'package:t_matatu/models/enums.dart';
 
 import 'package:t_matatu/models/vehicles/vehicle.dart';

@@ -10,6 +10,7 @@ import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/network/request.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/providers/db.dart';
+import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 class Member implements mapping, Tomaps, AbsDbUpdates {
@@ -151,22 +152,15 @@ $col_Vehicle text
   }
 
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
-
-    update.add(DbUpdate(version: 1, updates: [
-      'ALTER TABLE $table ADD COLUMN $col_Crew_Type int ',
-      'ALTER TABLE $table ADD COLUMN $col_Loans float ',
-      'ALTER TABLE $table ADD COLUMN $col_Vehicle text'
-    ]));
-    return update;
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
   }
 
 
   Future<void> getmembers() async {
     bool hasdata = true;
     String? bookmark;
-    int? size = 10;
+    int? size = 100;
     var request = Request(body: null, bookmark: bookmark, size: size);
     while (hasdata) {
       await ApiClient().postdata("members", request.toJson()).then((r) async {
@@ -194,11 +188,13 @@ $col_Vehicle text
         } else {
           hasdata = false;
         }
-        Get
-            .find<MemberController>()
-            .initialize;
+        
       });
     }
+Get
+            .find<MemberController>()
+            .initialize;
+
   }
 }
 enum status {
@@ -213,3 +209,4 @@ enum Crew_type {
   /// <remarks/>
   Conductor,
 }
+

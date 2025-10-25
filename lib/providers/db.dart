@@ -1,9 +1,8 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:t_matatu/hires/Hires.dart';
 import 'package:t_matatu/models/Header.dart';
-import 'package:t_matatu/models/Hires.dart';
 import 'package:t_matatu/models/Reversal.dart';
 import 'package:t_matatu/models/Tamounts.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
@@ -13,6 +12,7 @@ import 'package:t_matatu/models/expences.dart';
 import 'package:t_matatu/models/mappings.dart';
 import 'package:t_matatu/models/member.dart';
 import 'package:t_matatu/models/trantypes.dart';
+import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 
 import '../models/Utils/util.dart';
 import '../models/vehicles/Vehicle_crew.dart';
@@ -39,7 +39,8 @@ class db_Provider extends GetxController {
     Expenses(),
     Account_Types(),
     Reversal(),
-    Hires()
+    Hires(),
+    BusInspectionTable(),
   ];
   Future<Database> get database async {
     if (_database != null) {
@@ -61,13 +62,18 @@ class db_Provider extends GetxController {
   }
 
   Future<Database> open() async {
-    //"Mbranch", 2
-    List<DbUpdate>? upp = <DbUpdate>[];
-    for (AbsDbUpdates up in Dbupdate) {
-      if (up.updates()!.isNotEmpty) upp.addAll(up.updates()!.toList());
+    final List<dbu.DbUpdate> allUpdates = <dbu.DbUpdate>[];
+    for (final AbsDbUpdates up in Dbupdate) {
+      final List<dbu.DbUpdate>? updates = up.updates();
+      if (updates != null && updates.isNotEmpty) {
+        allUpdates.addAll(updates);
+      }
     }
-    upp!.sort((a, b) => b.version!.compareTo(a.version as num));
-    return await openDatabase("Mbranch", version: upp[0].version,
+    allUpdates.sort(
+        (dbu.DbUpdate a, dbu.DbUpdate b) => b.version.compareTo(a.version));
+    final int targetVersion =
+        allUpdates.isNotEmpty ? allUpdates.first.version : 1;
+    return await openDatabase("Mbranch", version: targetVersion,
         onCreate: (Database db, int version) async {
       await db.execute(Vehicles.createtable);
       await db.execute(Agent.createtable);
@@ -81,6 +87,7 @@ class db_Provider extends GetxController {
       await db.execute(Account_Types.createtable);
       await db.execute(Reversal.createtable);
       await db.execute(Hires.createtable);
+      await db.execute(BusInspectionTable.createtable);
     }, onUpgrade: _onUpgrade);
   }
 
@@ -93,7 +100,7 @@ class db_Provider extends GetxController {
     //     await db.execute(
     //       'ALTER TABLE ${TranTypes.table} ADD COLUMN ${TranTypes.col_Amount} float');
     // }
-    
+
     for (var i = oldVersion; i <= newVersion; i++) {
       for (var element in get_updates(newVersion)) {
         try {
@@ -117,44 +124,52 @@ class db_Provider extends GetxController {
     //close();
     return data;
   }
+
   Batch batch() {
     if (_database == null) throw Exception("DB not initialized");
     return _database!.batch();
   }
+
   Future<List<T>> batchinsert<T extends mapping>(
       String table, List<T> data) async {
+    print("insert table: $table");
+
     if (_database == null || _database!.isOpen == false) {
       await database;
     }
     await _database!.transaction((txn) async {
+      final batch = txn.batch();
+
       for (T entry in data) {
-        txn.insert(table, entry.toMap_fortable(),
-            conflictAlgorithm: ConflictAlgorithm.replace);
+        batch.insert(
+          table,
+          entry.toMap_fortable(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
+
+      await batch.commit(noResult: true);
     });
-  
+
     return data;
   }
-Future<void> batchdelete<T extends mapping>(
-    String table) async {
-      try   { 
-      if (_database == null || _database!.isOpen == false) {
-      await database;
-    }
 
-  await _database!.transaction((txn) async {
-  
+  Future<void> batchdelete<T extends mapping>(String table) async {
+    try {
+      if (_database == null || _database!.isOpen == false) {
+        await database;
+      }
+
+      await _database!.transaction((txn) async {
         await txn.delete(
           table,
           where: '1=1',
         );
-      
- 
-  });
-      }
-catch (e) {
-  e.printError();
-}}
+      });
+    } catch (e) {
+      e.printError();
+    }
+  }
   // Future<void> transactionprocess() async {
   //   List<Dbtrans> transaction = List.from(Get.find<db_Provider>().transactions);
   //   Get.find<db_Provider>().transactions.clear();
@@ -210,15 +225,16 @@ catch (e) {
     //     await Get.find<db_Provider>().database.query(table, columns: columns);
     // return maps;
   }
+
   Future<List<Map<String, dynamic>>> getdata(
       String table, List<String>? columns,
       [String? where, List<Object>? args]) async {
     List<Map<String, dynamic>> data = [];
- 
+
     if (_database == null || _database!.isOpen == false) {
       await database;
     }
-      //_showErrorSnackbar('Open Db');
+    //_showErrorSnackbar('Open Db');
     await _database!.transaction((txn) async {
       try {
         if (where == null) {
@@ -233,12 +249,12 @@ catch (e) {
         throw Exception('Error fetching data: $e');
       }
     });
+    print("Data fetched: ${data.toString()}");
     return data;
     // final List<Map<String, dynamic>> maps =
     //     await Get.find<db_Provider>().database.query(table, columns: columns);
     // return maps;
   }
-
 
   Future<List<Map<String, dynamic>>> getrawdata(String sql) async {
     List<Map<String, dynamic>> data = [];
@@ -341,6 +357,12 @@ catch (e) {
       List<String>? columns, String table, DateTime date) async {
     return getdata(table, columns, '${Header.col_Date} = ?',
         [getdates(date).millisecondsSinceEpoch]);
+  }
+
+  Future<List<Map<String, dynamic>>> gettransdate(
+      List<String>? columns, String table, DateTime date) async {
+    return getdata(table, columns, '${tmatatu.Trans.col_Transaction_Date} = ?',
+        [getdates(date).millisecondsSinceEpoch]);
 
     //    final List<Map<String, dynamic>> maps = await Get.find<db_Provider>()
     //     .database
@@ -349,6 +371,30 @@ catch (e) {
     //         where: '${Header.col_Date} = ?',
     //         whereArgs: [getdates(date).millisecondsSinceEpoch]);
     // return maps;
+  }
+
+  Future<List<Map<String, dynamic>>> getVehicleCollectionsByRange(
+      DateTime start, DateTime end) async {
+    final DateTime startDate = getdates(start);
+    final DateTime endDate = getdates(end);
+    final int startMs = startDate.millisecondsSinceEpoch;
+    final int endMs =
+        endDate.add(const Duration(days: 1)).millisecondsSinceEpoch - 1;
+
+    final String sql = '''
+      SELECT
+        COALESCE(${tmatatu.Trans.col_Account_No}, '') AS accountNo,
+        COALESCE(${tmatatu.Trans.col_Account_Name}, '') AS accountName,
+        SUM(COALESCE(${tmatatu.Trans.col_Amount}, 0)) AS totalAmount,
+        COUNT(${tmatatu.Trans.col_Document_No}) AS transactionCount
+      FROM ${tmatatu.Trans.tabletrans}
+      WHERE ${tmatatu.Trans.col_Transaction_Date} BETWEEN $startMs AND $endMs
+      GROUP BY accountNo, accountName
+      HAVING COALESCE(${tmatatu.Trans.col_Account_No}, '') <> ''
+      ORDER BY totalAmount DESC
+    ''';
+
+    return getrawdata(sql);
   }
 
   Future<List<Map<String, dynamic>>> rawquery(String query) async {
@@ -376,13 +422,10 @@ catch (e) {
 
   Future<Map<String, dynamic>?> getagent(
       List<String>? columns, String table, String agent) async {
-
-         
     List<Map<String, dynamic>> d = await getdata(
         table, columns, '${Agent.col_Agent_Code} = ?', [agent.toUpperCase()]);
-       
-     if (d.isEmpty)
-     return null;
+
+    if (d.isEmpty) return null;
     return d.first;
 
     //await db!.close();
@@ -398,31 +441,52 @@ catch (e) {
   }
 
   List<String> get_updates(int version) {
-    List<String>? updates = [];
-    for (AbsDbUpdates up in Dbupdate) {
-      List<DbUpdate>? upp = up.updates();
-      DbUpdate? pp = DbUpdate();
-      if (upp != null) {
-        pp = upp.firstWhereOrNull((element) => element.version == version);
+    final List<String> statements = <String>[];
+    for (final AbsDbUpdates up in Dbupdate) {
+      final List<dbu.DbUpdate>? updates = up.updates();
+      if (updates == null || updates.isEmpty) {
+        continue;
       }
-
-      if (pp != null) {
-        updates.addAll(pp.updates!.toList());
+      final dbu.DbUpdate? match = updates.firstWhereOrNull(
+          (dbu.DbUpdate element) => element.version == version);
+      if (match != null && match.updates.isNotEmpty) {
+        statements.addAll(match.updates);
       }
     }
-    return updates;
+    return statements;
   }
 }
 
 abstract class AbsDbUpdates {
-  List<DbUpdate>? updates();
+  List<dbu.DbUpdate>? updates();
 }
 
-class DbUpdate {
-  int? version;
-  List<String>? updates;
-  DbUpdate({
-    this.version,
-    this.updates,
-  });
+class BusInspectionTable extends AbsDbUpdates {
+  static const String table = 'bus_inspections';
+  static const String colId = 'id';
+  static const String colBusIdentifier = 'bus_identifier';
+  static const String colInspectorName = 'inspector_name';
+  static const String colInspectionDate = 'inspection_date';
+  static const String colFieldsJson = 'fields_json';
+  static const String colIsSynced = 'is_synced';
+  static const String colCreatedAt = 'created_at';
+  static const String colUpdatedAt = 'updated_at';
+
+  static const String createtable = '''
+    CREATE TABLE IF NOT EXISTS $table (
+      $colId INTEGER PRIMARY KEY AUTOINCREMENT,
+      $colBusIdentifier TEXT NOT NULL,
+      $colInspectorName TEXT,
+      $colInspectionDate TEXT NOT NULL,
+      $colFieldsJson TEXT NOT NULL,
+      $colIsSynced INTEGER NOT NULL DEFAULT 0,
+      $colCreatedAt TEXT NOT NULL,
+      $colUpdatedAt TEXT NOT NULL
+    )
+  ''';
+
+  @override
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
+  }
 }

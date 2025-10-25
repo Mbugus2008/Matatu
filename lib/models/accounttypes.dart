@@ -3,6 +3,7 @@
 import 'dart:convert';
 
 import 'package:t_matatu/models/mappings.dart';
+import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/network/request.dart';
 import 'package:t_matatu/network/results/results.dart';
@@ -71,10 +72,8 @@ PRIMARY KEY ($col_Account_type, $col_Transaction_Type)
 ''';
 
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
-
-    return update;
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
   }
 
   @override
@@ -108,3 +107,4 @@ PRIMARY KEY ($col_Account_type, $col_Transaction_Type)
     });
   }
 }
+

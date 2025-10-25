@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:t_matatu/bluetooth/bluetooth.dart';
+import 'package:t_matatu/bluetooth/bluetoothManager.dart';
 import 'package:t_matatu/models/Reversal.dart';
 import 'package:t_matatu/pages/Reversals/ReversalsList.dart';
 import 'package:t_matatu/pages/widgets/Groupbox.dart';
-import 'package:t_matatu/bluetooth/bluetoothManager.dart';
 import 'package:t_matatu/reports/Daily%20Summary.dart';
 import 'package:t_matatu/reports/controller.dart';
 import 'package:t_matatu/reports/receipts.dart';
+import 'package:t_matatu/reports/vehicle_contributions.dart';
+
+import '../bluetooth/bluetoothscans.dart';
 import '../controllers/main.dart';
 import '../models/summary/Tsummary.dart';
 import '../models/summary/TsummaryDetails.dart';
-import '../bluetooth/bluetoothscans.dart';
 
 class CustomDrawer extends StatelessWidget {
   CustomDrawer({super.key});
@@ -50,13 +51,16 @@ class CustomDrawer extends StatelessWidget {
                 ),
                 Expanded(
                   flex: 3,
-                  child: Obx(() => Text(Get.find<BluetoothManager>().selectedPrinter.value?.deviceName ?? '')),
+                  child: Obx(() => Text(Get.find<BluetoothManager>()
+                          .selectedPrinter
+                          .value
+                          ?.deviceName ??
+                      '')),
                 ),
                 Expanded(
                   flex: 2,
                   child: ElevatedButton(
                     onPressed: () {
-                
                       Get.to(() => const bluetoothScanresults());
                     },
                     child: const Text("Set"),
@@ -90,6 +94,13 @@ class CustomDrawer extends StatelessWidget {
                 Get.to(() => const SummaryReport());
               },
               title: const Text("Daily Summary"),
+            ),
+            ListTile(
+              leading: const Icon(Icons.ev_station),
+              onTap: () {
+                Get.to(() => const VehicleContributionsReport());
+              },
+              title: const Text("Vehicle Collections"),
             ),
             ListTile(
               leading: const Icon(Icons.summarize),

@@ -11,6 +11,7 @@ import '../network/Apis.dart';
 import '../network/request.dart';
 import '../network/results/results.dart';
 import '../providers/db.dart';
+import '../providers/dbupdates.dart' as dbu;
 
 class Tamounts implements Tomaps, mapping, AbsDbUpdates {
   String? Key;
@@ -31,7 +32,7 @@ class Tamounts implements Tomaps, mapping, AbsDbUpdates {
     return <String, dynamic>{
       'Key': Key,
       'Code': Code,
-      'Vehicle_Type': Vehicle_Type!.index,
+      'Vehicle_Type': Vehicle_Type?.index,
       'Amount': Amount,
       'Name': Name,
     };
@@ -44,7 +45,11 @@ class Tamounts implements Tomaps, mapping, AbsDbUpdates {
       Vehicle_Type: map['Vehicle_Type'] != null
           ? vehicle_type.values[(map['Vehicle_Type'])]
           : null,
-      Amount: map['Amount'] != null ? map['Amount'] as double : null,
+      Amount: map['Amount'] != null
+          ? (map['Amount'] is num
+              ? (map['Amount'] as num).toDouble()
+              : double.tryParse(map['Amount'].toString()))
+          : null,
       Name: map['Name'] != null ? map['Name'] as String : null,
     );
   }
@@ -91,12 +96,8 @@ PRIMARY KEY ($colCode, $colVehicleType)
  )
 ''';
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
-
-    update.add(DbUpdate(version: 6, updates: [createtable]));
-
-    return update;
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
   }
 //db
 
@@ -119,3 +120,4 @@ PRIMARY KEY ($colCode, $colVehicleType)
     });
   }
 }
+

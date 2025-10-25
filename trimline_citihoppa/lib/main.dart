@@ -4,9 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:t_matatu/main.dart' as tmatatu;
 import 'package:t_matatu/providers/AppConfig.dart';
+import 'package:t_matatu/providers/client.dart';
+import 'package:t_matatu/providers/clients/Citihoppa.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+   BaseClients client = Cityhoppa(clientName: "City Hoppa Limited", 
+  clientName_line2: "", 
+  email: "info@citihoppa.co.ke",
+  telephone: "312058/9", 
+   Crew_to_attach: CrewToattach.Both,
+       Auto_Assign: true , Attach_crew: false);
   if (Platform.isAndroid) {
     [
       Permission.location,
@@ -19,13 +27,18 @@ Future<void> main() async {
       
       AppConfig config = AppConfig(
        // apiBaseUrl: 'http://trimline.co.ke:4005/City/api/',
-        apiBaseUrl: 'http://trimline.co.ke:4010/api/Matatu/',
+        //apiBaseUrl: 'http://trimline.co.ke:4010/api/Matatu/',
+         apiBaseUrl: 'http://5.189.167.52:4010/api/Matatu/',
+         //updateUrl: 'https://trimline.co.ke/apps/CityHoppa/',
+            updateUrl: 'http://5.189.167.52:4010/api/Matatu/',
         clientId: "CITYHOPPER",
         clientName: "CityHoppa",
+        Client: client,
         logo: 'assets/logo.png',
+        
       );
 
-      await tmatatu.start(config);
+       tmatatu.start(config);
        runApp(tmatatu.MyApp());
     });
   }

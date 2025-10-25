@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:t_matatu/Clients/Amount%20dist.dart';
 import 'package:t_matatu/controllers/Members.dart';
 import 'package:t_matatu/controllers/SettingsController.dart';
 import 'package:t_matatu/controllers/TypesController.dart';
@@ -10,7 +11,7 @@ import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/init.dart';
 import 'package:t_matatu/models/TransSummary.dart';
 import 'package:t_matatu/models/trantypes.dart';
-import 'package:t_matatu/pages/Amount%20dist.dart';
+
 import 'package:t_matatu/pages/crew.dart';
 import 'package:t_matatu/bluetooth/bluetoothManager.dart';
 import 'package:t_matatu/providers/client.dart';
@@ -150,7 +151,7 @@ class _ReceiptState extends State<Receipts> {
     Get.find<HeaderController>().amountEditingController.value.text = '';
     Get.find<TransTypeController>().tType.value = TranTypes(Code: " ");
     Get.find<HeaderController>().curTran = tMatatu.Trans().obs;
-    Get.find<VehiclesController>().Currentvehicle = Vehicles().obs;
+    Get.find<VehiclesController>().Currentvehicle.value = Vehicles();
   }
 
   cleartrans() {
@@ -164,7 +165,7 @@ class _ReceiptState extends State<Receipts> {
     Get.find<TransTypeController>().vehicleTrantypes.forEach((element) {
       element.Checked = false;
     });
-    Get.find<VehiclesController>().Currentvehicle = Vehicles().obs;
+    Get.find<VehiclesController>().Currentvehicle.value = Vehicles();
     vehicleno.clear();
   }
 
@@ -1122,7 +1123,7 @@ class _ReceiptState extends State<Receipts> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 200,
+                    
                       child: TextFormField(
                         keyboardType: TextInputType.number,
                         controller: recamount,

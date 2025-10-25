@@ -70,7 +70,6 @@ class CrewAssignment extends StatelessWidget {
     return Column(
       children: [
         if(Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Both || Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Driver)
-                   
         CustomAutocomplete(
           textEditingController: driverController,
           crew_type: Crew_type.Driver,
@@ -107,7 +106,7 @@ class CrewAssignment extends StatelessWidget {
 
     final memberController = Get.find<MemberController>();
     
-    memberController.clearcrew(vehicle!.Vehicle_Number.toString());
+    memberController.clearCrew(vehicle!.Vehicle_Number.toString());
 
     if (memberController.currentdriver.value != null) {
       memberController.currentdriver.value!.Vehicle = vehicle!.Vehicle_Number;

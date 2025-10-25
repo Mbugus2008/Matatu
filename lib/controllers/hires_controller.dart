@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/models/enums.dart';
-import 'package:t_matatu/models/Hires.dart';
+import 'package:t_matatu/hires/Hires.dart';
 
 class HiresController extends GetxController {
   // Form key

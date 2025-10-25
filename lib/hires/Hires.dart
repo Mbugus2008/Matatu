@@ -13,6 +13,7 @@ import 'package:t_matatu/network/errors.dart';
 import 'package:t_matatu/network/request.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/providers/db.dart';
+import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 
 class HiresController extends GetxController {
   final hires = <Hires>[].obs;
@@ -260,24 +261,9 @@ $col_Driver  text
   }
 
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
- update.add(DbUpdate(version: 14, updates: [createtable]));
-    update.add(DbUpdate(
-        version: 15,
-        updates: ['ALTER TABLE $table ADD COLUMN $col_Fleet_No text ']));
-    update.add(DbUpdate(
-        version: 16,
-        updates: ['ALTER TABLE $table ADD COLUMN $col_Destination text ',
-        'ALTER TABLE $table ADD COLUMN $col_Client_Name text ',
-        'ALTER TABLE $table ADD COLUMN $col_Incharge text ',
-        'ALTER TABLE $table ADD COLUMN $col_Department text ',
-        'ALTER TABLE $table ADD COLUMN $col_Driver text ']
-        
-        ));
-    return update;
-  }
-Future<void> savetires(Hires hire) async {
+  List<dbu.DbUpdate>? updates() => dbu.getDbUpdatesForTable(table);
+
+  Future<void> savetires(Hires hire) async {
 
   try {
      List<Hires> hiress = [hire];
@@ -392,5 +378,7 @@ try{
     };
   }
 }
+
+
 
 

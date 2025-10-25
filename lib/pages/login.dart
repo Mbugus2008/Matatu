@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:t_matatu/controllers/TypesController.dart';
 import 'package:t_matatu/controllers/agent.dart';
+import 'package:t_matatu/controllers/header.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/decorations/input.dart';
 import 'package:t_matatu/init.dart';
-import 'package:t_matatu/network/Apis.dart';
-import 'package:t_matatu/pages/home.dart';
-import 'package:t_matatu/controllers/TypesController.dart';
-import 'package:t_matatu/controllers/header.dart';
 import 'package:t_matatu/models/agents.dart';
+import 'package:t_matatu/pages/home.dart';
 import 'package:t_matatu/providers/db.dart';
 import 'package:t_matatu/reports/controller.dart';
 import 'package:t_matatu/utils/snackbar_service.dart';
@@ -41,19 +40,19 @@ class _LoginState extends State<Login> {
   Future<void> login(String username, String password) async {
     try {
       loggingin.value = true;
-      final value = await db_Provider().getagent(Agent.columns, Agent.tableagents, username);
+      final value = await db_Provider()
+          .getagent(Agent.columns, Agent.tableagents, username);
       if (value != null) {
         final agent = Agent.fromMap(value);
         try {
-          if(agent.Status != 2){
+          if (agent.Status != 2) {
             SnackbarService.showError('Account Inactive');
             return;
           }
           String pass = AgentController().decrypt(agent.Password ?? "");
-          if ( pass == password) {
-            await _handleSuccessfulLogin(agent, username);
-          } else 
-          {
+          if (pass == password) {
+            _handleSuccessfulLogin(agent, username);
+          } else {
             SnackbarService.showError('Invalid Username / Password');
           }
         } catch (e) {
@@ -63,50 +62,50 @@ class _LoginState extends State<Login> {
       } else {
         SnackbarService.showError('Invalid Username / Password');
       }
-    } catch (e,stackTrace) {
-      
+    } catch (e, stackTrace) {
       stackTrace.printError();
-      
+
       _showErrorSnackbar(e.toString());
     } finally {
       loggingin.value = false;
     }
   }
 
-
-
   Future<void> _handleSuccessfulLogin(Agent agent, String username) async {
     try {
-    final mainController = Get.find<MainController>();
-    final headerController = Get.find<HeaderController>();
-    final transTypeController = Get.find<TransTypeController>();
-    final reportController = Get.find<ReportController>();
+      final mainController = Get.find<MainController>();
+      final headerController = Get.find<HeaderController>();
+      final transTypeController = Get.find<TransTypeController>();
+      final reportController = Get.find<ReportController>();
 
-    mainController.agent.value = agent;
+      mainController.agent.value = agent;
 
-    //await headerController.gettodaystrans();
-     mainController.savePreference('username', username);
-    password.clear();
+      //await headerController.gettodaystrans();
+      mainController.savePreference('username', username);
+      password.clear();
 
-     mainController.getPreference("printer");
+      mainController.getPreference("printer");
 
-    transTypeController.start();
-    upload(); // async fire-and-forget
+      transTypeController.start();
+      upload(); // async fire-and-forget
 
-     reportController.gettodaysdate();
+      reportController.gettransbydatetoday(DateTime.now());
 
-    Get.off(() => HomePage());
-     Future.delayed(const Duration(seconds: 2), () {
+      Get.off(() => HomePage());
+
+      Future.delayed(const Duration(seconds: 2), () {
         Get.find<UpdateController>().checkForUpdate();
       });
-  } catch (e) {
-    debugPrint("Login flow failed: $e");
-    Get.snackbar("Error", "Login process failed. Please try again.");
+    } catch (e) {
+      debugPrint("Login flow failed: $e");
+      Get.snackbar("Error", "Login process failed. Please try again.");
+    }
   }
-  }
+
   void _showErrorSnackbar(String message) {
     SnackbarService.showError(message);
   }
+
   @override
   Widget build(BuildContext context) {
     final logoValue = Get.find<MainController>().config?.value.logo;
@@ -120,12 +119,13 @@ class _LoginState extends State<Login> {
           elevation: 20,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(5),
-            side: const BorderSide(color: Color.fromARGB(255, 77, 179, 139), width: 1),
+            side: const BorderSide(
+                color: Color.fromARGB(255, 77, 179, 139), width: 1),
           ),
           child: Container(
             decoration: BoxDecoration(
               image: DecorationImage(
-                image:   AssetImage(logo),
+                image: AssetImage(logo),
                 fit: BoxFit.cover,
                 opacity: 0.1,
               ),
@@ -137,33 +137,37 @@ class _LoginState extends State<Login> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
                   Obx(() => TextFormField(
-                    controller: username.value,
-                    decoration: input.inputdecoration("User Name", const Icon(Icons.email)),
-                  )),
+                        controller: username.value,
+                        decoration: input.inputdecoration(
+                            "User Name", const Icon(Icons.email)),
+                      )),
                   const SizedBox(height: 20.0),
                   TextFormField(
                     controller: password,
                     obscureText: true,
-                    decoration: input.inputdecoration("Password", const Icon(Icons.lock)),
+                    decoration: input.inputdecoration(
+                        "Password", const Icon(Icons.lock)),
                   ),
                   const SizedBox(height: 20),
-                  Obx(() => loggingin.value
-                    ? const CircularProgressIndicator()
-                    : ElevatedButton(
-                        onPressed: () => login(username.value.text, password.text),
-                        style: ElevatedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: Colors.blue,
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            Icon(Icons.verified_user),
-                            SizedBox(width: 8.0),
-                            Text('Login'),
-                          ],
-                        ),
-                      ),
+                  Obx(
+                    () => loggingin.value
+                        ? const CircularProgressIndicator()
+                        : ElevatedButton(
+                            onPressed: () =>
+                                login(username.value.text, password.text),
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              backgroundColor: Colors.blue,
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                Icon(Icons.verified_user),
+                                SizedBox(width: 8.0),
+                                Text('Login'),
+                              ],
+                            ),
+                          ),
                   ),
                 ],
               ),

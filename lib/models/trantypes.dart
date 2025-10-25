@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/models/mappings.dart';
+import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 import 'package:t_matatu/providers/db.dart';
 
 import '../network/Apis.dart';
@@ -187,16 +188,8 @@ $col_Amount  float
   }
 
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
-
-    update.add(DbUpdate(
-        version: 2,
-        updates: ['ALTER TABLE $table ADD COLUMN $col_Amount float ']));
-    update.add(DbUpdate(version: 3, updates: [
-      'ALTER TABLE $table ADD COLUMN $col_Customer_Posting_Group text '
-    ]));
-    return update;
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
   }
 
   Future<void> getttypes() async {
@@ -260,3 +253,4 @@ $col_Amount  float
     );
   }
 }
+

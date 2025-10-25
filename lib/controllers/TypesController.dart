@@ -23,46 +23,45 @@ class TransTypeController extends GetxController {
   }
 
   void distribute(double amount) {
-    Get.find<TransTypeController>()
-        .vehicleTrantypes
-        .where((p0) => p0.Name != null)
-        .forEach((element) {
+  final transTypes = Get.find<TransTypeController>().vehicleTrantypes;
+
+  // Reset all
+  for (final element in transTypes) {
+    if (element.Name != null) {
       element.Amountedited = 0;
       element.Checked = false;
-    });
-
-    Get.find<TransTypeController>()
-        .vehicleTrantypes
-        .where((p0) => p0.Name != null)
-        .forEach((element) {
-      double bal = element.VehicleAmount! - element.Amounttoday!;
-      if ((bal > 0) && (amount > 0)) {
-        if (amount > bal) {
-          element.Amountedited = bal;
-          element.eAmount.text = '${element.Amountedited}';
-          element.Checked = true;
-        }
-        if (amount < bal) {
-          element.Amountedited = amount;
-          element.eAmount.text = '${element.Amountedited}';
-          element.Checked = true;
-        }
-      }
-      amount -= element.Amountedited!;
-      if (amount <= 0) return;
-    });
-    if (amount > 0) {
-      Get.find<TransTypeController>()
-          .vehicleTrantypes
-          .where((p0) => p0.Code == "OFFLOAD")
-          .forEach((element) {
-        element.Amountedited = amount;
-        element.eAmount.text = '${element.Amountedited}';
-        element.Checked = true;
-      });
     }
-    update();
   }
+
+  // Distribute amount
+  for (final element in transTypes) {
+    if (element.Name == null) continue;
+    final bal = (element.VehicleAmount ?? 0) - (element.Amounttoday ?? 0);
+    if (bal > 0 && amount > 0) {
+      final assign = (amount > bal) ? bal : amount;
+      element.Amountedited = assign;
+      element.eAmount.text = assign.toString();
+      element.Checked = true;
+      amount -= assign;
+      if (amount <= 0) break; // stop early
+    }
+  }
+
+  // Assign leftover to OFFLOAD
+  if (amount > 0) {
+    for (final element in transTypes) {
+      if (element.Code == "OFFLOAD") {
+        element.Amountedited = amount;
+        element.eAmount.text = amount.toString();
+        element.Checked = true;
+        break;
+      }
+    }
+  }
+
+  update();
+}
+
 
   double? get_selected() {
     double dd = 0;
@@ -93,7 +92,7 @@ class TransTypeController extends GetxController {
         });
         Get.find<TransTypeController>().alltrantypes.clear();
 
-        print(tt.length);
+   
         Get.find<TransTypeController>().alltrantypes.value = tt.toList();
 
         Get.find<TransTypeController>()

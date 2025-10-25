@@ -13,6 +13,9 @@ class ReportController extends GetxController {
   RxList<TsummaryDetails> tsummarydetails = <TsummaryDetails>[].obs;
   RxList<Header> daystrans = <Header>[].obs;
   RxList<Header> daystrans1 = <Header>[].obs;
+
+  RxList<Header> daystranstoday = <Header>[].obs;
+  RxList<Header> daystranstoday1 = <Header>[].obs;
   @override
   void onInit() {
     super.onInit();
@@ -33,28 +36,82 @@ class ReportController extends GetxController {
     List<Header> list = [];
     final maps = await Get.find<db_Provider>()
         .gettransbydate(Header.columns, Header.table, date);
+
     if (maps.isNotEmpty) {
       list = maps.map((row) {
         return Header.fromMap_d2(row);
       }).toList();
     }
-    for (Header h in list) {
-      final maps = await db_Provider().getrectrans(tmatatu.Trans.columns,
-          tmatatu.Trans.tabletrans, h.Receipt_No.toString());
-      // List<tmatatu.Trans> tr = [];
-      if (maps.isNotEmpty) {
-        h.transtions = maps.map((row) {
-          return tmatatu.Trans.fromMap_t(row);
-        }).toList();
-      }
-      // h.transtions = tr;
+
+    List<tmatatu.Trans> listtrans = [];
+    final listmaps = await Get.find<db_Provider>()
+        .gettransdate(tmatatu.Trans.columns, tmatatu.Trans.tabletrans, date);
+    if (maps.isNotEmpty) {
+      listtrans = listmaps.map((row) {
+        return tmatatu.Trans.fromMap_t(row);
+      }).toList();
     }
+    // ✅ Group transactions by Receipt_No
+    final Map<String, List<tmatatu.Trans>> grouped = {};
+    for (final tr in listtrans) {
+      if (tr.OTTN != null) {
+        grouped.putIfAbsent(tr.OTTN!, () => []).add(tr);
+      }
+    }
+
+// ✅ Attach to each header
+    for (final h in list) {
+      print("Sent Status: ${h.sent}");
+      h.transtions = grouped[h.Receipt_No] ?? [];
+    }
+
     list.sort((a, b) => b.Receipt_No!.compareTo(a.Receipt_No.toString()));
+
     Get.find<ReportController>().daystrans.value = list;
     Get.find<ReportController>().daystrans1.value = list;
-    // Get.find<ReportController>().daystrans[0].transtions?.forEach((element) {
-    //   print(element.toString());
-    // });
+
+    return Future.value(null);
+  }
+
+  Future<List<Header>?> gettransbydatetoday(DateTime date) async {
+    Get.find<ReportController>().daystrans.clear();
+    List<Header> list = [];
+    final maps = await Get.find<db_Provider>()
+        .gettransbydate(Header.columns, Header.table, date);
+
+    if (maps.isNotEmpty) {
+      list = maps.map((row) {
+        return Header.fromMap_d2(row);
+      }).toList();
+    }
+
+    List<tmatatu.Trans> listtrans = [];
+    final listmaps = await Get.find<db_Provider>()
+        .gettransdate(tmatatu.Trans.columns, tmatatu.Trans.tabletrans, date);
+    if (maps.isNotEmpty) {
+      listtrans = listmaps.map((row) {
+        return tmatatu.Trans.fromMap_t(row);
+      }).toList();
+    }
+    // ✅ Group transactions by Receipt_No
+    final Map<String, List<tmatatu.Trans>> grouped = {};
+    for (final tr in listtrans) {
+      if (tr.OTTN != null) {
+        grouped.putIfAbsent(tr.OTTN!, () => []).add(tr);
+      }
+    }
+
+// ✅ Attach to each header
+    for (final h in list) {
+      print("Sent Status: ${h.sent}");
+      h.transtions = grouped[h.Receipt_No] ?? [];
+    }
+
+    list.sort((a, b) => b.Receipt_No!.compareTo(a.Receipt_No.toString()));
+
+    Get.find<ReportController>().daystranstoday.value = list;
+    Get.find<ReportController>().daystranstoday1.value = list;
+
     return Future.value(null);
   }
 }

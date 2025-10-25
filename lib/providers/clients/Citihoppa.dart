@@ -6,18 +6,19 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/Members.dart';
 import 'package:t_matatu/controllers/main.dart';
+import 'package:t_matatu/inspection/pages/bus_inspection_page.dart';
+import 'package:t_matatu/inspection/pages/crew_compliance_page.dart';
 import 'package:t_matatu/models/Header.dart';
 import 'package:t_matatu/models/Tamounts.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/Utils/util.dart';
 import 'package:t_matatu/models/accounttypes.dart';
 import 'package:t_matatu/models/summary/Tsummary.dart';
-import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/pages/Depot.dart';
 import 'package:t_matatu/pages/Fuel.dart';
-import 'package:t_matatu/pages/hires/hires_list.dart';
+import 'package:t_matatu/hires/hires_list.dart';
 import 'package:t_matatu/pages/pageloader.dart';
 import 'package:t_matatu/pages/vehicles/vehdetails.dart';
 import 'package:t_matatu/providers/client.dart';
@@ -31,9 +32,19 @@ enum Receipttype { Member, Crew, Both }
 
 class Cityhoppa extends  BaseClients {
 
-  Cityhoppa({clientName,clientName_line2,email,
-  telephone,street,address,city,
-  Box,Auto_Assign,Attach_crew}):super(
+  Cityhoppa({
+     clientName,
+     clientName_line2,
+     email,
+     telephone,
+    street,
+    address,
+    city,
+    Box,
+     Auto_Assign,
+     Attach_crew,
+     Crew_to_attach,
+  }) :super(
     clientName: clientName,
     clientName_line2: clientName_line2,
     email: email,
@@ -44,6 +55,7 @@ class Cityhoppa extends  BaseClients {
     Box: Box,
     Auto_Assign: Auto_Assign,
     Attach_crew: Attach_crew,
+    Crew_to_attach: Crew_to_attach,
   );
 
   @override
@@ -53,8 +65,8 @@ class Cityhoppa extends  BaseClients {
     }
     Tamounts().getttypesamounts();
     Account_Types().get_account_Types();
-    await Vehicles().Daily_Contributions(getdate());
-    await MainController().getvehiclecrew();
+     Vehicles().Daily_Contributions(getdate());
+     MainController().getvehiclecrew();
   }
 
   @override
@@ -79,13 +91,15 @@ class Cityhoppa extends  BaseClients {
     int? account_type = Get.find<MainController>().agent.value.Account_type;
     switch (account_type) {
       case 3:
-        ReportController().gettransbydate(DateTime.now());
-        Get.find<ReportController>().selectedDate?.value = DateTime.now();
+        
+       
         DepotFuel().getNRODefects();
         DepotFuel().getdata(Get.find<ReportController>().selectedDate!.value);
         return const TwoTabScreen(); // Use the TwoTabScreen for account_type 3
-      default:
-        return GetBuilder<VehiclesController>(
+      default: 
+      Get.find<ReportController>().selectedDate?.value = DateTime.now();
+       
+       return GetBuilder<VehiclesController>(
           builder: (controller) {
             if (controller.vehdailycollections.isEmpty) {
               return const Center(child: CircularProgressIndicator());
@@ -93,8 +107,13 @@ class Cityhoppa extends  BaseClients {
             return Column(
               children: [
                 _buildSearchField(controller),
-                Expanded(child: _buildVehicleList(controller)),
-                _buildSummaryCard(controller),
+              Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () => controller.refreshDailyCollections(),
+                    child: Obx(() => _buildVehicleList(controller)),
+                  ),
+                ),
+                Obx(() => _buildSummaryCard(controller)),
               ],
             );
           },
@@ -116,6 +135,7 @@ class Cityhoppa extends  BaseClients {
 
   Widget _buildVehicleList(VehiclesController controller) {
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: controller.vehdailycollections.length,
       itemBuilder: (context, index) {
         final vehicle = controller.vehdailycollections[index];
@@ -929,7 +949,20 @@ class Cityhoppa extends  BaseClients {
           Get.to(() => PageLoader(page: HiresListScreen(), title: "Hires"));
         },
         title: const Text("Hires"),
+      ),ListTile(
+        leading: const Icon(Icons.summarize),
+        onTap: () {
+          Get.to(() => PageLoader(page: BusInspectionPage(), title: "Inspection"));
+        },
+        title: const Text("Inspection"),
       ),
+        ListTile(
+              leading: const Icon(Icons.verified_user),
+              onTap: () {
+                Get.to(() => const CrewCompliancePage());
+              },
+              title: const Text('Crew Compliance'),
+            ),
     ]);
   }
 
@@ -942,3 +975,4 @@ bool? Attach_crew = true;
     return 18.0; // Default title font size, adjust as needed
   }
 }
+

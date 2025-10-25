@@ -29,9 +29,7 @@ class MyAppLifecycleObserver extends WidgetsBindingObserver {
 
 class start {
   start(AppConfig clientId) {
-
-  
-        init().then((value) { 
+ init().then((value) { 
     Get.find<MainController>().config?.value = clientId;
     AppConfig().init(clientId);
 

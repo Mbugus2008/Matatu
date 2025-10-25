@@ -40,11 +40,12 @@ class HeaderController extends GetxController {
   String displayStringForOption(InputSuggetions option) =>
       option.Vehicle.toString();
   final filteredSuggestions = <InputSuggetions>[].obs;
-  
+
   void createheader() {
     Agent().getagents();
     Get.find<HeaderController>().currHeader.value = Header();
-    Get.find<HeaderController>().currHeader.value.Date =getdates(Get.find<SettingsController>().settings.value!.WorkingDate) ;
+    Get.find<HeaderController>().currHeader.value.Date =
+        getdates(Get.find<SettingsController>().settings.value!.WorkingDate);
     Get.find<HeaderController>().currHeader.value.Receipt_No =
         DateTime.now().microsecondsSinceEpoch.toString();
     Get.find<HeaderController>().currHeader.value.Agent =
@@ -54,7 +55,7 @@ class HeaderController extends GetxController {
 
     TsummaryDetails().getall();
     Tsummary().getall();
-    ReportController().gettransbydate(DateTime.now());
+    ReportController().gettransbydatetoday(DateTime.now());
 
     // DateTime(year, month, day);
   }
@@ -203,36 +204,35 @@ class HeaderController extends GetxController {
   }
 
   Future<void> reverse(Header header) async {
+    //   final app = await Get.find<db_Provider>().getdata(
+    //       Reversal.table, Reversal.columns, '${Reversal.col_Receipt_No}=?', [header.Receipt_No.toString()]);
+    //   if (app.length>0)
 
-  //   final app = await Get.find<db_Provider>().getdata(
-  //       Reversal.table, Reversal.columns, '${Reversal.col_Receipt_No}=?', [header.Receipt_No.toString()]);
-  //   if (app.length>0)
+    // { Get.snackbar(
+    //   'Reversal',
+    //   'Reversal Request Exist',
+    //   backgroundColor: Colors.red, // Customize the background color
+    //   duration: const Duration(
+    //       seconds: 3), // Set the duration the snackbar is displayed
+    //   snackPosition:
+    //   SnackPosition.BOTTOM, // Set the position of the snackbar
+    // );}
 
-  // { Get.snackbar(
-  //   'Reversal',
-  //   'Reversal Request Exist',
-  //   backgroundColor: Colors.red, // Customize the background color
-  //   duration: const Duration(
-  //       seconds: 3), // Set the duration the snackbar is displayed
-  //   snackPosition:
-  //   SnackPosition.BOTTOM, // Set the position of the snackbar
-  // );}
+    //   Reversal reversal = Reversal();
+    //   reversal.Account = header.Account;
+    //   reversal.Receipt_No = header.Receipt_No;
+    //   reversal.Agent = header.Agent;
+    //   reversal.Date = DateTime.now();
+    //   reversal.Transction_Date = header.Date;
+    //   reversal.Created_By = Get.find<MainController>().agent.value.Agent_Code;
+    //   reversal.Total_Amount = header.Total_Amount;
+    //   reversal.Total_Trans = header.Trans;
+    //   reversal.Vehicle = header.Vehicle;
+    //   reversal.Sent = false;
+    //   reversal.Status = STatus.Open;
 
-  //   Reversal reversal = Reversal();
-  //   reversal.Account = header.Account;
-  //   reversal.Receipt_No = header.Receipt_No;
-  //   reversal.Agent = header.Agent;
-  //   reversal.Date = DateTime.now();
-  //   reversal.Transction_Date = header.Date;
-  //   reversal.Created_By = Get.find<MainController>().agent.value.Agent_Code;
-  //   reversal.Total_Amount = header.Total_Amount;
-  //   reversal.Total_Trans = header.Trans;
-  //   reversal.Vehicle = header.Vehicle;
-  //   reversal.Sent = false;
-  //   reversal.Status = STatus.Open;
-
-  //   await Get.find<db_Provider>().insert(Reversal.table, reversal);
-  //   Reversal().uploadreversal();
+    //   await Get.find<db_Provider>().insert(Reversal.table, reversal);
+    //   Reversal().uploadreversal();
 
     final rev = header.copyWith(
       Key: header.Key,
