@@ -63,7 +63,9 @@ class _ReceiptState extends State<Receipt> {
     _amountFocusNode.dispose();
     _vehicleNoController.dispose();
     _commentsController.dispose(); // Added dispose for comments controller
-
+    _clearTransactionData();
+    // Clear vehicle transaction types
+    Get.find<TransTypeController>().vehicleTrantypes.clear();
     super.dispose();
   }
 
@@ -150,6 +152,7 @@ class _ReceiptState extends State<Receipt> {
     Get.find<HeaderController>().createheader();
     Get.find<MemberController>().clearcurrentvehicle();
     Get.find<MainController>().vehtrans.clear();
+    Get.find<TransTypeController>().vehicleTrantypes.clear();
   }
 
   @override
@@ -472,139 +475,188 @@ class _ReceiptState extends State<Receipt> {
   Widget _buildVehicleTransactionsList({bool expanded = false}) {
     return Padding(
       padding: const EdgeInsets.all(2.0),
-      child: GetBuilder<MainController>(
-        builder: (controller) {
-          final summary = controller.vehsummary;
-          if (summary.isEmpty) {
-            if (expanded) {
-              return const SizedBox.expand(
-                child: Center(
-                  child: Text('No vehicle transactions available'),
-                ),
-              );
-            }
-            return const SizedBox(
-              height: 160,
+      child: Obx(() {
+        final controller = Get.find<MainController>();
+        final transactions = controller.vehtrans;
+        if (transactions.isEmpty) {
+          if (expanded) {
+            return const SizedBox.expand(
               child: Center(
                 child: Text('No vehicle transactions available'),
               ),
             );
           }
-
-          final numberFormat = NumberFormat('#,##0.00');
-          final totalAmount = summary.fold<double>(
-            0.0,
-            (double sum, element) => sum + (element.Amount ?? 0),
-          );
-          final amountStyle = Get.find<VehiclesController>().summaryAmount();
-
-          final content = Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Colors.grey,
-                width: 1,
-              ),
-              borderRadius: BorderRadius.circular(10),
+          return const SizedBox(
+            height: 160,
+            child: Center(
+              child: Text('No vehicle transactions available'),
             ),
-            child: Column(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.blueGrey.withOpacity(0.05),
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(10)),
-                  ),
-                  child: Row(
-                    children: const [
-                      Expanded(
-                        child: Text(
-                          'Type',
-                          style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      Text(
-                        'Amount',
+          );
+        }
+
+        final numberFormat = NumberFormat('#,##0.00');
+        final totalAmount = transactions.fold<double>(
+          0.0,
+          (double sum, element) => sum + (element.Amount ?? 0),
+        );
+        final amountStyle = Get.find<VehiclesController>().summaryAmount();
+
+        // Group transactions by Agent Code
+        final Map<String, List<tMatatu.Trans>> groupedByAgent = {};
+        for (final tr in transactions) {
+          final agentCode = tr.Agent_Code?.toString() ?? 'Unknown';
+          groupedByAgent.putIfAbsent(agentCode, () => []).add(tr);
+        }
+
+        final content = Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Colors.grey,
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.withOpacity(0.05),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(10)),
+                ),
+                child: Row(
+                  children: const [
+                    Expanded(
+                      child: Text(
+                        'Type',
                         style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w600),
                       ),
-                    ],
-                  ),
+                    ),
+                    SizedBox(width: 16),
+                    Text(
+                      'Amount',
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: summary.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      final tr = summary[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                tr.Type?.toString() ?? '',
-                                style: const TextStyle(fontSize: 14),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: groupedByAgent.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final agentCode = groupedByAgent.keys.elementAt(index);
+                    final agentTransactions = groupedByAgent[agentCode]!;
+                    final agentTotal = agentTransactions.fold<double>(
+                      0.0,
+                      (sum, tr) => sum + (tr.Amount ?? 0),
+                    );
+
+                    // Group agent's transactions by Type
+                    final Map<String, double> typeAmounts = {};
+                    for (final tr in agentTransactions) {
+                      final type = tr.Description ?? tr.Type ?? 'Unknown';
+                      typeAmounts[type] =
+                          (typeAmounts[type] ?? 0) + (tr.Amount ?? 0);
+                    }
+
+                    return ExpansionTile(
+                      initiallyExpanded: false,
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Agent: $agentCode',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blueGrey,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Text(
-                              numberFormat.format(tr.Amount ?? 0),
-                              style: amountStyle,
-                              textAlign: TextAlign.right,
+                          ),
+                          Text(
+                            numberFormat.format(agentTotal),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: agentTotal >= 0
+                                  ? Colors.green[700]
+                                  : Colors.red[700],
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                  ),
-                ),
-                const Divider(height: 1),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: const BoxDecoration(
-                    borderRadius:
-                        BorderRadius.vertical(bottom: Radius.circular(10)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Total',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.bold),
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      Text(
-                        numberFormat.format(totalAmount),
-                        style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.right,
-                      ),
-                    ],
-                  ),
+                      children: typeAmounts.entries.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 32, vertical: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  entry.key,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Text(
+                                numberFormat.format(entry.value),
+                                style: amountStyle,
+                                textAlign: TextAlign.right,
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
                 ),
-              ],
-            ),
-          );
+              ),
+              const Divider(height: 1),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: const BoxDecoration(
+                  borderRadius:
+                      BorderRadius.vertical(bottom: Radius.circular(10)),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Total',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      numberFormat.format(totalAmount),
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
 
-          if (expanded) {
-            return content;
-          }
+        if (expanded) {
+          return content;
+        }
 
-          return SizedBox(
-            height: 320,
-            child: content,
-          );
-        },
-      ),
+        return SizedBox(
+          height: 320,
+          child: content,
+        );
+      }),
     );
   }
 
@@ -654,31 +706,36 @@ class _ReceiptState extends State<Receipt> {
   }
 
   Widget _buildTransactionTypeDropdown() {
-    return GetBuilder<TransTypeController>(
-      builder: (controller) {
-        final ttypes = List.from(controller.alltrantypes);
-        if (ttypes.firstWhereOrNull((e) => e.Code == " ") == null) {
-          ttypes.insert(0, TranTypes(Order: -1, Code: " "));
-        }
+    final controller = Get.find<TransTypeController>();
+    return Obx(() {
+      // Use vehicleTrantypes if available, otherwise fallback to alltrantypes
+      final sourceList = controller.vehicleTrantypes.isNotEmpty
+          ? controller.vehicleTrantypes
+          : controller.alltrantypes;
+      final ttypes = List<TranTypes>.from(sourceList);
 
-        return DropdownButtonFormField<TranTypes>(
-          onChanged: (newValue) => _handleTransactionTypeChange(newValue),
-          items: ttypes
-              .map((value) => DropdownMenuItem<TranTypes>(
-                    value: value,
-                    child: SizedBox(
-                      child: Text(
-                        value.Order! >= 0
-                            ? '${value.Name} (${value.VehicleAmount})'
-                            : value.Name ?? "",
-                        style: const TextStyle(fontSize: 14),
-                      ),
+      if (ttypes.firstWhereOrNull((e) => e.Code == " ") == null) {
+        ttypes.insert(0, TranTypes(Order: -1, Code: " "));
+      }
+
+      return DropdownButtonFormField<TranTypes>(
+        key: ValueKey(sourceList.length), // Force rebuild when list changes
+        onChanged: (newValue) => _handleTransactionTypeChange(newValue),
+        items: ttypes
+            .map((value) => DropdownMenuItem<TranTypes>(
+                  value: value,
+                  child: SizedBox(
+                    child: Text(
+                      value.Order! >= 0
+                          ? '${value.Name} (${value.VehicleAmount})'
+                          : value.Name ?? "",
+                      style: const TextStyle(fontSize: 14),
                     ),
-                  ))
-              .toList(),
-        );
-      },
-    );
+                  ),
+                ))
+            .toList(),
+      );
+    });
   }
 
   void _handleTransactionTypeChange(TranTypes? newValue) {

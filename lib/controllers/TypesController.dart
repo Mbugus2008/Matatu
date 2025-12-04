@@ -23,45 +23,44 @@ class TransTypeController extends GetxController {
   }
 
   void distribute(double amount) {
-  final transTypes = Get.find<TransTypeController>().vehicleTrantypes;
+    final transTypes = Get.find<TransTypeController>().vehicleTrantypes;
 
-  // Reset all
-  for (final element in transTypes) {
-    if (element.Name != null) {
-      element.Amountedited = 0;
-      element.Checked = false;
-    }
-  }
-
-  // Distribute amount
-  for (final element in transTypes) {
-    if (element.Name == null) continue;
-    final bal = (element.VehicleAmount ?? 0) - (element.Amounttoday ?? 0);
-    if (bal > 0 && amount > 0) {
-      final assign = (amount > bal) ? bal : amount;
-      element.Amountedited = assign;
-      element.eAmount.text = assign.toString();
-      element.Checked = true;
-      amount -= assign;
-      if (amount <= 0) break; // stop early
-    }
-  }
-
-  // Assign leftover to OFFLOAD
-  if (amount > 0) {
+    // Reset all
     for (final element in transTypes) {
-      if (element.Code == "OFFLOAD") {
-        element.Amountedited = amount;
-        element.eAmount.text = amount.toString();
-        element.Checked = true;
-        break;
+      if (element.Name != null) {
+        element.Amountedited = 0;
+        element.Checked = false;
       }
     }
+
+    // Distribute amount
+    for (final element in transTypes) {
+      if (element.Name == null) continue;
+      final bal = (element.VehicleAmount ?? 0) - (element.Amounttoday ?? 0);
+      if (bal > 0 && amount > 0) {
+        final assign = (amount > bal) ? bal : amount;
+        element.Amountedited = assign;
+        element.eAmount.text = assign.toString();
+        element.Checked = true;
+        amount -= assign;
+        if (amount <= 0) break; // stop early
+      }
+    }
+
+    // Assign leftover to OFFLOAD
+    if (amount > 0) {
+      for (final element in transTypes) {
+        if (element.Code == "OFFLOAD") {
+          element.Amountedited = amount;
+          element.eAmount.text = amount.toString();
+          element.Checked = true;
+          break;
+        }
+      }
+    }
+
+    update();
   }
-
-  update();
-}
-
 
   double? get_selected() {
     double dd = 0;
@@ -92,7 +91,6 @@ class TransTypeController extends GetxController {
         });
         Get.find<TransTypeController>().alltrantypes.clear();
 
-   
         Get.find<TransTypeController>().alltrantypes.value = tt.toList();
 
         Get.find<TransTypeController>()

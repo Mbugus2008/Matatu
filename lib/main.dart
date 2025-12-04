@@ -6,12 +6,10 @@ import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/init.dart';
-import 'package:t_matatu/pages/edit_phone.dart';
 import 'package:t_matatu/pages/login.dart';
 import 'package:t_matatu/providers/AppConfig.dart';
 import 'package:t_matatu/providers/colors.dart';
 import 'package:t_matatu/utils/updater.dart';
-
 
 const simplePeriodicTask =
     "be.tramckrijte.workmanagerExample.simplePeriodicTask";
@@ -29,19 +27,21 @@ class MyAppLifecycleObserver extends WidgetsBindingObserver {
 
 class start {
   start(AppConfig clientId) {
- init().then((value) { 
-    Get.find<MainController>().config?.value = clientId;
-    AppConfig().init(clientId);
+    init().then((value) {
+      Get.find<MainController>().config?.value = clientId;
+      AppConfig().init(clientId);
 
-   
-   
-    Get.find<MainController>()
-        .CurrentClient
-        ?.value
-        .init(); //Inistialize client dependent processeses
+      Get.find<MainController>()
+          .CurrentClient
+          ?.value
+          .init(); //Inistialize client dependent processeses
 
-    
       initializedata();
+
+      // After app starts, check for updates (silent - don't show "up to date")
+      Future.delayed(const Duration(seconds: 3), () {
+        Get.find<UpdateController>().checkForUpdate(showUpToDate: false);
+      });
 
       // Workmanager().initialize(
       //   callbackDispatcher,
@@ -58,7 +58,6 @@ class start {
   }
 
   Future<void> initiate() async {
-    
     if (Platform.isAndroid) {
       [
         Permission.location,
@@ -66,12 +65,11 @@ class start {
         Permission.bluetooth,
         Permission.bluetoothConnect,
         Permission.bluetoothScan,
-       
       ].request().then((status) async {
         await init().then((value) {
           initializedata();
-   // After app starts, check for updates
-     
+          // After app starts, check for updates
+
           // Workmanager().initialize(
           //   callbackDispatcher,
           //   isInDebugMode: true,
@@ -105,9 +103,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: AppColors.backgroundColor,
       ),
       home: const Login(),
-      getPages: [
-       
-      ],
+      getPages: [],
     );
   }
 }

@@ -5,8 +5,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/models/mappings.dart';
-import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 import 'package:t_matatu/providers/db.dart';
+import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 
 import '../network/Apis.dart';
 import '../network/Errors.dart';
@@ -202,8 +202,11 @@ $col_Amount  float
           if (results.Code == 0) {
             if (results.Contents != null) {
               Get.find<db_Provider>().batchdelete(TranTypes.table);
-              Get.find<db_Provider>().batchinsert(
-                  TranTypes.table, results.Contents as List<TranTypes>);
+              final filteredList = (results.Contents as List<TranTypes>)
+                  .where((item) => item.Name != null)
+                  .toList();
+              Get.find<db_Provider>()
+                  .batchinsert(TranTypes.table, filteredList);
               // for (TranTypes element in results.Contents as List<TranTypes>) {
               //   db.insert(TranTypes.table, element);
               // }
@@ -253,4 +256,3 @@ $col_Amount  float
     );
   }
 }
-
