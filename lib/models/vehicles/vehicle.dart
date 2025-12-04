@@ -7,6 +7,7 @@ import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/models/mappings.dart';
 import 'package:t_matatu/models/member.dart';
 import 'package:t_matatu/providers/db.dart';
+import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import '../../network/Apis.dart';
 import '../../network/request.dart';
@@ -26,7 +27,7 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
   String? Fleet_No;
   double? Offload = 0;
   double? Management = 0;
-  double get total => (Offload ?? 0) + (Management ?? 0);
+  double get total => (Cash ?? 0) + (Mpesa ?? 0);
   Member? Driver;
   Member? Conductor;
   double? Mpesa;
@@ -95,14 +96,18 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
           map['Start_Date'] != null ? map['Start_Date'] as String : null,
       Code: map['Code'] != null ? map['Code'] as String : null,
       Id_Number: map['Id_Number'] != null ? map['Id_Number'] as String : null,
-      Penalty: map['Penalty'] != null ? map['Penalty'] as double : null,
-      Parking: map['Parking'] != null ? map['Parking'] as double : null,
+      Penalty:
+          map['Penalty'] != null ? (map['Penalty'] as num).toDouble() : null,
+      Parking:
+          map['Parking'] != null ? (map['Parking'] as num).toDouble() : null,
       Fleet_No: map['Fleet_No'] != null ? map['Fleet_No'] as String : null,
-      Offload: map['Offload'] != null ? map['Offload'] as double : null,
-      Management:
-          map['Management'] != null ? map['Management'] as double : null,
-      Mpesa: map['Mpesa'] != null ? map['Mpesa'] as double : null,
-      Cash: map['Cash'] != null ? map['Cash'] as double : null,
+      Offload:
+          map['Offload'] != null ? (map['Offload'] as num).toDouble() : null,
+      Management: map['Management'] != null
+          ? (map['Management'] as num).toDouble()
+          : null,
+      Mpesa: map['Mpesa'] != null ? (map['Mpesa'] as num).toDouble() : null,
+      Cash: map['Cash'] != null ? (map['Cash'] as num).toDouble() : null,
     );
   }
   @override
@@ -110,6 +115,9 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
     return '$Code $Vehicle_Number $Fleet_No $Vehicle_Type ';
   }
 
+  String toString2() {
+    return '$Fleet_No $Vehicle_Type ';
+  }
   String toJson() => json.encode(toMap());
 
   factory Vehicles.fromJson(String source) =>
@@ -145,12 +153,8 @@ $col_Id_Number	text
  )
 ''';
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
-
-    update.add(DbUpdate(version: 3, updates: []));
-
-    return update;
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
   }
 
   @override
@@ -165,9 +169,11 @@ $col_Id_Number	text
       Daily_Contribution: map['Daily_Contribution'] != null
           ? (map['Daily_Contribution'] as num).toDouble()
           : null,
-      Offload: map['Offload'] != null ? map['Offload'] as double : null,
-      Management:
-          map['Management'] != null ? map['Management'] as double : null,
+      Offload:
+          map['Offload'] != null ? (map['Offload'] as num).toDouble() : null,
+      Management: map['Management'] != null
+          ? (map['Management'] as num).toDouble()
+          : null,
       Start_Date:
           map['Start_Date'] != null ? map['Start_Date'] as String : null,
       Code: map['Code'] != null ? map['Code'] as String : null,
@@ -190,36 +196,62 @@ $col_Id_Number	text
   }
 
   Future<List<Vehicles>> Daily_Contributions(DateTime date) async {
-    var request = Request(date: date);
-    ApiClient().postdata("Dailytrans", request.toJson()).then((r) async {
+    bool hasData = true;
+    String? bookmark;
+    int size = 50;
+    List<Vehicles> allVehicles = [];
+
+    while (hasData) {
+      final request = Request(date: date, bookmark: bookmark, size: size);
+      final r = await ApiClient().postdata("Dailytrans", request.toJson());
+
       if (r.statusCode == 200) {
-        Results<Vehicles> results =
-            Results<Vehicles>.fromJson(r.body, Vehicles.fromMap);
-        if (results.Code == 0) {
-          if (results.Contents != null) {
-            Get.find<VehiclesController>().vehdailycollections.value =
-                (results.Contents as List<Vehicles>)
-                  ..sort((a, b) => a.Fleet_No!.compareTo(b.Fleet_No as String));
-            Get.find<VehiclesController>().vehdailycollectionsf.value =
-                (results.Contents as List<Vehicles>)
-                  ..sort((a, b) => a.Fleet_No!.compareTo(b.Fleet_No as String));
-            return results.Contents as List<Vehicles>;
+        final results = Results<Vehicles>.fromJson(r.body, Vehicles.fromMap);
+
+        if (results.Code == 0 &&
+            results.Contents != null &&
+            results.Contents!.isNotEmpty) {
+          // Add to accumulated list
+          allVehicles.addAll(results.Contents!);
+
+          // Sort latest contents if needed
+          final sortedList = List<Vehicles>.from(allVehicles)
+            ..sort((a, b) => (a.Fleet_No ?? "").compareTo(b.Fleet_No ?? ""));
+
+          Get.find<VehiclesController>().vehdailycollections.value = sortedList;
+          Get.find<VehiclesController>().vehdailycollectionsf.value =
+              sortedList;
+
+          // Update bookmark for next request
+          bookmark = results.Contents!.last.Key;
+        } else {
+          // Handle timeout or empty
+          if (results.Desc == 'The operation has timed out') {
+            size = (size / 2).round().clamp(1, size); // avoid size=0
           }
+          hasData = false;
         }
+      } else {
+        hasData = false;
       }
-    });
-    return [];
-  }Future<List<tmatatu.Trans>> Daily_Veh_Contributions(DateTime date,String? vehicle) async {
-    var request = Request(date: date,vehicle: vehicle );
+    }
+
+    return allVehicles;
+  }
+
+  Future<List<tmatatu.Trans>> Daily_Veh_Contributions(
+      DateTime date, String? vehicle) async {
+    var request = Request(date: date, vehicle: vehicle);
     ApiClient().postdata("getvehicletrans", request.toJson()).then((r) async {
       if (r.statusCode == 200) {
         Results<tmatatu.Trans> results =
-        Results<tmatatu.Trans>.fromJson(r.body, tmatatu.Trans.fromMap);
+            Results<tmatatu.Trans>.fromJson(r.body, tmatatu.Trans.fromMap);
         if (results.Code == 0) {
           if (results.Contents != null) {
             Get.find<VehiclesController>().vehcollections.value =
-            (results.Contents as List<tmatatu.Trans>)
-              ..sort((a, b) => a.Transaction_Time!.compareTo(b.Transaction_Time as DateTime));
+                (results.Contents as List<tmatatu.Trans>)
+                  ..sort((a, b) => a.Transaction_Time!
+                      .compareTo(b.Transaction_Time as DateTime));
 
             return results.Contents as List<tmatatu.Trans>;
           }
@@ -228,10 +260,6 @@ $col_Id_Number	text
     });
     return [];
   }
-
-
-
-
 
   Future<void> getvehicles() async {
     bool hasdata = true;
@@ -247,8 +275,18 @@ $col_Id_Number	text
             if (results.Contents != null) {
               hasdata = results.Contents!.isNotEmpty;
               if (results.Contents!.isNotEmpty) {
+                final db = await Get.find<db_Provider>().database;
+                await db.delete(
+                  Vehicles.table,
+                  where: "Vehicle_Number IS NULL OR TRIM(Vehicle_Number) = ''",
+                );
                 Get.find<db_Provider>().batchinsert(
-                    Vehicles.table, results.Contents as List<Vehicles>);
+                    Vehicles.table,
+                    (results.Contents as List<Vehicles>)
+                        .where((v) =>
+                            v.Vehicle_Number != null &&
+                            v.Vehicle_Number!.trim().isNotEmpty)
+                        .toList());
                 bookmark = results.Contents!.last.Key;
                 request = Request(body: null, bookmark: bookmark, size: size);
               }

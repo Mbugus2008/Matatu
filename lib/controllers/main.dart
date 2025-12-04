@@ -46,7 +46,7 @@ class MainController extends GetxController {
     isLoading.value = true;
     try {
       // Refresh your data here
-      await Vehicles().Daily_Contributions(DateTime.now());
+   
       await fetchVehicleTransactions();
       // Add any other data refresh logic you need
     } catch (e) {

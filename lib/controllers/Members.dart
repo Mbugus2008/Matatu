@@ -1,10 +1,10 @@
 import 'package:get/get.dart';
 import 'package:t_matatu/init.dart';
 import 'package:t_matatu/providers/db.dart';
-import 'package:t_matatu/controllers/vehicles/vehicles.dart';  // Add this import
+import 'package:t_matatu/controllers/vehicles/vehicles.dart'; // Add this import
 
 import '../models/member.dart';
-import '../models/vehicles/vehicle.dart';  // Add this import
+import '../models/vehicles/vehicle.dart'; // Add this import
 import '../network/Apis.dart';
 import '../network/results/results.dart';
 import 'header.dart';
@@ -46,7 +46,7 @@ class MemberController extends GetxController {
 
   getcurrentcrew(String vehicle) {
     clearcurrentvehicle();
-    print(Get.find<MemberController>().allMembers.length);
+
     Get.find<MemberController>().currentcrew.value =
         Get.find<MemberController>()
             .allMembers
@@ -71,22 +71,29 @@ class MemberController extends GetxController {
     }
     update();
   }
-  clearcrew(String vehicle) async {
+
+  clearCrew(String vehicle) async {
+    // 1. Update database
     await db_Provider().updatedata(
       Member.table,
       {Member.col_Vehicle: null},
       '${Member.col_Vehicle} = ?',
       [vehicle],
     );
-    Get.find<MemberController>()
-        .allMembers
-        .where((m) => m.Vehicle == (vehicle))
-        .forEach((m) {
-      // Update the value
-      Get.find<MemberController>()
-          .allMembers[Get.find<MemberController>().allMembers.indexOf(m)]
-          .Vehicle = '';
-    });
+
+    // 2. Update in-memory list
+    final controller = Get.find<MemberController>();
+    for (var m in controller.allMembers.where((m) => m.Vehicle == vehicle)) {
+      m.Vehicle = null; // use null consistently instead of ''
+      m.Loans = 0;
+       updateremotecrew(m);
+    }
+    for (var m in controller.Crews.where((m) => m.Vehicle == vehicle)) {
+      m.Vehicle = null; // use null consistently instead of ''
+      m.Loans = 0;
+      updateremotecrew(m);
+    }
+    // 3. Refresh UI
     update();
   }
 
@@ -108,7 +115,7 @@ class MemberController extends GetxController {
       Get.find<MemberController>()
           .allMembers[Get.find<MemberController>().allMembers.indexOf(m)]
           .Crew_Type = crew_type;
-          m.Loans = 0;  
+      m.Loans = 0;
       updateremotecrew(m);
     });
     update();
@@ -128,6 +135,7 @@ class MemberController extends GetxController {
       }
     });
   }
+
   Future<void> updatephone(Member member) async {
     member.Loans = 0;
     ApiClient().postdata("updatephone", member.toJson()).then((r) async {
@@ -138,13 +146,13 @@ class MemberController extends GetxController {
           if (results.Contents != null) {
             showToast('Updated successfully');
           }
-            final h = results.Contents;
-            if (h?.Key != null) {}
-          
+          final h = results.Contents;
+          if (h?.Key != null) {}
         }
       }
     });
   }
+
   Future<List<Suggestion>> getVehicleSuggestions(String pattern) async {
     List<Suggestion> suggestions = [];
 
@@ -155,35 +163,37 @@ class MemberController extends GetxController {
     }
     var matchingVehicles = vehiclesController.allVehicles
         .where((vehicle) =>
-          vehicle.toString().toLowerCase().contains(pattern.toLowerCase()) ?? false)
+            vehicle.toString().toLowerCase().contains(pattern.toLowerCase()) ??
+            false)
         .toList();
 
     suggestions.addAll(matchingVehicles.map((vehicle) => Suggestion(
-      id: vehicle.Fleet_No ?? '',
-      account: vehicle.Code ?? '',
-      displayText:  vehicle.Vehicle_Number ?? '',
-      details: vehicle_type_desc.desc[vehicle.Vehicle_Type] ?? '',
-      isVehicle: true,
-      customerPostingGroup: 'Vehicle',
-      crewType: null,
-    )));
+          id: vehicle.Fleet_No ?? '',
+          account: vehicle.Code ?? '',
+          displayText: vehicle.Vehicle_Number ?? '',
+          details: vehicle_type_desc.desc[vehicle.Vehicle_Type] ?? '',
+          isVehicle: true,
+          customerPostingGroup: 'Vehicle',
+          crewType: null,
+        )));
 
     // Get member suggestions
     var matchingMembers = allMembers
-        .where((member) => 
-          member.toString().toLowerCase().contains(pattern.toLowerCase()) ?? false )
+        .where((member) =>
+            member.toString().toLowerCase().contains(pattern.toLowerCase()) ??
+            false)
         .toList();
-    
+
     suggestions.addAll(matchingMembers.map((member) => Suggestion(
-      id: member.No ?? '',
-      account: member.No ?? '',
-      displayText: member.No ?? '',
-      details: member.Name ?? '',
-      isVehicle: false,
-      customerPostingGroup: member.Customer_Posting_Group ?? 'Unknown',
-      crewType: member.Crew_Type,
-      loan: member.Loans ?? 0,
-    )));
+          id: member.No ?? '',
+          account: member.No ?? '',
+          displayText: member.No ?? '',
+          details: member.Name ?? '',
+          isVehicle: false,
+          customerPostingGroup: member.Customer_Posting_Group ?? 'Unknown',
+          crewType: member.Crew_Type,
+          loan: member.Loans ?? 0,
+        )));
 
     // Sort suggestions to ensure vehicles appear first
     suggestions.sort((a, b) => a.isVehicle ? -1 : 1);
@@ -198,12 +208,11 @@ class VehicleSuggestion {
   final String fleetNo;
   final String vehicleType;
 
-  VehicleSuggestion({
-    required this.vehicle,
-    required this.vehicleNumber,
-    required this.fleetNo,
-    required this.vehicleType
-  });
+  VehicleSuggestion(
+      {required this.vehicle,
+      required this.vehicleNumber,
+      required this.fleetNo,
+      required this.vehicleType});
 
   @override
   bool operator ==(Object other) =>
@@ -255,7 +264,9 @@ class Suggestion {
 
   @override
   String toString() {
-    String crewTypeStr = crewType != null ? ', Crew Type: ${crewType.toString().split('.').last}' : '';
+    String crewTypeStr = crewType != null
+        ? ', Crew Type: ${crewType.toString().split('.').last}'
+        : '';
     return '$displayText - $details - Group: $customerPostingGroup$crewTypeStr';
   }
 }

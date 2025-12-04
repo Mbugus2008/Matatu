@@ -10,9 +10,11 @@ import 'package:t_matatu/pages/widgets/receiptsReport.dart';
 import 'package:t_matatu/pages/widgets/searchreceipts.dart';
 // ignore: unused_import
 import 'package:t_matatu/reports/receipts.dart';
+
 import '../models/Header.dart';
 import '../models/summary/Tsummary.dart';
-enum CrewToattach{Both,Driver,Condutor} 
+
+enum CrewToattach { Both, Driver, Condutor }
 
 class BaseClients {
   BaseClients({
@@ -27,9 +29,9 @@ class BaseClients {
     this.Auto_Assign,
     this.Attach_crew,
     this.Crew_to_attach,
-     this.Show_comments,
+    this.Show_comments,
   });
-  factory BaseClients.fromMap(Map<String, dynamic> map){
+  factory BaseClients.fromMap(Map<String, dynamic> map) {
     return BaseClients(
       clientName: map['clientName'],
       clientName_line2: map['clientName_line2'],
@@ -58,53 +60,57 @@ class BaseClients {
   String v_description(Header header) {
     return '${header.Vehicle ?? ''}';
   }
+
   bool? Auto_Assign;
   bool? Show_comments = false;
   //Future<void> init();
   Future<void> init() async {}
   //GroupBox? clientMenu();
-   GroupBox? clientMenu() {
+  GroupBox? clientMenu() {
     return null;
   }
+
   bool? Attach_crew = false;
   CrewToattach? Crew_to_attach = CrewToattach.Both;
 
-  Widget homelist(){
-  return  Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisAlignment: MainAxisAlignment.start,
-    children: [
- searchReceipt(),
-  receiptReport()
-    ]);
- }
+  Widget homelist() {
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          searchReceiptToday(),
+          receiptReporttoday(),
+        ]);
+  }
+
   AppBar? appBar() {
     return AppBar(
       title: Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    Text(
-      Get.find<MainController>().CurrentClient?.value.clientName ?? '',
-      style: TextStyle(
-        fontSize: GetTitleFontSize(Get.find<MainController>()
-                .CurrentClient
-                ?.value
-                .clientName
-                ?.length ??
-            0),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            Get.find<MainController>().CurrentClient?.value.clientName ?? '',
+            style: TextStyle(
+              fontSize: GetTitleFontSize(Get.find<MainController>()
+                      .CurrentClient
+                      ?.value
+                      .clientName
+                      ?.length ??
+                  0),
+            ),
+          ),
+          Text(
+            'Balance: ${NumberFormat('#,##0.00', 'en_US').format(Get.find<MainController>().agent.value.Account_Balance ?? 0)}', // Customize this text
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold, // Smaller than main title
+            ),
+          ),
+        ],
       ),
-    ),
-    Text(
-    'Balance: ${Get.find<MainController>().agent .value.Account_Balance.toString()}', // Customize this text
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.bold,// Smaller than main title
-      ),
-    ),
-  ],
-),
     );
   }
+
   Future<List<int>> printReceipt(Header header) async {
     List<int> bytes = [];
 
@@ -112,11 +118,12 @@ class BaseClients {
 
     return Future.value(bytes);
   }
+
   Future<List<int>> getHeader() async {
     List<int> bytes = [];
     CapabilityProfile profile = await CapabilityProfile.load();
     final generator = Generator(PaperSize.mm58, profile);
-    
+
     bytes += generator.text(
       clientName!,
       styles: const PosStyles(
@@ -126,60 +133,67 @@ class BaseClients {
       ),
     );
     if (clientName_line2!.isNotEmpty) {
-    bytes += generator.text(
-      clientName_line2!,
-      styles: const PosStyles(
-        align: PosAlign.center,
-        height: PosTextSize.size2,
-        width: PosTextSize.size1,
-      ),
-    );
+      bytes += generator.text(
+        clientName_line2!,
+        styles: const PosStyles(
+          align: PosAlign.center,
+          height: PosTextSize.size2,
+          width: PosTextSize.size1,
+        ),
+      );
     }
     if (Box != null) {
-    bytes += generator.text(
-      Box!,
-      styles: const PosStyles(
-        align: PosAlign.center,
-      ),
-    );
+      bytes += generator.text(
+        Box!,
+        styles: const PosStyles(
+          align: PosAlign.center,
+        ),
+      );
     }
     if (city != null) {
       bytes += generator.text(
-      city!,
-      styles: const PosStyles(
-        align: PosAlign.center,
-      ),
-    );
-    }  if (address != null) {
-    bytes += generator.text(
-      address!,
-      styles: const PosStyles(
-        align: PosAlign.center,
-      ),
-    );
-    } if (street != null) {
-      bytes += generator.text(
-      street!,
-      styles: const PosStyles(
-        align: PosAlign.center,
-      ),
-    );
-    } if (telephone != null) {
-      bytes += generator.text(telephone!,
+        city!,
         styles: const PosStyles(
           align: PosAlign.center,
         ),
-        );
-          } if (email != null) {
-      bytes += generator.text(email!,
-        styles: const PosStyles(
-          align: PosAlign.center,
-        ),
-        );
+      );
     }
-     bytes += generator.hr();
+    if (address != null) {
+      bytes += generator.text(
+        address!,
+        styles: const PosStyles(
+          align: PosAlign.center,
+        ),
+      );
+    }
+    if (street != null) {
+      bytes += generator.text(
+        street!,
+        styles: const PosStyles(
+          align: PosAlign.center,
+        ),
+      );
+    }
+    if (telephone != null) {
+      bytes += generator.text(
+        telephone!,
+        styles: const PosStyles(
+          align: PosAlign.center,
+        ),
+      );
+    }
+    if (email != null) {
+      bytes += generator.text(
+        email!,
+        styles: const PosStyles(
+          align: PosAlign.center,
+        ),
+      );
+    }
+    bytes += generator.hr();
     return bytes;
   }
+
   Future<List<int>> getTicket(Header header) async {
     List<int> bytes = [];
     CapabilityProfile profile = await CapabilityProfile.load();
@@ -243,14 +257,14 @@ class BaseClients {
             align: PosAlign.left,
           )),
       PosColumn(
-          text: "${ formattedDate2.format(header.Date!)} ${formattedTime.format(DateTime.fromMicrosecondsSinceEpoch(
-              int.tryParse(header.Receipt_No.toString())!))}",
+          text:
+              "${formattedDate2.format(header.Date!)} ${formattedTime.format(DateTime.fromMicrosecondsSinceEpoch(int.tryParse(header.Receipt_No.toString())!))}",
           width: 10,
           styles: const PosStyles(
             align: PosAlign.right,
           )),
     ]);
-   
+
     bytes += generator.hr();
     bytes += generator.row([
       PosColumn(
@@ -322,7 +336,7 @@ class BaseClients {
           )),
     ]);
 
-     bytes += generator.row([
+    bytes += generator.row([
       PosColumn(
           text: 'Printed on',
           width: 4,
@@ -330,7 +344,7 @@ class BaseClients {
             align: PosAlign.left,
           )),
       PosColumn(
-          text: printedon.format(DateTime.now()) ,
+          text: printedon.format(DateTime.now()),
           width: 8,
           styles: const PosStyles(
             align: PosAlign.right,
@@ -341,7 +355,8 @@ class BaseClients {
     bytes += generator.cut();
     return bytes;
   }
- // Future<List<int>> printReceipt(Header header);
+
+  // Future<List<int>> printReceipt(Header header);
   //Future<List<int>> getZreport(Tsummary summary);
   Future<List<int>> getZreport(Tsummary summary) async {
     // TODO: implement getZreport
@@ -461,8 +476,4 @@ class BaseClients {
     bytes += generator.cut();
     return bytes;
   }
-
-  
-  
-  
-  }
+}

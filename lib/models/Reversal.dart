@@ -12,6 +12,7 @@ import 'package:t_matatu/network/errors.dart';
 import 'package:t_matatu/network/request.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/providers/db.dart';
+import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 
 import '../controllers/header.dart';
 import '../init.dart';
@@ -215,10 +216,8 @@ class Reversal implements mapping, Tomaps, AbsDbUpdates {
  )
 ''';
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
-    update.add(DbUpdate(version: 11, updates: [createtable]));
-    return update;
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
   }
 
   @override
@@ -413,4 +412,5 @@ extension StatusDescription on STatus {
     }
   }
 }
+
 

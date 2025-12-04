@@ -1,35 +1,54 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:t_matatu/controllers/main.dart';
+import 'package:t_matatu/init.dart';
 import 'package:t_matatu/main.dart' as tmatatu;
 import 'package:t_matatu/providers/AppConfig.dart';
+import 'package:t_matatu/providers/client.dart';
+import 'package:t_matatu/providers/clients/Citihoppa.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  BaseClients client = Cityhoppa(
+      clientName: "City Hoppa Limited",
+      clientName_line2: "",
+      email: "info@citihoppa.co.ke",
+      telephone: "312058/9",
+      Crew_to_attach: CrewToattach.Both,
+      Auto_Assign: true,
+      Attach_crew: false);
+
+  AppConfig config = AppConfig(
+    apiBaseUrl: 'http://trimline.co.ke:4010/api/Matatu/',
+    updateUrl: 'https://trimline.co.ke/apps/CityHoppa/',
+    clientId: "CITYHOPPER",
+    clientName: "CityHoppa",
+    Client: client,
+    logo: 'assets/logo.png',
+  );
+
   if (Platform.isAndroid) {
-    [
+    await [
       Permission.location,
       Permission.storage,
       Permission.bluetooth,
       Permission.bluetoothConnect,
       Permission.bluetoothScan
-      
-    ].request().then((status) async {
-      
-      AppConfig config = AppConfig(
-       // apiBaseUrl: 'http://trimline.co.ke:4005/City/api/',
-        apiBaseUrl: 'http://trimline.co.ke:4010/api/Matatu/',
-        clientId: "CITYHOPPER",
-        clientName: "CityHoppa",
-        logo: 'assets/logo.png',
-      );
-
-      await tmatatu.start(config);
-       runApp(tmatatu.MyApp());
-    });
+    ].request();
   }
- 
+
+  // Initialize before running app
+  await init();
+  Get.find<MainController>().config?.value = config;
+  AppConfig().init(config);
+  Get.find<MainController>().CurrentClient?.value.init();
+  initializedata();
+
+  runApp(tmatatu.MyApp());
 }
 
 class MyApp extends StatelessWidget {

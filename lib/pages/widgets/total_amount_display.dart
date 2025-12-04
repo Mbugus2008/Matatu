@@ -17,7 +17,7 @@ class TotalAmountDisplay extends StatelessWidget {
           0.0, (sum, item) => sum + (item.Amount ?? 0));
   return Container(
           color: Colors.lightGreen.withOpacity(0.8),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 16),
           child: Row(
             children: [
               const Text(

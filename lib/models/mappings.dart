@@ -1,7 +1,7 @@
 // ignore_for_file: non_constant_identifier_names, camel_case_types
 
-abstract class mapping<T> {
-  T toMap_fortable();
+abstract class mapping {
+  Map<String, dynamic> toMap_fortable();
 }
 
 abstract class Tomaps<T> {

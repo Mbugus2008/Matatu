@@ -6,6 +6,7 @@ import 'package:t_matatu/init.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 
 import '../providers/db.dart';
+import '../providers/dbupdates.dart' as dbu;
 import 'Utils/util.dart';
 import 'mappings.dart';
 
@@ -26,8 +27,8 @@ class Header implements Tomaps, mapping, AbsDbUpdates {
   String? Agent;
   String? Crew;
   String? Crew2;
-    String? Comments;
- 
+  String? Comments;
+
   List<tmatatu.Trans>? transtions;
   Header({
     this.Key,
@@ -51,7 +52,7 @@ class Header implements Tomaps, mapping, AbsDbUpdates {
   });
   @override
   String toString() {
-    return '$Receipt_No $Account $Date $Vehicle $Fleet $Total_Amount $Agent';
+    return '$Receipt_No $Account $Date $Vehicle $Fleet $Total_Amount $Agent $sent ';
   }
 
   Map<String, dynamic> toMap() {
@@ -97,8 +98,9 @@ class Header implements Tomaps, mapping, AbsDbUpdates {
       Reversal: map['Reversal'] != null ? map['Reversal'] as bool : null,
       Reversed: map['Reversed'] != null ? map['Reversed'] as bool : null,
       Trans: map['Trans'] != null ? map['Trans'] as int : null,
-      Total_Amount:
-          map['Total_Amount'] != null ? (map['Total_Amount'] as num).toDouble()  : null,
+      Total_Amount: map['Total_Amount'] != null
+          ? (map['Total_Amount'] as num).toDouble()
+          : null,
       Agent: map['Agent'] != null ? map['Agent'] as String : null,
       sent: map['sent'] != null ? map['sent'] as bool : false,
     );
@@ -128,10 +130,15 @@ class Header implements Tomaps, mapping, AbsDbUpdates {
       Reversal: map['Reversal'] != null ? map['Reversal'] == 1 : null,
       Reversed: map['Reversed'] != null ? map['Reversed'] == 1 : null,
       Trans: map['Trans'] != null ? map['Trans'] as int : null,
-      Total_Amount:
-          map['Total_Amount'] != null ? map['Total_Amount'] as double : null,
       Agent: map['Agent'] != null ? map['Agent'] as String : null,
-      sent: map['sent'] != null ? map['sent'] as bool : false,
+      Total_Amount: map['Total_Amount'] != null
+          ? (map['Total_Amount'] as num).toDouble()
+          : null,
+      sent: map['Sent'] != null
+          ? (map['Sent'] is int
+              ? (map['Sent'] as int) == 1
+              : (map['Sent'] as bool))
+          : false,
     );
   }
   String toJson() => json.encode(toMap());
@@ -253,21 +260,8 @@ $col_Comments	text
   }
 
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
-
-    update.add(DbUpdate(version: 4, updates: [
-      'ALTER TABLE $table ADD COLUMN $col_Posting_Group text ',
-      'ALTER TABLE $table ADD COLUMN $col_Crew text',
-      'ALTER TABLE $table ADD COLUMN $col_Crew2 text',
-    ]));
-    update.add(DbUpdate(version: 5, updates: [
-      'ALTER TABLE $table ADD COLUMN $col_Fleet text ',
-    ]));
-    update.add(DbUpdate(version: 17, updates: [
-      'ALTER TABLE $table ADD COLUMN $col_Comments text ',
-    ]));
-    return update;
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
   }
 
   Header copyWith({

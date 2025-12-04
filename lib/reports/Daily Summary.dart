@@ -143,39 +143,39 @@ class SummaryReport extends StatelessWidget {
                                       );
                                     }),
                               ),
-                              Expanded(
-                                flex: 1,
-                                child: Card(
-                                  elevation: 20,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                        12), // Adjust the border radius
-                                    side: const BorderSide(
-                                        color:
-                                            Color.fromARGB(255, 88, 122, 150),
-                                        width: 2), // Border color and width
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text("Totals"),
-                                      Text(
-                                        NumberFormat("#,##0.00", "en_US")
-                                            .format(controller.tsummary
-                                                .fold<double>(
-                                                    0.0,
-                                                    (double currentSum,
-                                                            Tsummary item) =>
-                                                        currentSum +
-                                                        num.tryParse(item.Total
-                                                            .toString())!)),
-                                        style: const TextStyle(fontSize: 20),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                              // Expanded(
+                              //   flex: 1,
+                              //   child: Card(
+                              //     elevation: 20,
+                              //     shape: RoundedRectangleBorder(
+                              //       borderRadius: BorderRadius.circular(
+                              //           12), // Adjust the border radius
+                              //       side: const BorderSide(
+                              //           color:
+                              //               Color.fromARGB(255, 88, 122, 150),
+                              //           width: 2), // Border color and width
+                              //     ),
+                              //     child: Row(
+                              //       mainAxisAlignment:
+                              //           MainAxisAlignment.spaceBetween,
+                              //       children: [
+                              //         const Text("Totals"),
+                              //         Text(
+                              //           NumberFormat("#,##0.00", "en_US")
+                              //               .format(controller.tsummary
+                              //                   .fold<double>(
+                              //                       0.0,
+                              //                       (double currentSum,
+                              //                               Tsummary item) =>
+                              //                           currentSum +
+                              //                           num.tryParse(item.Total
+                              //                               .toString())!)),
+                              //           style: const TextStyle(fontSize: 20),
+                              //         ),
+                              //       ],
+                              //     ),
+                              //   ),
+                              // ),
                             ],
                           )
                         : const Center(

@@ -27,8 +27,10 @@ Future<void> main() async {
          ].request().then((status) async {
     }).then((value) async {
      AppConfig   config = AppConfig(
-        apiBaseUrl: 'http://nav.trimline.co.ke:4010/api/Matatu/',
-        updateUrl: 'https://trimline.co.ke/apps/RemboClassic/',
+        //apiBaseUrl: 'http://nav.trimline.co.ke:4010/api/Matatu/',
+        apiBaseUrl: 'http://195.26.249.217:4010/api/Matatu/',
+        //updateUrl: 'https://trimline.co.ke/apps/RemboClassic/',
+          updateUrl: 'https://5.189.167.52/apps/RemboClassic/',
         clientId: "REMBOCLASIC",
         clientName: "REMBOCLASIC",
         Client: client,

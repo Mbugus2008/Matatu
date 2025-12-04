@@ -1,32 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
-import 'package:t_matatu/controllers/header.dart';
-import 'package:t_matatu/pages/widgets/datepicker.dart';
 import 'package:t_matatu/pages/widgets/receiptsReport.dart';
 import 'package:t_matatu/pages/widgets/searchreceipts.dart';
-import 'package:t_matatu/providers/colors.dart';
 import 'package:t_matatu/reports/controller.dart';
 
-import '../bluetooth/bluetooth.dart';
-import '../controllers/main.dart';
 import '../models/Header.dart';
-import '../models/Transaction.dart' as tmatatu;
 import '../models/Utils/util.dart';
-import '../bluetooth/bluetoothManager.dart';
 
 class ReceiptReport extends StatelessWidget {
   const ReceiptReport({super.key});
 
   Future<void> _selectDate() async {
-    DateTime picked = await Get.bottomSheet(
-      DatePicker(
-        DateTime.now(),
-        onDateChange: (DateTime? date) {
-          Get.back(result: date);
-        },
-      ),
+    DateTime? picked = await showDatePicker(
+      context: Get.context!,
+      initialDate:
+          Get.find<ReportController>().selectedDate?.value?.toLocal() ??
+              DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
     );
+    if (picked == null) return;
     Get.find<ReportController>().searching.value = true;
     Get.find<ReportController>().selectedDate!.value = picked;
     await Get.find<ReportController>().gettransbydate(picked);
@@ -64,17 +57,11 @@ class ReceiptReport extends StatelessWidget {
                                 .toLocal())),
                   ),
                   searchReceipt(),
-                  receiptReport()
+                  receiptReport(),
                 ],
               )),
         ),
       ),
     );
   }
-
-  
-
- 
 }
-
-

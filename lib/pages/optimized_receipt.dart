@@ -1,28 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:t_matatu/controllers/main.dart';
+import 'package:t_matatu/Clients/Amount%20dist.dart';
+import 'package:t_matatu/bluetooth/bluetoothManager.dart';
 import 'package:t_matatu/controllers/Members.dart';
 import 'package:t_matatu/controllers/SettingsController.dart';
 import 'package:t_matatu/controllers/TypesController.dart';
 import 'package:t_matatu/controllers/header.dart';
+import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/init.dart';
+import 'package:t_matatu/models/member.dart';
 import 'package:t_matatu/models/trantypes.dart';
-import 'package:t_matatu/pages/Amount%20dist.dart';
 import 'package:t_matatu/pages/crew.dart';
-import 'package:t_matatu/bluetooth/bluetoothManager.dart';
 import 'package:t_matatu/providers/client.dart';
 import 'package:t_matatu/reports/controller.dart';
-import 'package:t_matatu/models/member.dart';
+
 import '../controllers/expenses.dart';
 import '../models/Header.dart';
 import '../models/Transaction.dart' as tMatatu;
 import '../models/expences.dart';
 import '../models/vehicles/vehicle.dart';
 import '../providers/db.dart';
-import 'widgets/transaction_list_item.dart';
 import 'widgets/total_amount_display.dart';
+import 'widgets/transaction_list_item.dart';
 
 class Receipt extends StatefulWidget {
   const Receipt({super.key});
@@ -49,7 +50,7 @@ class _ReceiptState extends State<Receipt> {
     _amountFocusNode = FocusNode();
     _vehicleNoController = TextEditingController();
     _commentsController = TextEditingController();
-    
+
     // Load initial data if needed
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitialData();
@@ -62,13 +63,15 @@ class _ReceiptState extends State<Receipt> {
     _amountFocusNode.dispose();
     _vehicleNoController.dispose();
     _commentsController.dispose(); // Added dispose for comments controller
-  
+    _clearTransactionData();
+    // Clear vehicle transaction types
+    Get.find<TransTypeController>().vehicleTrantypes.clear();
     super.dispose();
   }
 
   Future<void> _loadInitialData() async {
     // Load any initial data needed
-     Get.find<SettingsController>().fetchWorkingDate();
+    Get.find<SettingsController>().fetchWorkingDate();
   }
 
   // Optimized print function
@@ -90,26 +93,26 @@ class _ReceiptState extends State<Receipt> {
       if (headerController.currTrans.isEmpty) {
         throw "No transactions to print";
       }
-      header.Total_Amount = headerController.currTrans.fold<double>(
-        0.0, (sum, item) => sum + (item.Amount ?? 0));
-      await dbProvider.insert(Header.table, header);
-      
+      header.Total_Amount = headerController.currTrans
+          .fold<double>(0.0, (sum, item) => sum + (item.Amount ?? 0));
+
       final batch = dbProvider.batch();
-      for (final element in headerController.currTrans) { 
-        await dbProvider.insert(tMatatu.Trans.tabletrans, element);
+      batch.insert(Header.table, header.toMap_fortable());
+      for (final element in headerController.currTrans) {
+        batch.insert(tMatatu.Trans.tabletrans, element.toMap_fortable());
       }
       await batch.commit();
       headerController.trans.insert(0, header);
       reportController.daystrans.insert(0, header);
       headerController.filteredTrans.value = headerController.trans;
-      
-      settingsController.fetchWorkingDate(); 
+
+      settingsController.fetchWorkingDate();
 
       final client = mainControllerInstance.CurrentClient?.value;
       if (client != null) {
         final bytes = await client.printReceipt(header);
         if (bytes != null) {
-           bluetoothManager.printReceip(bytes);
+          bluetoothManager.printReceip(bytes);
         } else {
           throw "Failed to generate receipt bytes";
         }
@@ -121,23 +124,23 @@ class _ReceiptState extends State<Receipt> {
       upload();
       Get.back();
       Get.snackbar(
-        "Success", 
+        "Success",
         "Receipt printed successfully",
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
     } catch (e) {
       if (Get.isDialogOpen!) Get.back();
-      
+
       Get.snackbar(
-        "Print Error", 
+        "Print Error",
         e.toString(),
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 3),
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-      
+
       debugPrint("Print error: $e");
     }
   }
@@ -148,6 +151,8 @@ class _ReceiptState extends State<Receipt> {
     Get.find<HeaderController>().currTrans.clear();
     Get.find<HeaderController>().createheader();
     Get.find<MemberController>().clearcurrentvehicle();
+    Get.find<MainController>().vehtrans.clear();
+    Get.find<TransTypeController>().vehicleTrantypes.clear();
   }
 
   @override
@@ -210,7 +215,7 @@ class _ReceiptState extends State<Receipt> {
 
   Widget _buildComments() {
     return TextFormField(
-      controller: _commentsController, 
+      controller: _commentsController,
       decoration: const InputDecoration(
         labelText: 'Comments',
         border: OutlineInputBorder(),
@@ -226,7 +231,8 @@ class _ReceiptState extends State<Receipt> {
         child: Column(
           children: [
             _buildVehicleSearch(),
-            if (Get.find<MainController>().CurrentClient?.value.Attach_crew == true)
+            if (Get.find<MainController>().CurrentClient?.value.Attach_crew ==
+                true)
               _buildCrewInfoSection(),
           ],
         ),
@@ -238,24 +244,26 @@ class _ReceiptState extends State<Receipt> {
     return Autocomplete<Suggestion>(
       initialValue: TextEditingValue.empty,
       optionsBuilder: (textEditingValue) async {
-        if (textEditingValue.text.isEmpty) return const Iterable<Suggestion>.empty();
+        if (textEditingValue.text.isEmpty)
+          return const Iterable<Suggestion>.empty();
         return memberController.getVehicleSuggestions(textEditingValue.text);
       },
       displayStringForOption: (option) => option.displayText,
       onSelected: (selection) => _handleVehicleSelection(selection),
       fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
         return TextField(
-          controller: controller,
-          focusNode: focusNode,
-          decoration: InputDecoration(
-            hintText: 'Enter vehicle number or member name',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.clear, color: Colors.red),
-              onPressed: () => controller.clear(),
-            ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        ));
+            controller: controller,
+            focusNode: focusNode,
+            decoration: InputDecoration(
+              hintText: 'Enter vehicle number or member name',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.clear, color: Colors.red),
+                onPressed: () => controller.clear(),
+              ),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ));
       },
       optionsViewBuilder: (context, onSelected, options) {
         return Align(
@@ -284,22 +292,24 @@ class _ReceiptState extends State<Receipt> {
     headerController.currHeader.value.Account = selection.account;
     _vehicleNoController.text = selection.displayText;
 
-     if (selection.isVehicle) {
+    if (selection.isVehicle) {
       if (selection.id.isNotEmpty) {
         _vehicleNoController.text = selection.id;
         headerController.currHeader.value.Fleet = selection.id;
       }
       memberController.getcurrentcrew(selection.displayText);
       headerController.currHeader.value.Vehicle = selection.displayText;
-      Get.find<VehiclesController>().getvehtrans(selection.displayText, DateTime.now());
+      Get.find<VehiclesController>()
+          .getvehtrans(selection.displayText, DateTime.now());
     }
   }
 
-  Widget _buildSuggestionItem(Suggestion option, AutocompleteOnSelected<Suggestion> onSelected) {
-    final title = option.id.isEmpty 
-        ? option.displayText 
+  Widget _buildSuggestionItem(
+      Suggestion option, AutocompleteOnSelected<Suggestion> onSelected) {
+    final title = option.id.isEmpty
+        ? option.displayText
         : '${option.id}-${option.displayText}';
-    
+
     return ListTile(
       leading: option.isVehicle
           ? const Icon(Icons.directions_bus, color: Colors.blue, size: 24)
@@ -308,7 +318,7 @@ class _ReceiptState extends State<Receipt> {
       subtitle: Text(option.details),
       trailing: option.loan > 0
           ? Text(NumberFormat("#,##0.00").format(option.loan),
-          style: const TextStyle(fontSize: 12, color: Colors.red))
+              style: const TextStyle(fontSize: 12, color: Colors.red))
           : null,
       onTap: () => onSelected(option),
     );
@@ -319,14 +329,19 @@ class _ReceiptState extends State<Receipt> {
       builder: (controller) => Row(
         children: [
           if (_shouldShowDriver())
-            Expanded(child: _buildCrewInfo("Driver", controller.currentdriver.value)),
+            Expanded(
+                child:
+                    _buildCrewInfo("Driver", controller.currentdriver.value)),
           if (_shouldShowConductor())
-            Expanded(child: _buildCrewInfo("Conductor", controller.currentcunductor.value)),
+            Expanded(
+                child: _buildCrewInfo(
+                    "Conductor", controller.currentcunductor.value)),
           Expanded(
             child: IconButton(
               icon: const Icon(Icons.edit, size: 30),
               onPressed: () => Get.to(() => CrewAssignment(
-                vehicle: Get.find<VehiclesController>().Currentvehicle.value)),
+                  vehicle:
+                      Get.find<VehiclesController>().Currentvehicle.value)),
             ),
           )
         ],
@@ -336,14 +351,14 @@ class _ReceiptState extends State<Receipt> {
 
   bool _shouldShowDriver() {
     final client = Get.find<MainController>().CurrentClient?.value;
-    return client?.Crew_to_attach == CrewToattach.Both || 
-           client?.Crew_to_attach == CrewToattach.Driver;
+    return client?.Crew_to_attach == CrewToattach.Both ||
+        client?.Crew_to_attach == CrewToattach.Driver;
   }
 
   bool _shouldShowConductor() {
     final client = Get.find<MainController>().CurrentClient?.value;
-    return client?.Crew_to_attach == CrewToattach.Both || 
-           client?.Crew_to_attach == CrewToattach.Condutor;
+    return client?.Crew_to_attach == CrewToattach.Both ||
+        client?.Crew_to_attach == CrewToattach.Condutor;
   }
 
   Widget _buildCrewInfo(String title, Member? member) {
@@ -365,14 +380,16 @@ class _ReceiptState extends State<Receipt> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(title,
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 2.0),
           Text(
             member?.Name ?? "Not Assigned",
             style: TextStyle(
-              fontSize: 10, 
-              color: member != null ? Colors.black : Colors.red,
-              overflow: TextOverflow.ellipsis),
+                fontSize: 10,
+                color: member != null ? Colors.black : Colors.red,
+                overflow: TextOverflow.ellipsis),
           ),
           if (member != null) ...[
             const SizedBox(height: 2.0),
@@ -387,28 +404,29 @@ class _ReceiptState extends State<Receipt> {
   }
 
   Widget _buildTodayTransactionsButton() {
-    return Obx(() {
-        final total = Get.find<MainController>().vehtrans.fold<double>(
-          0, (sum, item) => sum + (item.Amount ?? 0));
-        
-        return ElevatedButton(
-          onPressed: () => _showTodayTransactions(),
-          child: RichText(
-            text: TextSpan(
-              style: DefaultTextStyle.of(context).style,
-              children: [
-                const TextSpan(
-                  text: 'Todays Transactions : ',
-                  style: TextStyle(fontSize: 12, color: Colors.black87)),
-                TextSpan(
-                  text: NumberFormat.currency(symbol: 'KSh ').format(total),
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: total >= 0 ? Colors.green[800] : Colors.red[800],
+    return Obx(
+      () {
+        final total = Get.find<MainController>()
+            .vehtrans
+            .fold<double>(0, (sum, item) => sum + (item.Amount ?? 0));
+
+        return Container(
+          child: ElevatedButton(
+            onPressed: () => _showTodayTransactions(),
+            child: RichText(
+              text: TextSpan(
+                style: DefaultTextStyle.of(context).style,
+                children: [
+                  TextSpan(
+                    text: NumberFormat.currency(symbol: 'KSh ').format(total),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: total >= 0 ? Colors.green[800] : Colors.red[800],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -419,78 +437,226 @@ class _ReceiptState extends State<Receipt> {
   void _showTodayTransactions() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Vehicle Transactions'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: _buildVehicleTransactionsList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+      barrierDismissible: true,
+      builder: (context) => Dialog.fullscreen(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Vehicle Transactions',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: _buildVehicleTransactionsList(expanded: true),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildVehicleTransactionsList() {
+  Widget _buildVehicleTransactionsList({bool expanded = false}) {
     return Padding(
       padding: const EdgeInsets.all(2.0),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: GetBuilder<MainController>(
-          builder: (controller) {
-            return DataTable(
-              columnSpacing: 100,
-             
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.grey,
-                  width: 1,
-                ),
-                borderRadius: BorderRadius.circular(10),
+      child: Obx(() {
+        final controller = Get.find<MainController>();
+        final transactions = controller.vehtrans;
+        if (transactions.isEmpty) {
+          if (expanded) {
+            return const SizedBox.expand(
+              child: Center(
+                child: Text('No vehicle transactions available'),
               ),
-              columns: [
-                DataColumn(label: Text('Type', style: TextStyle(fontSize: 14))),
-                DataColumn(
-                  label: Container(
-                    alignment: Alignment.centerRight,
-                    child: Text('Amount', style: TextStyle(fontSize: 14)),
-                  ),
+            );
+          }
+          return const SizedBox(
+            height: 160,
+            child: Center(
+              child: Text('No vehicle transactions available'),
+            ),
+          );
+        }
+
+        final numberFormat = NumberFormat('#,##0.00');
+        final totalAmount = transactions.fold<double>(
+          0.0,
+          (double sum, element) => sum + (element.Amount ?? 0),
+        );
+        final amountStyle = Get.find<VehiclesController>().summaryAmount();
+
+        // Group transactions by Agent Code
+        final Map<String, List<tMatatu.Trans>> groupedByAgent = {};
+        for (final tr in transactions) {
+          final agentCode = tr.Agent_Code?.toString() ?? 'Unknown';
+          groupedByAgent.putIfAbsent(agentCode, () => []).add(tr);
+        }
+
+        final content = Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Colors.grey,
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.withOpacity(0.05),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(10)),
                 ),
-              ],
-              rows: [
-                ...controller.vehsummary.map((tr) => DataRow(
-                  cells: [
-                    DataCell(Text(tr.Type.toString(), style: const TextStyle(fontSize: 14))),
-                    DataCell( 
-                      Container(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          NumberFormat("#,##0.00").format(tr.Amount),
-                          style: VehiclesController().summaryAmount()),
+                child: Row(
+                  children: const [
+                    Expanded(
+                      child: Text(
+                        'Type',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600),
                       ),
                     ),
-                  ],
-                )),
-                DataRow(
-                  cells: [
-                    const DataCell(Text('Total', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold))),
-                    DataCell(Text(
-                      NumberFormat("#,##0.00").format(
-                        controller.vehsummary.fold<double>(
-                          0.0, (sum, item) => sum + (item.Amount ?? 0))),
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    SizedBox(width: 16),
+                    Text(
+                      'Amount',
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
-              ],
-            );
-          },
-        ),
-      ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: groupedByAgent.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final agentCode = groupedByAgent.keys.elementAt(index);
+                    final agentTransactions = groupedByAgent[agentCode]!;
+                    final agentTotal = agentTransactions.fold<double>(
+                      0.0,
+                      (sum, tr) => sum + (tr.Amount ?? 0),
+                    );
+
+                    // Group agent's transactions by Type
+                    final Map<String, double> typeAmounts = {};
+                    for (final tr in agentTransactions) {
+                      final type = tr.Description ?? tr.Type ?? 'Unknown';
+                      typeAmounts[type] =
+                          (typeAmounts[type] ?? 0) + (tr.Amount ?? 0);
+                    }
+
+                    return ExpansionTile(
+                      initiallyExpanded: false,
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Agent: $agentCode',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blueGrey,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            numberFormat.format(agentTotal),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: agentTotal >= 0
+                                  ? Colors.green[700]
+                                  : Colors.red[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                      children: typeAmounts.entries.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 32, vertical: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  entry.key,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Text(
+                                numberFormat.format(entry.value),
+                                style: amountStyle,
+                                textAlign: TextAlign.right,
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+              ),
+              const Divider(height: 1),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: const BoxDecoration(
+                  borderRadius:
+                      BorderRadius.vertical(bottom: Radius.circular(10)),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Total',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      numberFormat.format(totalAmount),
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+
+        if (expanded) {
+          return content;
+        }
+
+        return SizedBox(
+          height: 320,
+          child: content,
+        );
+      }),
     );
   }
 
@@ -511,7 +677,9 @@ class _ReceiptState extends State<Receipt> {
                 Expanded(
                   child: TextFormField(
                     focusNode: _amountFocusNode,
-                    controller: Get.find<HeaderController>().amountEditingController.value,
+                    controller: Get.find<HeaderController>()
+                        .amountEditingController
+                        .value,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       hintText: 'Amount',
@@ -521,12 +689,13 @@ class _ReceiptState extends State<Receipt> {
                 ),
               ],
             ),
-         if (Get.find<MainController>().CurrentClient?.value.Show_comments ?? false) ...[
-      const SizedBox(height: 1.0),
-      _buildCommentsSection(),
-    ],
-          //     const SizedBox(height: 1.0),
-          // _buildCommentsSection(),  
+            if (Get.find<MainController>().CurrentClient?.value.Show_comments ??
+                false) ...[
+              const SizedBox(height: 1.0),
+              _buildCommentsSection(),
+            ],
+            //     const SizedBox(height: 1.0),
+            // _buildCommentsSection(),
             _buildExpenseDropdownIfNeeded(),
             const SizedBox(height: 16.0),
             _buildActionButtons(),
@@ -537,29 +706,36 @@ class _ReceiptState extends State<Receipt> {
   }
 
   Widget _buildTransactionTypeDropdown() {
-    return GetBuilder<TransTypeController>(
-      builder: (controller) {
-        final ttypes = List.from(controller.alltrantypes);
-        if (ttypes.firstWhereOrNull((e) => e.Code == " ") == null) {
-          ttypes.insert(0, TranTypes(Order: -1, Code: " "));
-        }
+    final controller = Get.find<TransTypeController>();
+    return Obx(() {
+      // Use vehicleTrantypes if available, otherwise fallback to alltrantypes
+      final sourceList = controller.vehicleTrantypes.isNotEmpty
+          ? controller.vehicleTrantypes
+          : controller.alltrantypes;
+      final ttypes = List<TranTypes>.from(sourceList);
 
-        return DropdownButtonFormField<TranTypes>(
-          onChanged: (newValue) => _handleTransactionTypeChange(newValue),
-          items: ttypes.map((value) => DropdownMenuItem<TranTypes>(
-            value: value,
-            child: SizedBox(
-              child: Text(
-                value.Order! >= 0 
-                  ? '${value.Name} (${value.VehicleAmount})'
-                  : value.Name ?? "",
-                style: const TextStyle(fontSize: 14),
-              ),
-            ),
-          )).toList(),
-        );
-      },
-    );
+      if (ttypes.firstWhereOrNull((e) => e.Code == " ") == null) {
+        ttypes.insert(0, TranTypes(Order: -1, Code: " "));
+      }
+
+      return DropdownButtonFormField<TranTypes>(
+        key: ValueKey(sourceList.length), // Force rebuild when list changes
+        onChanged: (newValue) => _handleTransactionTypeChange(newValue),
+        items: ttypes
+            .map((value) => DropdownMenuItem<TranTypes>(
+                  value: value,
+                  child: SizedBox(
+                    child: Text(
+                      value.Order! >= 0
+                          ? '${value.Name} (${value.VehicleAmount})'
+                          : value.Name ?? "",
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ))
+            .toList(),
+      );
+    });
   }
 
   void _handleTransactionTypeChange(TranTypes? newValue) {
@@ -568,10 +744,11 @@ class _ReceiptState extends State<Receipt> {
     final headerController = Get.find<HeaderController>();
     headerController.curTran.value.Type = newValue.Code;
     headerController.curTran.value.Description = newValue.Name;
-    
+
     Get.find<TransTypeController>().tType.value = newValue;
-    headerController.amountEditingController.value.text = newValue.VehicleAmount.toString();
-    
+    headerController.amountEditingController.value.text =
+        newValue.VehicleAmount.toString();
+
     FocusScope.of(context).requestFocus(_amountFocusNode);
     headerController.amountEditingController.value.selection = TextSelection(
       baseOffset: 0,
@@ -589,13 +766,16 @@ class _ReceiptState extends State<Receipt> {
               return DropdownButtonFormField<Expenses>(
                 onChanged: (newValue) {
                   if (newValue != null) {
-                    Get.find<HeaderController>().curTran.value.Constituency = newValue.Code;
+                    Get.find<HeaderController>().curTran.value.Constituency =
+                        newValue.Code;
                   }
                 },
-                items: expController.all.map((value) => DropdownMenuItem<Expenses>(
-                  value: value,
-                  child: Text(value.Description ?? ''),
-                )).toList(),
+                items: expController.all
+                    .map((value) => DropdownMenuItem<Expenses>(
+                          value: value,
+                          child: Text(value.Description ?? ''),
+                        ))
+                    .toList(),
               );
             },
           ),
@@ -627,7 +807,8 @@ class _ReceiptState extends State<Receipt> {
             icon: const Icon(Icons.more_horiz, size: 20),
             label: const Text('Distribute', style: TextStyle(fontSize: 14)),
             style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+              padding:
+                  const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
               backgroundColor: Colors.blue[600],
               foregroundColor: Colors.white,
             ),
@@ -653,7 +834,8 @@ class _ReceiptState extends State<Receipt> {
       _showErrorSnackbar("Amount cannot be empty");
       return;
     }
-    if (Get.find<TransTypeController>().tType.value.Code?.trim().isEmpty ?? true) {
+    if (Get.find<TransTypeController>().tType.value.Code?.trim().isEmpty ??
+        true) {
       _showErrorSnackbar("No Type Selected");
       return;
     }
@@ -668,8 +850,10 @@ class _ReceiptState extends State<Receipt> {
 
   bool _isExpenseWithoutConstituency() {
     final transType = Get.find<TransTypeController>().tType.value.Code;
-    final constituency = Get.find<HeaderController>().curTran.value.Constituency;
-    return transType == "EXPENSES" && (constituency == null || constituency.isEmpty);
+    final constituency =
+        Get.find<HeaderController>().curTran.value.Constituency;
+    return transType == "EXPENSES" &&
+        (constituency == null || constituency.isEmpty);
   }
 
   void _showErrorSnackbar(String message) {
@@ -689,25 +873,26 @@ class _ReceiptState extends State<Receipt> {
     currentTran.Document_No = DateTime.now().microsecondsSinceEpoch.toString();
     currentTran.OTTN = currentHeader.Receipt_No;
     currentTran.Account_No = currentHeader.Account;
-    
-    if (currentTran.Type == "SAVINGSCREW" && 
+
+    if (currentTran.Type == "SAVINGSCREW" &&
         (currentHeader.Crew != null && currentHeader.Crew!.isNotEmpty)) {
       currentTran.Account_No = currentHeader.Crew;
     }
     currentTran.Messages = _commentsController.value.text;
     currentTran.Loan_No = currentHeader.Vehicle;
     currentTran.Transaction_Date = currentHeader.Date;
-    currentTran.Amount = double.tryParse(
-      headerController.amountEditingController.value.text) ?? 0;
-    
+    currentTran.Amount =
+        double.tryParse(headerController.amountEditingController.value.text) ??
+            0;
+
     if (currentTran.Type == "EXPENSES") {
-      currentTran.Amount =  currentTran.Amount! * -1;
+      currentTran.Amount = currentTran.Amount! * -1;
     }
-    
+
     currentTran.Transaction_Time = DateTime.now();
     currentTran.Agent_Code = currentHeader.Agent;
     currentTran.sent = false;
-    
+
     headerController.currTrans.add(currentTran);
     headerController.currHeader.value.transtions?.add(currentTran);
   }
@@ -716,17 +901,18 @@ class _ReceiptState extends State<Receipt> {
     Get.find<HeaderController>().amountEditingController.value.text = '';
     Get.find<TransTypeController>().tType.value = TranTypes(Code: " ");
     Get.find<HeaderController>().curTran = tMatatu.Trans().obs;
-    Get.find<VehiclesController>().Currentvehicle = Vehicles().obs;
+    Get.find<VehiclesController>().Currentvehicle.value = Vehicles();
   }
 
   Widget _buildCurrentTransactions() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8.0),
-      child: Card(
-        elevation: 4,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 200),
-          child: Obx(() => Column(
+        margin: const EdgeInsets.only(bottom: 8.0),
+        child: Card(
+          elevation: 4,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 200),
+            child: Obx(
+              () => Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Transactions List
@@ -734,22 +920,26 @@ class _ReceiptState extends State<Receipt> {
                     child: Get.find<HeaderController>().currTrans.isEmpty
                         ? const Center(
                             child: Padding(
-                              padding: EdgeInsets.all(16.0),
+                              padding: EdgeInsets.all(2.0),
                               child: Text('No transactions yet'),
                             ),
                           )
                         : ListView.builder(
-                            itemCount: Get.find<HeaderController>().currTrans.length,
+                            itemCount:
+                                Get.find<HeaderController>().currTrans.length,
                             itemExtent: 60, // Fixed height for each item
-                            cacheExtent: 500, // Cache more items for smooth scrolling
+                            cacheExtent:
+                                500, // Cache more items for smooth scrolling
                             addAutomaticKeepAlives: true,
                             addRepaintBoundaries: true,
                             physics: const AlwaysScrollableScrollPhysics(),
                             itemBuilder: (context, index) {
-                              final tr = Get.find<HeaderController>().currTrans[index];
+                              final tr =
+                                  Get.find<HeaderController>().currTrans[index];
                               return TransactionListItem(
                                 transaction: tr,
-                                onDelete: () => Get.find<HeaderController>().removetrans(tr),
+                                onDelete: () => Get.find<HeaderController>()
+                                    .removetrans(tr),
                                 key: ValueKey(tr.Document_No),
                               );
                             },
@@ -759,17 +949,16 @@ class _ReceiptState extends State<Receipt> {
                   const TotalAmountDisplay(),
                 ],
               ),
-            ),  
+            ),
           ),
-        )
-    );  
+        ));
   }
 
   // Transaction list item has been moved to a separate widget file
 
   Widget _buildPrintButtons() {
     final headerController = Get.find<HeaderController>();
-    
+
     return Row(
       children: [
         Expanded(

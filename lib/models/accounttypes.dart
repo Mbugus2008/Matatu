@@ -7,6 +7,7 @@ import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/network/request.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/providers/db.dart';
+import 'package:t_matatu/providers/dbupdates.dart' as dbu;
 
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 class Account_Types implements mapping, Tomaps, AbsDbUpdates {
@@ -71,10 +72,8 @@ PRIMARY KEY ($col_Account_type, $col_Transaction_Type)
 ''';
 
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
-
-    return update;
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
   }
 
   @override
@@ -84,8 +83,8 @@ PRIMARY KEY ($col_Account_type, $col_Transaction_Type)
   }
 
   @override
-  toMap_fortable() {
-    return toJson();
+  Map<String, dynamic> toMap_fortable() {
+    return toMap();
   }
 
   Future<void> get_account_Types() async {

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:t_matatu/models/Hires.dart';
+import 'package:t_matatu/hires/Hires.dart';
 import 'package:t_matatu/models/enums.dart';
  
 
 
-import 'package:t_matatu/pages/hires/addhire.dart';
+import 'package:t_matatu/hires/addhire.dart';
 import 'package:t_matatu/components/shimmer_loading.dart';
 import 'package:t_matatu/utils/snackbar_service.dart';
 

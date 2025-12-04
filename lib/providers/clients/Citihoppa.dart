@@ -6,44 +6,54 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/Members.dart';
 import 'package:t_matatu/controllers/main.dart';
+import 'package:t_matatu/hires/hires_list.dart';
 import 'package:t_matatu/models/Header.dart';
 import 'package:t_matatu/models/Tamounts.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/Utils/util.dart';
+import 'package:t_matatu/models/accounttypes.dart';
 import 'package:t_matatu/models/summary/Tsummary.dart';
-import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/pages/Depot.dart';
 import 'package:t_matatu/pages/Fuel.dart';
-import 'package:t_matatu/pages/hires/hires_list.dart';
 import 'package:t_matatu/pages/pageloader.dart';
 import 'package:t_matatu/pages/vehicles/vehdetails.dart';
 import 'package:t_matatu/providers/client.dart';
 
 import '../../controllers/vehicles/vehicles.dart';
+import '../../pages/TwoTabScreen.dart';
 import '../../pages/widgets/Groupbox.dart';
 import '../../reports/controller.dart';
-import '../../pages/TwoTabScreen.dart';
 
 enum Receipttype { Member, Crew, Both }
 
-class Cityhoppa extends  BaseClients {
-
-  Cityhoppa({clientName,clientName_line2,email,
-  telephone,street,address,city,
-  Box,Auto_Assign,Attach_crew}):super(
-    clientName: clientName,
-    clientName_line2: clientName_line2,
-    email: email,
-    telephone: telephone,
-    street: street,
-    address: address,
-    city: city,
-    Box: Box,
-    Auto_Assign: Auto_Assign,
-    Attach_crew: Attach_crew,
-  );
+class Cityhoppa extends BaseClients {
+  Cityhoppa({
+    clientName,
+    clientName_line2,
+    email,
+    telephone,
+    street,
+    address,
+    city,
+    Box,
+    Auto_Assign,
+    Attach_crew,
+    Crew_to_attach,
+  }) : super(
+          clientName: clientName,
+          clientName_line2: clientName_line2,
+          email: email,
+          telephone: telephone,
+          street: street,
+          address: address,
+          city: city,
+          Box: Box,
+          Auto_Assign: Auto_Assign,
+          Attach_crew: Attach_crew,
+          Crew_to_attach: Crew_to_attach,
+        );
 
   @override
   Future<void> init() async {
@@ -51,8 +61,9 @@ class Cityhoppa extends  BaseClients {
       Get.put(DepotController());
     }
     Tamounts().getttypesamounts();
-    await Vehicles().Daily_Contributions(getdate());
-    await MainController().getvehiclecrew();
+    Account_Types().get_account_Types();
+    Vehicles().Daily_Contributions(getdate());
+    MainController().getvehiclecrew();
   }
 
   @override
@@ -77,12 +88,12 @@ class Cityhoppa extends  BaseClients {
     int? account_type = Get.find<MainController>().agent.value.Account_type;
     switch (account_type) {
       case 3:
-        ReportController().gettransbydate(DateTime.now());
-        Get.find<ReportController>().selectedDate?.value = DateTime.now();
         DepotFuel().getNRODefects();
         DepotFuel().getdata(Get.find<ReportController>().selectedDate!.value);
         return const TwoTabScreen(); // Use the TwoTabScreen for account_type 3
       default:
+        Get.find<ReportController>().selectedDate?.value = DateTime.now();
+
         return GetBuilder<VehiclesController>(
           builder: (controller) {
             if (controller.vehdailycollections.isEmpty) {
@@ -91,8 +102,13 @@ class Cityhoppa extends  BaseClients {
             return Column(
               children: [
                 _buildSearchField(controller),
-                Expanded(child: _buildVehicleList(controller)),
-                _buildSummaryCard(controller),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () => controller.refreshDailyCollections(),
+                    child: Obx(() => _buildVehicleList(controller)),
+                  ),
+                ),
+                Obx(() => _buildSummaryCard(controller)),
               ],
             );
           },
@@ -114,6 +130,7 @@ class Cityhoppa extends  BaseClients {
 
   Widget _buildVehicleList(VehiclesController controller) {
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: controller.vehdailycollections.length,
       itemBuilder: (context, index) {
         final vehicle = controller.vehdailycollections[index];
@@ -381,9 +398,13 @@ class Cityhoppa extends  BaseClients {
 
   Receipttype gettype(List<tmatatu.Trans>? t) {
     tmatatu.Trans? crew = t?.firstWhereOrNull((element) =>
-        element.Type == "SAVINGSCREW" || element.Type == "SAVINGS");
+        element.Type == "SAVINGSCREW" ||
+        element.Type == "SAVINGS" ||
+        element.Type == "CREWLOAN");
     tmatatu.Trans? member = t?.firstWhereOrNull((element) =>
-        element.Type != "SAVINGSCREW" && element.Type != "SAVINGS");
+        element.Type != "SAVINGSCREW" &&
+        element.Type != "SAVINGS" &&
+        element.Type != "CREWLOAN");
     if (crew != null && member != null) return Receipttype.Both;
     if (crew != null) return Receipttype.Crew;
     return Receipttype.Member;
@@ -395,13 +416,13 @@ class Cityhoppa extends  BaseClients {
     Receipttype type = gettype(header.transtions);
     switch (type) {
       case Receipttype.Member:
-       clientName = "City Hoppa Limited";
-      clientName_line2 = "";
+        clientName = "City Hoppa Limited";
+        clientName_line2 = "";
         bytes += await getHeader() + await getTicket(header);
         break;
       case Receipttype.Crew:
-      clientName = "Citi Travel Savings & Credit";
-      clientName_line2 = "Co-operative Society Ltd";
+        clientName = "City Travel Savings & Credit";
+        clientName_line2 = "Co-operative Society Ltd";
         for (var element in header.transtions!) {
           Header h = header.copyWith();
           if (element.Type == "SAVINGSCREW") h.Account = element.Account_No;
@@ -411,32 +432,36 @@ class Cityhoppa extends  BaseClients {
         }
         break;
       case Receipttype.Both:
-       clientName = "City Hoppa Limited";
-      clientName_line2 = "";
+        clientName = "City Hoppa Limited";
+        clientName_line2 = "";
         List<tmatatu.Trans> listcopy = header.transtions!;
         List<tmatatu.Trans> mtr = listcopy
             .where((element) =>
                 element.Type != "SAVINGSCREW" && element.Type != "SAVINGS")
             .toList();
         if (mtr.isNotEmpty) {
+          clientName = "City Hoppa Limited";
+          clientName_line2 = "";
           Header h = header.copyWith();
           h.transtions = mtr;
           h.Total_Amount = mtr.fold<double>(
               0.0,
               (currentSum, item) =>
                   currentSum + num.tryParse(item.Amount.toString())!);
-          bytes += await getTicket(h);
+          bytes += await getHeader() + await getTicket(h);
         }
         List<tmatatu.Trans> mtrc = listcopy
             .where((element) =>
                 element.Type == "SAVINGSCREW" || element.Type == "SAVINGS")
             .toList();
         for (var element in mtrc) {
+          clientName = "City Travel Savings & Credit";
+          clientName_line2 = "Co-operative Society Ltd";
           Header h = header.copyWith();
           if (element.Type == "SAVINGSCREW") h.Account = element.Account_No;
           h.transtions = [element];
           h.Total_Amount = element.Amount;
-          bytes += await getTicketcrew(h);
+          bytes += await getHeader() + await getTicketcrew(h);
         }
         break;
     }
@@ -600,7 +625,16 @@ class Cityhoppa extends  BaseClients {
           width: 6,
           styles: const PosStyles(align: PosAlign.right)),
     ]);
-
+    bytes += generator.row([
+      PosColumn(
+          text: 'Time Printed',
+          width: 5,
+          styles: const PosStyles(align: PosAlign.left)),
+      PosColumn(
+          text: formattedTime.format(DateTime.now()),
+          width: 7,
+          styles: const PosStyles(align: PosAlign.right)),
+    ]);
     bytes += generator.cut();
     return bytes;
   }
@@ -660,10 +694,12 @@ class Cityhoppa extends  BaseClients {
 
     bytes += generator.row([
       PosColumn(
-          text: 'No:', width: 8, styles: const PosStyles(align: PosAlign.left)),
+          text: 'Account:',
+          width: 6,
+          styles: const PosStyles(align: PosAlign.left)),
       PosColumn(
           text: header.Account.toString(),
-          width: 4,
+          width: 6,
           styles: const PosStyles(align: PosAlign.right)),
     ]);
 
@@ -681,22 +717,22 @@ class Cityhoppa extends  BaseClients {
     bytes += generator.row([
       PosColumn(
           text: 'Date',
-          width: 8,
+          width: 4,
           styles: const PosStyles(align: PosAlign.left)),
       PosColumn(
           text: formattedDate2.format(header.Date!),
-          width: 4,
+          width: 8,
           styles: const PosStyles(align: PosAlign.right)),
     ]);
     bytes += generator.row([
       PosColumn(
           text: 'Time',
-          width: 8,
+          width: 4,
           styles: const PosStyles(align: PosAlign.left)),
       PosColumn(
           text: formattedTime.format(DateTime.fromMicrosecondsSinceEpoch(
               int.tryParse(header.Receipt_No.toString())!)),
-          width: 4,
+          width: 8,
           styles: const PosStyles(align: PosAlign.right)),
     ]);
     bytes += generator.hr();
@@ -764,9 +800,20 @@ class Cityhoppa extends  BaseClients {
           styles: const PosStyles(align: PosAlign.right)),
     ]);
 
+    bytes += generator.row([
+      PosColumn(
+          text: 'Time Printed',
+          width: 5,
+          styles: const PosStyles(align: PosAlign.left)),
+      PosColumn(
+          text: formattedTime.format(DateTime.now()),
+          width: 7,
+          styles: const PosStyles(align: PosAlign.right)),
+    ]);
     bytes += generator.cut();
     return bytes;
   }
+
   @override
   Future<List<int>> getZreport(Tsummary summary) async {
     List<int> bytes = [];
@@ -898,6 +945,7 @@ class Cityhoppa extends  BaseClients {
   String v_description(Header header) {
     return '${header.Vehicle ?? ''}- ${header.Fleet}';
   }
+
   @override
   GroupBox? clientMenu() {
     return GroupBox("", [
@@ -931,10 +979,8 @@ class Cityhoppa extends  BaseClients {
     ]);
   }
 
-
-
-@override
-bool? Attach_crew = true;
+  @override
+  bool? Attach_crew = true;
 
   double _getTitleFontSize(int length) {
     return 18.0; // Default title font size, adjust as needed

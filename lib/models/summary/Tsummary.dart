@@ -97,11 +97,11 @@ class Tsummary implements Tomaps, mapping, data {
     }
     //sum.sort((a, b) => b.Date!.compareTo(a.Date!));
     sum.sort((a, b) {
-  if (a.Date == null && b.Date == null) return 0;
-  if (a.Date == null) return 1;
-  if (b.Date == null) return -1;
-  return b.Date!.compareTo(a.Date!);
-});
+      if (a.Date == null && b.Date == null) return 0;
+      if (a.Date == null) return 1;
+      if (b.Date == null) return -1;
+      return b.Date!.compareTo(a.Date!);
+    });
     Get.find<ReportController>().tsummary.value = sum;
 
     return Get.find<ReportController>().tsummary;

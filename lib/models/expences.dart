@@ -10,6 +10,7 @@ import '../network/errors.dart';
 import '../network/request.dart';
 import '../network/results/results.dart';
 import '../providers/db.dart';
+import '../providers/dbupdates.dart' as dbu;
 import 'mappings.dart';
 
 // ignore_for_file: public_member_api_docs, sort_constructors_first
@@ -74,10 +75,8 @@ $col_Description  text
   }
 
   @override
-  List<DbUpdate>? updates() {
-    List<DbUpdate> update = [];
-    update.add(DbUpdate(version: 7, updates: [createtable]));
-    return update;
+  List<dbu.DbUpdate>? updates() {
+    return dbu.getDbUpdatesForTable(table);
   }
 
   @override
@@ -117,3 +116,4 @@ $col_Description  text
     throw UnimplementedError();
   }
 }
+
