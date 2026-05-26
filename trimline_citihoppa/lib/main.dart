@@ -14,11 +14,9 @@ Future<void> main() async {
       Permission.bluetooth,
       Permission.bluetoothConnect,
       Permission.bluetoothScan
-      
     ].request().then((status) async {
-      
       AppConfig config = AppConfig(
-       // apiBaseUrl: 'http://trimline.co.ke:4005/City/api/',
+        // apiBaseUrl: 'http://trimline.co.ke:4005/City/api/',
         apiBaseUrl: 'http://trimline.co.ke:4010/api/Matatu/',
         clientId: "CITYHOPPER",
         clientName: "CityHoppa",
@@ -26,10 +24,9 @@ Future<void> main() async {
       );
 
       await tmatatu.start(config);
-       runApp(tmatatu.MyApp());
+      runApp(tmatatu.MyApp());
     });
   }
- 
 }
 
 class MyApp extends StatelessWidget {

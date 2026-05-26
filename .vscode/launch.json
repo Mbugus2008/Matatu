@@ -5,59 +5,57 @@
   "version": "0.2.0",
   "configurations": [
 
-
-
     {
       "name": "Base",
       "request": "launch",
       "type": "dart",
-      "program": "D:/Projects/Flutter/t_matatu/lib/main.dart"
+      "program": "D:\\Projects2\\Matatu\\lib\\main.dart"
     },
     {
       "name": "Kmos",
       "request": "launch",
       "type": "dart",
-      "program": "D:/Projects/Flutter/t_matatu/trimline_kmos/lib/main.dart"
+      "program": "D:\\Projects2\\Matatu\\trimline_kmos\\lib\\main.dart"
     },
  
     {
        "name": "Lopha",
       "request": "launch",
       "type": "dart",
-      "program": "D:/Projects/Flutter/t_matatu/trimline_Lopha/lib/main.dart"
+      "program": "D:\\Projects2\\Matatu\\trimline_Lopha\\lib\\main.dart"
     }, 
     {
        "name": "KCS",
       "request": "launch",
       "type": "dart",
-      "program": "D:/Projects/Flutter/t_matatu/trimline_KCS/lib/main.dart"
+      "program": "D:\\Projects2\\Matatu\\trimline_KCS\\lib\\main.dart"
     }, 
     {
        "name": "Rembo Classic",
       "request": "launch",
       "type": "dart",
-      "program": "D:/Projects/Flutter/t_matatu/trimline_RemboClassic/lib/main.dart"
+      "program": "D:\\Projects2\\Matatu\\trimline_RemboClassic\\lib\\main.dart"
     }, 
     
     {
       "name": "Cityhoppa",
       "request": "launch",
       "type": "dart",
-      "program": "D:/Projects/Flutter/t_matatu/trimline_citihoppa/lib/main.dart"
+      "program": "D:\\Projects2\\Matatu\\trimline_citihoppa\\lib\\main.dart"
     },
     {
       "name": "t_matatu/trimline_kmos (profile mode)",
       "request": "launch",
       "type": "dart",
       "flutterMode": "profile",
-      "program": "D:/Projects/Flutter/t_matatu/trimline_kmos/lib/main.dart"
+      "program": "D:\\Projects2\\Matatu\\trimline_kmos\\lib\\main.dart"
     },
     {
       "name": "t_matatu/trimline_kmos (release mode)",
       "request": "launch",
       "type": "dart",
       "flutterMode": "release",
-      "program": "D:/Projects/Flutter/t_matatu/trimline_kmos/lib/main.dart"
+      "program": "D:\\Projects2\\Matatu\\trimline_kmos\\lib\\main.dart"
     }
   ]
 }

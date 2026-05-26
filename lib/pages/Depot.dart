@@ -3,7 +3,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/models/Utils/util.dart';
-import 'package:t_matatu/models/expences.dart';
+import 'package:t_matatu/models/expenses/expenses.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/pages/crew.dart';
@@ -33,16 +33,17 @@ class Depot extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildSearchField() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: TextFormField(
         onChanged: (value) {
           Get.find<DepotController>().filterDepotTrans(value.toUpperCase());
-           if (value.isEmpty) {
-          // Optionally, force a refresh or reset the list if the search field is empty
-          //Get.find<DepotController>().depottrans.assignAll(Get.find<DepotController>().depottrans1); // You might need to implement this method
-        }
+          if (value.isEmpty) {
+            // Optionally, force a refresh or reset the list if the search field is empty
+            //Get.find<DepotController>().depottrans.assignAll(Get.find<DepotController>().depottrans1); // You might need to implement this method
+          }
         },
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 12),
@@ -56,6 +57,7 @@ class Depot extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildActiveVehiclesInfo(DepotController dp) {
     return Container(
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
@@ -80,7 +82,10 @@ class Depot extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Obx(() {
-            final activeCount = Get.find<DepotController>().depottrans.where((p0) => p0.On_route == true).length;
+            final activeCount = Get.find<DepotController>()
+                .depottrans
+                .where((p0) => p0.On_route == true)
+                .length;
             final totalCount = Get.find<DepotController>().depottrans.length;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,26 +111,31 @@ class Depot extends StatelessWidget {
             );
           }),
           Obx(() => Switch(
-            value: dp.checkall.value,
-            onChanged: dp.checkallvehicles,
-            activeColor: Colors.white,
-            activeTrackColor: Colors.green.shade300,
-          )),
+                value: dp.checkall.value,
+                onChanged: dp.checkallvehicles,
+                activeColor: Colors.white,
+                activeTrackColor: Colors.green.shade300,
+              )),
         ],
       ),
     );
   }
+
   Widget _buildVehicleList(DepotController depotController) {
     return Obx(() {
       if (depotController.depottrans.isEmpty) {
-        return Center(child: Text('No vehicles available', style: TextStyle(fontSize: 12)));
+        return Center(
+            child:
+                Text('No vehicles available', style: TextStyle(fontSize: 12)));
       }
       return ListView.builder(
         itemCount: depotController.depottrans.length,
-        itemBuilder: (context, index) => Container(child: _buildVehicleCard(depotController.depottrans[index])  ),
+        itemBuilder: (context, index) => Container(
+            child: _buildVehicleCard(depotController.depottrans[index])),
       );
     });
   }
+
   Widget _buildVehicleCard(DepotFuel depotFuel) {
     return Card(
       elevation: 2,
@@ -141,9 +151,11 @@ class Depot extends StatelessWidget {
               children: [
                 Expanded(flex: 2, child: _buildCrewInfo(depotFuel)),
                 SizedBox(width: 8),
-                Expanded(flex: 3, child: _buildDefectAndDescriptionFields(depotFuel)),
+                Expanded(
+                    flex: 3,
+                    child: _buildDefectAndDescriptionFields(depotFuel)),
                 SizedBox(width: 8),
-               Expanded(flex: 1,child: _buildOnRouteCheckbox(depotFuel)),
+                Expanded(flex: 1, child: _buildOnRouteCheckbox(depotFuel)),
               ],
             ),
           ),
@@ -151,6 +163,7 @@ class Depot extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildVehicleHeader(DepotFuel depotFuel) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
@@ -189,11 +202,11 @@ class Depot extends StatelessWidget {
               ],
             ),
           ),
-        
         ],
       ),
     );
   }
+
   Widget _buildCrewInfo(DepotFuel depotFuel) {
     return InkWell(
       onTap: () => setvehicle(depotFuel.Vehicle ?? '', depotFuel),
@@ -207,14 +220,17 @@ class Depot extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildCrewMemberInfo('Driver', depotFuel.Driver, depotFuel.Driver_Name),
+            _buildCrewMemberInfo(
+                'Driver', depotFuel.Driver, depotFuel.Driver_Name),
             SizedBox(height: 8),
-            _buildCrewMemberInfo('Conductor', depotFuel.Conductor, depotFuel.Conductor_Name),
+            _buildCrewMemberInfo(
+                'Conductor', depotFuel.Conductor, depotFuel.Conductor_Name),
           ],
         ),
       ),
     );
   }
+
   Widget _buildCrewMemberInfo(String role, String? id, String? name) {
     final hasInfo = !id.isNullOrEmpty;
     return Column(
@@ -262,6 +278,7 @@ class Depot extends StatelessWidget {
       ],
     );
   }
+
   Widget _buildDefectAndDescriptionFields(DepotFuel depotFuel) {
     return Column(
       children: [
@@ -271,6 +288,7 @@ class Depot extends StatelessWidget {
       ],
     );
   }
+
   Widget _buildDefectField(DepotFuel depotFuel) {
     if (depotFuel.On_route == null || depotFuel.On_route == false) {
       return Container(
@@ -295,7 +313,8 @@ class Depot extends StatelessWidget {
               focusNode: focusNode,
               style: const TextStyle(fontSize: 12),
               decoration: const InputDecoration(
-                contentPadding: EdgeInsets.symmetric(vertical: 0.0, horizontal: 10.0),
+                contentPadding:
+                    EdgeInsets.symmetric(vertical: 0.0, horizontal: 10.0),
                 hintText: 'Defect',
               ),
             );
@@ -306,6 +325,7 @@ class Depot extends StatelessWidget {
       return SizedBox.shrink(); // Return an empty widget if On_route is true
     }
   }
+
   Widget _buildDescriptionField(DepotFuel depotFuel) {
     print("Description ${depotFuel.Descrition}");
     return Visibility(
@@ -316,7 +336,8 @@ class Depot extends StatelessWidget {
           controller: depotFuel.desc_editor,
           style: const TextStyle(fontSize: 12),
           decoration: const InputDecoration(
-            contentPadding: EdgeInsets.symmetric(vertical: 0.0, horizontal: 10.0),
+            contentPadding:
+                EdgeInsets.symmetric(vertical: 0.0, horizontal: 10.0),
             hintText: 'Description',
           ),
           onChanged: (String? newValue) {
@@ -328,6 +349,7 @@ class Depot extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildOnRouteCheckbox(DepotFuel depotFuel) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -382,6 +404,7 @@ class Depot extends StatelessWidget {
       ],
     );
   }
+
   Widget _buildUpdateButton(DepotController dp) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -411,9 +434,11 @@ class Depot extends StatelessWidget {
       }),
     );
   }
+
   void update() {
     DepotFuel().updatedepot(Get.find<DepotController>().depottrans);
   }
+
   Future<void> setvehicle(String vehicle, DepotFuel depotFuel) async {
     final veh = await VehiclesController().getcurrvehicle(vehicle);
     final result = await Get.to(() => CrewAssignment(vehicle: veh));

@@ -1,5 +1,4 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:t_matatu/models/Header.dart';
@@ -9,12 +8,13 @@ import 'package:t_matatu/models/Tamounts.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/accounttypes.dart';
 import 'package:t_matatu/models/agents.dart';
-import 'package:t_matatu/models/expences.dart';
+import 'package:t_matatu/models/expenses/expenses.dart';
 import 'package:t_matatu/models/mappings.dart';
 import 'package:t_matatu/models/member.dart';
 import 'package:t_matatu/models/trantypes.dart';
 
 import '../models/Utils/util.dart';
+import '../models/expenses/vehicle_expenses.dart';
 import '../models/vehicles/Vehicle_crew.dart';
 import '../models/vehicles/vehicle.dart';
 
@@ -37,6 +37,7 @@ class db_Provider extends GetxController {
     Header(),
     Tamounts(),
     Expenses(),
+    Vehicle_Expenses(),
     Account_Types(),
     Reversal(),
     Hires()
@@ -78,6 +79,7 @@ class db_Provider extends GetxController {
       await db.execute(Vehicle_Crew.createtable);
       await db.execute(Tamounts.createtable);
       await db.execute(Expenses.createtable);
+      await db.execute(Vehicle_Expenses.createtable);
       await db.execute(Account_Types.createtable);
       await db.execute(Reversal.createtable);
       await db.execute(Hires.createtable);
@@ -93,7 +95,7 @@ class db_Provider extends GetxController {
     //     await db.execute(
     //       'ALTER TABLE ${TranTypes.table} ADD COLUMN ${TranTypes.col_Amount} float');
     // }
-    
+
     for (var i = oldVersion; i <= newVersion; i++) {
       for (var element in get_updates(newVersion)) {
         try {
@@ -117,10 +119,12 @@ class db_Provider extends GetxController {
     //close();
     return data;
   }
+
   Batch batch() {
     if (_database == null) throw Exception("DB not initialized");
     return _database!.batch();
   }
+
   Future<List<T>> batchinsert<T extends mapping>(
       String table, List<T> data) async {
     if (_database == null || _database!.isOpen == false) {
@@ -132,29 +136,26 @@ class db_Provider extends GetxController {
             conflictAlgorithm: ConflictAlgorithm.replace);
       }
     });
-  
+
     return data;
   }
-Future<void> batchdelete<T extends mapping>(
-    String table) async {
-      try   { 
-      if (_database == null || _database!.isOpen == false) {
-      await database;
-    }
 
-  await _database!.transaction((txn) async {
-  
+  Future<void> batchdelete<T extends mapping>(String table) async {
+    try {
+      if (_database == null || _database!.isOpen == false) {
+        await database;
+      }
+
+      await _database!.transaction((txn) async {
         await txn.delete(
           table,
           where: '1=1',
         );
-      
- 
-  });
-      }
-catch (e) {
-  e.printError();
-}}
+      });
+    } catch (e) {
+      e.printError();
+    }
+  }
   // Future<void> transactionprocess() async {
   //   List<Dbtrans> transaction = List.from(Get.find<db_Provider>().transactions);
   //   Get.find<db_Provider>().transactions.clear();
@@ -210,15 +211,16 @@ catch (e) {
     //     await Get.find<db_Provider>().database.query(table, columns: columns);
     // return maps;
   }
+
   Future<List<Map<String, dynamic>>> getdata(
       String table, List<String>? columns,
       [String? where, List<Object>? args]) async {
     List<Map<String, dynamic>> data = [];
- 
+
     if (_database == null || _database!.isOpen == false) {
       await database;
     }
-      //_showErrorSnackbar('Open Db');
+    //_showErrorSnackbar('Open Db');
     await _database!.transaction((txn) async {
       try {
         if (where == null) {
@@ -238,7 +240,6 @@ catch (e) {
     //     await Get.find<db_Provider>().database.query(table, columns: columns);
     // return maps;
   }
-
 
   Future<List<Map<String, dynamic>>> getrawdata(String sql) async {
     List<Map<String, dynamic>> data = [];
@@ -376,13 +377,10 @@ catch (e) {
 
   Future<Map<String, dynamic>?> getagent(
       List<String>? columns, String table, String agent) async {
-
-         
     List<Map<String, dynamic>> d = await getdata(
         table, columns, '${Agent.col_Agent_Code} = ?', [agent.toUpperCase()]);
-       
-     if (d.isEmpty)
-     return null;
+
+    if (d.isEmpty) return null;
     return d.first;
 
     //await db!.close();

@@ -1,11 +1,11 @@
 import 'package:get/get.dart';
-import 'package:t_matatu/models/vehicle.dart';
+import 'package:t_matatu/models/vehicles/vehicle_info.dart';
 
 class VehiclesController extends GetxController {
   final RxList<Vehicle> _vehicles = <Vehicle>[].obs;
-  
+
   List<Vehicle> get vehicles => _vehicles;
-  
+
   // Fetch vehicles from the database
   Future<void> fetchVehicles() async {
     try {
@@ -27,39 +27,45 @@ class VehiclesController extends GetxController {
       rethrow;
     }
   }
-  
+
   // Search for vehicles by number or fleet number
   Future<List<Vehicle>> searchVehicles(String query) async {
     if (query.isEmpty) {
       return [];
     }
-    
+
     // If we have cached vehicles, search in them
     if (_vehicles.isNotEmpty) {
       return _vehicles.where((vehicle) {
-        return (vehicle.vehicleNumber.toLowerCase().contains(query.toLowerCase())) ||
-               (vehicle.fleetNumber?.toLowerCase().contains(query.toLowerCase()) ?? false);
+        return (vehicle.vehicleNumber
+                .toLowerCase()
+                .contains(query.toLowerCase())) ||
+            (vehicle.fleetNumber?.toLowerCase().contains(query.toLowerCase()) ??
+                false);
       }).toList();
     }
-    
+
     // Otherwise, fetch from the database
     await fetchVehicles();
     return _vehicles.where((vehicle) {
-      return (vehicle.vehicleNumber.toLowerCase().contains(query.toLowerCase())) ||
-             (vehicle.fleetNumber?.toLowerCase().contains(query.toLowerCase()) ?? false);
+      return (vehicle.vehicleNumber
+              .toLowerCase()
+              .contains(query.toLowerCase())) ||
+          (vehicle.fleetNumber?.toLowerCase().contains(query.toLowerCase()) ??
+              false);
     }).toList();
   }
-  
+
   // Get vehicle suggestions for autocomplete
   Future<List<Vehicle>> getVehicleSuggestions(String query) async {
     if (query.length < 2) {
       return [];
     }
-    
+
     final results = await searchVehicles(query);
     return results.take(5).toList(); // Limit to 5 suggestions
   }
-  
+
   // Add a new vehicle
   Future<void> addVehicle(Vehicle vehicle) async {
     try {
@@ -72,7 +78,7 @@ class VehiclesController extends GetxController {
       rethrow;
     }
   }
-  
+
   // Update an existing vehicle
   Future<void> updateVehicle(Vehicle vehicle) async {
     try {
@@ -88,7 +94,7 @@ class VehiclesController extends GetxController {
       rethrow;
     }
   }
-  
+
   // Delete a vehicle
   Future<void> deleteVehicle(int id) async {
     try {

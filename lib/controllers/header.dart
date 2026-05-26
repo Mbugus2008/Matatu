@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/SettingsController.dart';
 import 'package:t_matatu/controllers/TypesController.dart';
-import 'package:t_matatu/controllers/agent.dart';
 import 'package:t_matatu/controllers/main.dart';
-import 'package:t_matatu/init.dart';
 import 'package:t_matatu/models/Header.dart';
 import 'package:t_matatu/models/Reversal.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
@@ -40,11 +38,12 @@ class HeaderController extends GetxController {
   String displayStringForOption(InputSuggetions option) =>
       option.Vehicle.toString();
   final filteredSuggestions = <InputSuggetions>[].obs;
-  
+
   void createheader() {
     Agent().getagents();
     Get.find<HeaderController>().currHeader.value = Header();
-    Get.find<HeaderController>().currHeader.value.Date =getdates(Get.find<SettingsController>().settings.value!.WorkingDate) ;
+    Get.find<HeaderController>().currHeader.value.Date =
+        getdates(Get.find<SettingsController>().settings.value!.WorkingDate);
     Get.find<HeaderController>().currHeader.value.Receipt_No =
         DateTime.now().microsecondsSinceEpoch.toString();
     Get.find<HeaderController>().currHeader.value.Agent =
@@ -203,108 +202,95 @@ class HeaderController extends GetxController {
   }
 
   Future<void> reverse(Header header) async {
+    final db = Get.find<db_Provider>();
+    final receiptNo = header.Receipt_No?.toString() ?? '';
+    final createdBy = Get.find<MainController>().agent.value.Agent_Code ?? '';
 
-  //   final app = await Get.find<db_Provider>().getdata(
-  //       Reversal.table, Reversal.columns, '${Reversal.col_Receipt_No}=?', [header.Receipt_No.toString()]);
-  //   if (app.length>0)
-
-  // { Get.snackbar(
-  //   'Reversal',
-  //   'Reversal Request Exist',
-  //   backgroundColor: Colors.red, // Customize the background color
-  //   duration: const Duration(
-  //       seconds: 3), // Set the duration the snackbar is displayed
-  //   snackPosition:
-  //   SnackPosition.BOTTOM, // Set the position of the snackbar
-  // );}
-
-  //   Reversal reversal = Reversal();
-  //   reversal.Account = header.Account;
-  //   reversal.Receipt_No = header.Receipt_No;
-  //   reversal.Agent = header.Agent;
-  //   reversal.Date = DateTime.now();
-  //   reversal.Transction_Date = header.Date;
-  //   reversal.Created_By = Get.find<MainController>().agent.value.Agent_Code;
-  //   reversal.Total_Amount = header.Total_Amount;
-  //   reversal.Total_Trans = header.Trans;
-  //   reversal.Vehicle = header.Vehicle;
-  //   reversal.Sent = false;
-  //   reversal.Status = STatus.Open;
-
-  //   await Get.find<db_Provider>().insert(Reversal.table, reversal);
-  //   Reversal().uploadreversal();
-
-    final rev = header.copyWith(
-      Key: header.Key,
-      Receipt_No: header.Receipt_No,
-      Date: header.Date,
-      Account: header.Account,
-      Vehicle: header.Vehicle,
-      Posted: header.Posted,
-      Reversal: header.Reversal,
-      Reversed: header.Reversed,
-      sent: header.sent,
-      Trans: header.Trans,
-      Total_Amount: header.Total_Amount,
-      Agent: header.Agent,
-      transtions: header.transtions,
-    );
-    rev.Reversed = true;
-    rev.Reversal = true;
-    rev.Receipt_No = '${rev.Receipt_No}R';
-    rev.Total_Amount = rev.Total_Amount! * -1;
-
-    header.Reversed = true;
-    await db_Provider().updatedata(
-      Header.table,
-      {Header.col_Reversed: true},
-      '${Header.col_Receipt_No} = ?',
-      [header.Receipt_No.toString()],
-    );
-    // await Get.find<db_Provider>().database.update(
-    //       Header.table,
-    //       {Header.col_Reversed: true},
-    //       where: '${Header.col_Receipt_No} = ?',
-    //       whereArgs: [header.Receipt_No],
-    //     );
-    await Get.find<db_Provider>().insert(Header.table, rev);
-
-    if (rev.transtions != null) {
-      for (var element in rev.transtions!.toList()) {
-        tmatatu.Trans t = element.copyWith(
-          Key: element.Key,
-          Document_No: element.Document_No,
-          Transaction_Date: element.Transaction_Date,
-          Account_No: element.Account_No,
-          Description: element.Description,
-          Amount: element.Amount,
-          Posted: element.Posted,
-          Transaction_Time: element.Transaction_Time,
-          Messages: element.Messages,
-          OTTN: element.OTTN,
-          Transaction_Location: element.Transaction_Location,
-          Transaction_By: element.Transaction_By,
-          Agent_Code: element.Agent_Code,
-          Loan_No: element.Loan_No,
-          Account_Name: element.Account_Name,
-          Telephone: element.Telephone,
-          Id_No: element.Id_No,
-          Constituency: element.Constituency,
-          Ward: element.Ward,
-          Type: element.Type,
-          sent: element.sent,
-          Creation_time: element.Creation_time,
-        );
-        t.OTTN = '${t.OTTN}R';
-        t.Document_No = '${t.Document_No}R';
-        t.Amount = t.Amount! * -1;
-        await Get.find<db_Provider>().insert(tmatatu.Trans.tabletrans, t);
-      }
+    if (receiptNo.isEmpty || createdBy.isEmpty) {
+      Get.snackbar(
+        'Reversal',
+        'Unable to create reversal request',
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
     }
-    // Get.find<HeaderController>().filteredTrans.add(rev);
-    Get.find<HeaderController>().trans.add(rev);
-    Get.find<ReportController>().daystrans.add(rev);
-    upload();
+
+    if (header.Reversed == true || header.Reversal == true) {
+      Get.snackbar(
+        'Reversal',
+        'Reversal request already exists',
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 3),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final existing = await db.getdata(
+      Reversal.table,
+      Reversal.columns,
+      '${Reversal.col_Receipt_No}=?',
+      [receiptNo],
+    );
+
+    if (existing.isNotEmpty) {
+      header.Reversal = true;
+      await db.updatedata(
+        Header.table,
+        {Header.col_Reversal: true},
+        '${Header.col_Receipt_No} = ?',
+        [receiptNo],
+      );
+      Get.find<ReportController>().daystrans.refresh();
+      Get.find<HeaderController>().trans.refresh();
+      Get.snackbar(
+        'Reversal',
+        'Reversal request already exists',
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 3),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final reversal = Reversal(
+      Account: header.Account,
+      Receipt_No: receiptNo,
+      Agent: header.Agent,
+      Date: DateTime.now(),
+      Transction_Date: header.Date,
+      Created_By: createdBy,
+      Total_Amount: header.Total_Amount,
+      Total_Trans: header.Trans ?? header.transtions?.length ?? 0,
+      Vehicle: header.Vehicle,
+      Sent: false,
+      Status: STatus.Open,
+    );
+
+    await db.insert(Reversal.table, reversal);
+
+    header.Reversal = true;
+    await db.updatedata(
+      Header.table,
+      {Header.col_Reversal: true},
+      '${Header.col_Receipt_No} = ?',
+      [receiptNo],
+    );
+    Get.find<ReportController>().daystrans.refresh();
+    Get.find<HeaderController>().trans.refresh();
+
+    await Reversal().getreversals();
+    await Reversal().uploadreversal();
+
+    Get.snackbar(
+      'Reversal',
+      'Reversal request submitted',
+      backgroundColor: Colors.green,
+      duration: const Duration(seconds: 3),
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   Future<void> getsuggetions() async {

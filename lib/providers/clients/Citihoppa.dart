@@ -11,39 +11,46 @@ import 'package:t_matatu/models/Tamounts.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/Utils/util.dart';
 import 'package:t_matatu/models/summary/Tsummary.dart';
-import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
-import 'package:t_matatu/pages/Depot.dart';
-import 'package:t_matatu/pages/Fuel.dart';
 import 'package:t_matatu/pages/hires/hires_list.dart';
 import 'package:t_matatu/pages/pageloader.dart';
+import 'package:t_matatu/pages/vehicles/depot.dart';
+import 'package:t_matatu/pages/vehicles/fuel.dart';
 import 'package:t_matatu/pages/vehicles/vehdetails.dart';
 import 'package:t_matatu/providers/client.dart';
 
 import '../../controllers/vehicles/vehicles.dart';
+import '../../pages/vehicles/two_tab_screen.dart';
 import '../../pages/widgets/Groupbox.dart';
 import '../../reports/controller.dart';
-import '../../pages/TwoTabScreen.dart';
 
 enum Receipttype { Member, Crew, Both }
 
-class Cityhoppa extends  BaseClients {
-
-  Cityhoppa({clientName,clientName_line2,email,
-  telephone,street,address,city,
-  Box,Auto_Assign,Attach_crew}):super(
-    clientName: clientName,
-    clientName_line2: clientName_line2,
-    email: email,
-    telephone: telephone,
-    street: street,
-    address: address,
-    city: city,
-    Box: Box,
-    Auto_Assign: Auto_Assign,
-    Attach_crew: Attach_crew,
-  );
+class Cityhoppa extends BaseClients {
+  Cityhoppa(
+      {clientName,
+      clientName_line2,
+      email,
+      telephone,
+      street,
+      address,
+      city,
+      Box,
+      Auto_Assign,
+      Attach_crew})
+      : super(
+          clientName: clientName,
+          clientName_line2: clientName_line2,
+          email: email,
+          telephone: telephone,
+          street: street,
+          address: address,
+          city: city,
+          Box: Box,
+          Auto_Assign: Auto_Assign,
+          Attach_crew: Attach_crew,
+        );
 
   @override
   Future<void> init() async {
@@ -395,13 +402,13 @@ class Cityhoppa extends  BaseClients {
     Receipttype type = gettype(header.transtions);
     switch (type) {
       case Receipttype.Member:
-       clientName = "City Hoppa Limited";
-      clientName_line2 = "";
+        clientName = "City Hoppa Limited";
+        clientName_line2 = "";
         bytes += await getHeader() + await getTicket(header);
         break;
       case Receipttype.Crew:
-      clientName = "Citi Travel Savings & Credit";
-      clientName_line2 = "Co-operative Society Ltd";
+        clientName = "Citi Travel Savings & Credit";
+        clientName_line2 = "Co-operative Society Ltd";
         for (var element in header.transtions!) {
           Header h = header.copyWith();
           if (element.Type == "SAVINGSCREW") h.Account = element.Account_No;
@@ -411,8 +418,8 @@ class Cityhoppa extends  BaseClients {
         }
         break;
       case Receipttype.Both:
-       clientName = "City Hoppa Limited";
-      clientName_line2 = "";
+        clientName = "City Hoppa Limited";
+        clientName_line2 = "";
         List<tmatatu.Trans> listcopy = header.transtions!;
         List<tmatatu.Trans> mtr = listcopy
             .where((element) =>
@@ -767,6 +774,7 @@ class Cityhoppa extends  BaseClients {
     bytes += generator.cut();
     return bytes;
   }
+
   @override
   Future<List<int>> getZreport(Tsummary summary) async {
     List<int> bytes = [];
@@ -898,6 +906,7 @@ class Cityhoppa extends  BaseClients {
   String v_description(Header header) {
     return '${header.Vehicle ?? ''}- ${header.Fleet}';
   }
+
   @override
   GroupBox? clientMenu() {
     return GroupBox("", [
@@ -931,10 +940,8 @@ class Cityhoppa extends  BaseClients {
     ]);
   }
 
-
-
-@override
-bool? Attach_crew = true;
+  @override
+  bool? Attach_crew = true;
 
   double _getTitleFontSize(int length) {
     return 18.0; // Default title font size, adjust as needed

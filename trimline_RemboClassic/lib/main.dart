@@ -9,13 +9,14 @@ import 'package:t_matatu/providers/clients/RemboClassic.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  BaseClients client = RemboClassic(clientName: "REMBO CLASSIC SACCO", 
-  clientName_line2: "", 
-  email: "remboclassicsaccos@gmail.com",
-  telephone: "0715118735 | 0787188117", 
-  Show_comments: true,
- 
-     Auto_Assign: false , Attach_crew: false);
+  BaseClients client = RemboClassic(
+      clientName: "REMBO CLASSIC SACCO",
+      clientName_line2: "",
+      email: "remboclassicsaccos@gmail.com",
+      telephone: "0715118735 | 0787188117",
+      Show_comments: true,
+      Auto_Assign: false,
+      Attach_crew: false);
 
   if (Platform.isAndroid) {
     [
@@ -24,21 +25,18 @@ Future<void> main() async {
       Permission.bluetooth,
       Permission.bluetoothConnect,
       Permission.bluetoothScan
-         ].request().then((status) async {
-    }).then((value) async {
-     AppConfig   config = AppConfig(
-        apiBaseUrl: 'http://nav.trimline.co.ke:4010/api/Matatu/',
+    ].request().then((status) async {}).then((value) async {
+      AppConfig config = AppConfig(
+        apiBaseUrl: 'http://nav.trimline.co.ke:4010/Test/api/Matatu/',
+        // apiBaseUrl: 'http://nav.trimline.co.ke:4010/api/Matatu/',
         updateUrl: 'https://trimline.co.ke/apps/RemboClassic/',
         clientId: "REMBOCLASIC",
         clientName: "REMBOCLASIC",
         Client: client,
         logo: 'assets/logo.png',
       );
-       await tmatatu.start(config);
-       runApp(tmatatu.MyApp());
-       
+      await tmatatu.start(config);
+      runApp(tmatatu.MyApp());
     });
   }
- 
 }
-

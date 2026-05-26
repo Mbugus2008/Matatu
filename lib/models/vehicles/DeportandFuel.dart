@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/models/Utils/util.dart';
 import 'package:t_matatu/models/enums.dart';
-import 'package:t_matatu/models/expences.dart';
+import 'package:t_matatu/models/expenses/expenses.dart';
 import 'package:t_matatu/models/mappings.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/network/Apis.dart';
@@ -27,15 +27,16 @@ class DepotFuel implements Tomaps {
     _On_route = value;
     DepotController().updateCheckAll();
   }
-  bool? _Run_Back ;
+
+  bool? _Run_Back;
   bool? get Run_Back => _Run_Back;
   set Run_Back(bool? value) {
     _Run_Back = value;
   }
-  DateTime? Run_Bak_Time;
- double? Management;
-double? Management_Target;
 
+  DateTime? Run_Bak_Time;
+  double? Management;
+  double? Management_Target;
 
   DateTime? From;
   String? Nro_Defects;
@@ -43,9 +44,10 @@ double? Management_Target;
   String? get Descrition => _Descrition;
   set Descrition(String? value) {
     print("New description: $value");
-   _Descrition = value;
+    _Descrition = value;
     desc_editor.text = value ?? '';
   }
+
   DateTime? Date;
   String? User;
   vehicle_type? Capacity;
@@ -57,6 +59,7 @@ double? Management_Target;
     _Millage = value;
     //milleage_editor.text =  value.toString();
   }
+
   String? Driver;
   String? Conductor;
   double? Offload;
@@ -64,37 +67,39 @@ double? Management_Target;
   double? get Fuel => _Fuel;
   set Fuel(double? value) {
     _Fuel = value;
-    Balance= (Amount_Paid ?? 0) - (value ??0);
+    Balance = (Amount_Paid ?? 0) - (value ?? 0);
     //fuel_editor.text =  value.toString();
   }
+
   double? _Amount_Paid;
   double? get Amount_Paid => _Amount_Paid;
   set Amount_Paid(double? value) {
     _Amount_Paid = value;
-    Balance= (value ?? 0) - (Fuel ??0);
+    Balance = (value ?? 0) - (Fuel ?? 0);
     //amountpaid_editor.text = value.toString();
   }
+
   double? Balance;
   double? Net_Offload;
   double? _Total_litres;
   double? get Total_litres => _Total_litres;
   set Total_litres(double? value) {
     _Total_litres = value;
-  
+
     //litres_editor.text = value.toString();
   }
+
   double? Km_Litre;
   String? Fuel_Agent;
   String? Driver_Name;
   String? Conductor_Name;
-     double? Offload_Target ;
-   
-     double? Offload_Balance ;
-   
-     double? Management_Balance ;
-    
-     Whos_to_blame? Whos_to_blame_for_Deficiet ;
-    
+  double? Offload_Target;
+
+  double? Offload_Balance;
+
+  double? Management_Balance;
+
+  Whos_to_blame? Whos_to_blame_for_Deficiet;
 
   // TextEditingControllers
   late TextEditingController Nro_Defects_editor;
@@ -132,8 +137,8 @@ double? Management_Target;
     double? Total_litres,
     double? Km_Litre,
     String? Fuel_Agent,
-   this.Driver_Name,
-   this.Conductor_Name,
+    this.Driver_Name,
+    this.Conductor_Name,
     bool? Run_Back,
     this.Run_Bak_Time,
     this.Whos_to_blame_for_Deficiet,
@@ -142,14 +147,25 @@ double? Management_Target;
     this.Management_Balance,
     this.Management,
     this.Management_Target,
-  }) : _Millage = Millage, _Amount_Paid = Amount_Paid, _Fuel = Fuel, _On_route = On_route,_Descrition = Descrition,_Total_litres = Total_litres,_Run_Back = Run_Back {
+  })  : _Millage = Millage,
+        _Amount_Paid = Amount_Paid,
+        _Fuel = Fuel,
+        _On_route = On_route,
+        _Descrition = Descrition,
+        _Total_litres = Total_litres,
+        _Run_Back = Run_Back {
     // Initialize TextEditingControllers with current values or empty string
-    Nro_Defects_editor = TextEditingController(text: Nro_Defects?.toString() ?? '');
-    desc_editor = TextEditingController(text: _Descrition ?? ''); // Assuming _Descrition holds the description value
+    Nro_Defects_editor =
+        TextEditingController(text: Nro_Defects?.toString() ?? '');
+    desc_editor = TextEditingController(
+        text: _Descrition ??
+            ''); // Assuming _Descrition holds the description value
     fuel_editor = TextEditingController(text: _Fuel?.toStringAsFixed(2) ?? '');
-    amountpaid_editor = TextEditingController(text: _Amount_Paid?.toStringAsFixed(2) ?? '');
+    amountpaid_editor =
+        TextEditingController(text: _Amount_Paid?.toStringAsFixed(2) ?? '');
     milleage_editor = TextEditingController(text: _Millage?.toString() ?? '');
-    litres_editor = TextEditingController(text: _Total_litres?.toStringAsFixed(2) ?? '');
+    litres_editor =
+        TextEditingController(text: _Total_litres?.toStringAsFixed(2) ?? '');
 
     // Initialize FocusNodes
     fuel_focus_node = FocusNode();
@@ -173,11 +189,12 @@ double? Management_Target;
     milleage_focus_node.dispose();
     // print('DepotFuel disposed for vehicle: $Vehicle'); // Optional: for debugging
   }
-  
+
   @override
   String toString() {
     return '$Vehicle $Fleet $Driver_Name $Conductor_Name';
   }
+
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'Key': Key,
@@ -204,7 +221,8 @@ double? Management_Target;
       'Driver_Name': Driver_Name,
       'Conductor_Name': Conductor_Name,
       'Run_Back': Run_Back,
-      'Run_Bak_Time': Run_Bak_Time != null ? formattedTime.format(Run_Bak_Time!) : null,
+      'Run_Bak_Time':
+          Run_Bak_Time != null ? formattedTime.format(Run_Bak_Time!) : null,
       'Whos_to_blame_for_Deficiet': Whos_to_blame_for_Deficiet?.index,
       'Offload_Target': Offload_Target,
       'Offload_Balance': Offload_Balance,
@@ -216,17 +234,19 @@ double? Management_Target;
 
   factory DepotFuel.fromMap(Map<String, dynamic> map) {
     final dateFormat = DateFormat('HH:mm:ss');
-    DateTime? parsedDate,runbacktime;
+    DateTime? parsedDate, runbacktime;
     try {
       parsedDate = dateFormat.parse(map['From'] as String);
-      runbacktime =dateFormat.parse(map['Run_Bak_Time'] as String);
+      runbacktime = dateFormat.parse(map['Run_Bak_Time'] as String);
     } catch (e) {}
-    String? driver_name = map['Driver_Name'] != null ? map['Driver_Name'] as String : null;
-String? conductor_name = map['Conductor_Name'] != null ? map['Conductor_Name'] as String : null;
+    String? driver_name =
+        map['Driver_Name'] != null ? map['Driver_Name'] as String : null;
+    String? conductor_name =
+        map['Conductor_Name'] != null ? map['Conductor_Name'] as String : null;
     print("Driver Name: ${driver_name}");
     print("Conductor Name: ${conductor_name}");
 
-DepotFuel df  = DepotFuel(
+    DepotFuel df = DepotFuel(
       Key: map['Key'] != null ? map['Key'] as String : null,
       Vehicle: map['Vehicle'] != null ? map['Vehicle'] as String : null,
       Fleet: map['Fleet'] != null ? map['Fleet'] as String : null,
@@ -253,21 +273,32 @@ DepotFuel df  = DepotFuel(
       Balance: map['Balance'] != null ? map['Balance'] as double : null,
       Net_Offload:
           map['Net_Offload'] != null ? map['Net_Offload'] as double : null,
-      Total_litres: map['Total_Litres'] != null ? map['Total_Litres'] as double : null,
+      Total_litres:
+          map['Total_Litres'] != null ? map['Total_Litres'] as double : null,
       Km_Litre: map['Km_Litre'] != null ? map['Km_Litre'] as double : null,
       Fuel_Agent:
           map['Fuel_Agent'] != null ? map['Fuel_Agent'] as String : null,
-      Driver_Name:
-         driver_name,
-      Conductor_Name: map['Conductor_Name']?.toString() ,
+      Driver_Name: driver_name,
+      Conductor_Name: map['Conductor_Name']?.toString(),
       Run_Back: map['Run_Back'] != null ? map['Run_Back'] as bool : null,
       Run_Bak_Time: runbacktime,
-      Whos_to_blame_for_Deficiet: map['Whos_to_blame_for_Deficiet'] != null ? Whos_to_blame.values[map['Whos_to_blame_for_Deficiet'] as int] : null,
-      Offload_Target: map['Offload_Target'] != null ? map['Offload_Target'] as double : null,
-      Offload_Balance: map['Offload_Balance'] != null ? map['Offload_Balance'] as double : null,
-      Management_Balance: map['Management_Balance'] != null ? map['Management_Balance'] as double : null,
-      Management: map['Management'] != null ? map['Management'] as double : null,
-      Management_Target: map['Management_Target'] != null ? map['Management_Target'] as double : null,
+      Whos_to_blame_for_Deficiet: map['Whos_to_blame_for_Deficiet'] != null
+          ? Whos_to_blame.values[map['Whos_to_blame_for_Deficiet'] as int]
+          : null,
+      Offload_Target: map['Offload_Target'] != null
+          ? map['Offload_Target'] as double
+          : null,
+      Offload_Balance: map['Offload_Balance'] != null
+          ? map['Offload_Balance'] as double
+          : null,
+      Management_Balance: map['Management_Balance'] != null
+          ? map['Management_Balance'] as double
+          : null,
+      Management:
+          map['Management'] != null ? map['Management'] as double : null,
+      Management_Target: map['Management_Target'] != null
+          ? map['Management_Target'] as double
+          : null,
     );
 
     print('Recieved Driver Name: ${df.Driver_Name}');
@@ -316,7 +347,8 @@ DepotFuel df  = DepotFuel(
             print(results.Contents);
             var ll = (results.Contents ?? []);
             ll.sort((a, b) => a.Fleet!.compareTo(b.Fleet.toString()));
-            Get.find<DepotController>().updateDepotTrans(ll); // Use the new method
+            Get.find<DepotController>()
+                .updateDepotTrans(ll); // Use the new method
             Get.find<DepotController>().depottrans1.value = ll;
           }
         }
@@ -325,7 +357,7 @@ DepotFuel df  = DepotFuel(
   }
 
   Future<void> updatedepot(List<DepotFuel> depots) async {
-    Get.find<DepotController>().updating .value = true;
+    Get.find<DepotController>().updating.value = true;
     for (var depot in depots) {
       ApiClient().postdata("setdepotdata", depot.toJson()).then((r) async {
         if (r.statusCode == 200) {
@@ -341,14 +373,14 @@ DepotFuel df  = DepotFuel(
         }
       });
     }
-    Get.find<DepotController>().updating .value = false;
+    Get.find<DepotController>().updating.value = false;
   }
 
-String serializeDepotList(List<DepotFuel> depots) {
-  List<Map<String, dynamic>> jsonList = depots.map((depot) => depot.toMap()).toList();
-  return json.encode(jsonList);
-}
-
+  String serializeDepotList(List<DepotFuel> depots) {
+    List<Map<String, dynamic>> jsonList =
+        depots.map((depot) => depot.toMap()).toList();
+    return json.encode(jsonList);
+  }
 }
 
 class DepotController extends GetxController {
@@ -364,14 +396,16 @@ class DepotController extends GetxController {
     depottrans.value = [];
     //depottrans1.value = [];
     // Fetch initial data
-   // DepotFuel().getdata(DateTime.now());
+    // DepotFuel().getdata(DateTime.now());
   }
 
   void updateCheckAll() {
     var selected = Get.find<DepotController>()
-        .depottrans.any((dt)=> dt.On_route== false);
+        .depottrans
+        .any((dt) => dt.On_route == false);
 
-    checkall.value = !selected;// Get.find<VehiclesController>().depottrans.any((dt)=> dt.On_route== false);
+    checkall.value =
+        !selected; // Get.find<VehiclesController>().depottrans.any((dt)=> dt.On_route== false);
 
     update();
   }
@@ -389,8 +423,9 @@ class DepotController extends GetxController {
       depotFuelInstance.dispose();
     }
     depottrans1.clear(); // Optional: clear the list after disposing
-    
-    print('DepotController closed and resources disposed.'); // Optional: for debugging
+
+    print(
+        'DepotController closed and resources disposed.'); // Optional: for debugging
     super.onClose();
   }
 
@@ -406,11 +441,13 @@ class DepotController extends GetxController {
     Get.find<DepotController>().depottrans.value = newDepotTrans;
     update(); // This will notify all GetBuilder widgets to rebuild
   }
-    void filterDepotTrans(String value) {
+
+  void filterDepotTrans(String value) {
     value = value.toUpperCase();
     print("Filtering1 ${Get.find<DepotController>().depottrans1.length}");
     print("Filtering ${Get.find<DepotController>().depottrans.length}");
-    Get.find<DepotController>().depottrans.value = Get.find<DepotController>().depottrans1.where((item) {
+    Get.find<DepotController>().depottrans.value =
+        Get.find<DepotController>().depottrans1.where((item) {
       return item.toString().toUpperCase().contains(value);
     }).toList();
   }

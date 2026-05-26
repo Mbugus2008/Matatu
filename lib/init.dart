@@ -4,22 +4,20 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
+import 'package:t_matatu/bluetooth/bluetoothManager.dart';
 import 'package:t_matatu/controllers/Members.dart';
 import 'package:t_matatu/controllers/SettingsController.dart';
 import 'package:t_matatu/controllers/TypesController.dart';
 import 'package:t_matatu/controllers/agent.dart';
-
-import 'package:t_matatu/controllers/expenses.dart';
+import 'package:t_matatu/controllers/expenses/expense_controller.dart';
 import 'package:t_matatu/controllers/header.dart';
 import 'package:t_matatu/controllers/main.dart';
-
 import 'package:t_matatu/controllers/trans.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/models/Header.dart';
 import 'package:t_matatu/models/Hires.dart';
 import 'package:t_matatu/models/Reversal.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
-import 'package:t_matatu/models/Utils/Settings.dart';
 import 'package:t_matatu/models/accounttypes.dart';
 import 'package:t_matatu/models/agents.dart';
 import 'package:t_matatu/models/member.dart';
@@ -28,45 +26,39 @@ import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/network/results/results.dart';
-import 'package:t_matatu/bluetooth/bluetoothManager.dart';
 import 'package:t_matatu/providers/colors.dart';
 import 'package:t_matatu/providers/db.dart';
+import 'package:t_matatu/providers/logger.dart';
 import 'package:t_matatu/reports/controller.dart';
 import 'package:t_matatu/utils/updater.dart';
 import 'package:uuid/uuid.dart';
-import 'package:t_matatu/providers/logger.dart';
-
-
-
 
 @pragma(
     'vm:entry-point') // Mandatory if the App is obfuscated or using Flutter 3.1+
-void callbackDispatcher() {
-
-}
+void callbackDispatcher() {}
 Map<String, dynamic> toJsonIgnoreNull(Map<String, dynamic> json) {
   json.removeWhere((key, value) => value == null);
   return json;
 }
 
- double GetTitleFontSize(int length) {
-    if (length < 10) {
-      return 18;
-    } else if (length < 20) {
-      return 16;
-    } else {
-      return 14;
-    }
+double GetTitleFontSize(int length) {
+  if (length < 10) {
+    return 18;
+  } else if (length < 20) {
+    return 16;
+  } else {
+    return 14;
   }
+}
 
 Future<void> initializedata() async {
   try {
-     Agent().getagents();
+    Agent().getagents();
     Vehicles().getvehicles();
-    Member().getmembers(); 
+    Member().getmembers();
     TranTypes().getttypes();
-     Account_Types().get_account_Types();
-     SettingsController().fetchWorkingDate();
+    Account_Types().get_account_Types();
+    SettingsController().fetchWorkingDate();
   } catch (e, stackTrace) {
     print('Initialization error: $e');
     print(stackTrace);
@@ -75,7 +67,6 @@ Future<void> initializedata() async {
 }
 
 Future<void> upload() async {
-  
   sendtransdetails();
   sendtrans();
 }
@@ -167,30 +158,31 @@ void showToast(String message) {
 }
 
 Future<void> init() async {
-    Get.put(UpdateController());
-Get.put(MainController(),permanent: true);
- Get.put(LoggerService(),permanent: true);
+  Get.put(UpdateController());
+  Get.put(MainController(), permanent: true);
+  Get.put(LoggerService(), permanent: true);
   Get.put(DepotController(), permanent: true);
-  Get.put(HeaderController(),permanent: true);
-  Get.put(db_Provider(),permanent: true);
-  Get.put(ReversalController(),permanent: true);
-  Get.put(AgentController(),permanent: true);
-  Get.put(VehiclesController(),permanent: true);
+  Get.put(HeaderController(), permanent: true);
+  Get.put(db_Provider(), permanent: true);
+  Get.put(ReversalController(), permanent: true);
+  Get.put(AgentController(), permanent: true);
+  Get.put(VehiclesController(), permanent: true);
   //Get.lazyPut(() => DepotController());
-  Get.put(ExpenseController(),permanent: true);
-  Get.put(TransTypeController(),permanent: true);
-  Get.put(ReportController(),permanent: true);
-  Get.put(TransController(),permanent: true);
-  Get.put(MemberController(),permanent: true);
-  Get.put(BluetoothManager(),permanent: true);
-  Get.put(HiresController(),permanent: true);
-  Get.put(SettingsController(),permanent: true);
+  Get.put(ExpenseController(), permanent: true);
+  Get.put(TransTypeController(), permanent: true);
+  Get.put(ReportController(), permanent: true);
+  Get.put(TransController(), permanent: true);
+  Get.put(MemberController(), permanent: true);
+  Get.put(BluetoothManager(), permanent: true);
+  Get.put(HiresController(), permanent: true);
+  Get.put(SettingsController(), permanent: true);
   BluetoothManager().Scan();
   BluetoothManager().Subscriptionstatus();
   //Get.put(Bluetooth(),permanent: true);
   // Get.find<ExpenseController>().onInit();
   //Get.find<TransTypeController>().onInit();
 }
+
 Future<String> generateCustomCode() async {
   var uuid = Uuid().v4();
   var bytes = utf8.encode(uuid);

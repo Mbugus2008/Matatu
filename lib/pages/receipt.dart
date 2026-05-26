@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:t_matatu/bluetooth/bluetoothManager.dart';
 import 'package:t_matatu/controllers/Members.dart';
 import 'package:t_matatu/controllers/SettingsController.dart';
 import 'package:t_matatu/controllers/TypesController.dart';
@@ -9,20 +10,18 @@ import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/init.dart';
 import 'package:t_matatu/models/TransSummary.dart';
+import 'package:t_matatu/models/member.dart';
 import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/pages/Amount%20dist.dart';
 import 'package:t_matatu/pages/crew.dart';
-import 'package:t_matatu/bluetooth/bluetoothManager.dart';
 import 'package:t_matatu/providers/client.dart';
 import 'package:t_matatu/providers/colors.dart';
 import 'package:t_matatu/reports/controller.dart';
-import 'package:t_matatu/models/member.dart';
 
-import '../controllers/expenses.dart';
-
+import '../controllers/expenses/expense_controller.dart';
 import '../models/Header.dart';
 import '../models/Transaction.dart' as tMatatu;
-import '../models/expences.dart';
+import '../models/expenses/expenses.dart';
 import '../models/vehicles/vehicle.dart';
 import '../providers/db.dart';
 
@@ -50,52 +49,56 @@ class _ReceiptState extends State<Receipts> {
   List<VehicleSuggestion> _vehicleSuggestions = [];
 
   Future<void> Print(Header header) async {
-     Get.dialog(
-    Center(child: CircularProgressIndicator()),
-    barrierDismissible: false,
-  );
-    await Future.delayed(Duration.zero, () async {  
-    try{
-   if (header.Vehicle == null || header.Vehicle!.isEmpty || header.Account == null || header.Account!.isEmpty) {
-      Get.snackbar("Error", "Vehicle or Account is empty.");
-      return;
-   }
-   if (header.transtions == null || header.transtions!.isEmpty) {
-      Get.snackbar("Error", "Transactions is empty.");
-      return;
-   }
-    header.Total_Amount = header.transtions!.fold<double>(
-        0.0,
-        (double currentSum, item) =>
-            currentSum + num.tryParse(item.Amount.toString())!);
-    await Get.find<db_Provider>().insert(Header.table, header);
-    if (header.transtions != null) {
-      for (var element in header.transtions!.toList()) {
-        await Get.find<db_Provider>().insert(tMatatu.Trans.tabletrans, element);
+    Get.dialog(
+      Center(child: CircularProgressIndicator()),
+      barrierDismissible: false,
+    );
+    await Future.delayed(Duration.zero, () async {
+      try {
+        if (header.Vehicle == null ||
+            header.Vehicle!.isEmpty ||
+            header.Account == null ||
+            header.Account!.isEmpty) {
+          Get.snackbar("Error", "Vehicle or Account is empty.");
+          return;
+        }
+        if (header.transtions == null || header.transtions!.isEmpty) {
+          Get.snackbar("Error", "Transactions is empty.");
+          return;
+        }
+        header.Total_Amount = header.transtions!.fold<double>(
+            0.0,
+            (double currentSum, item) =>
+                currentSum + num.tryParse(item.Amount.toString())!);
+        await Get.find<db_Provider>().insert(Header.table, header);
+        if (header.transtions != null) {
+          for (var element in header.transtions!.toList()) {
+            await Get.find<db_Provider>()
+                .insert(tMatatu.Trans.tabletrans, element);
+          }
+        }
+        SettingsController().fetchWorkingDate();
+        Get.find<HeaderController>().trans.insert(0, header);
+        Get.find<ReportController>().daystrans.insert(0, header);
+        Get.find<HeaderController>().filteredTrans.value =
+            Get.find<HeaderController>().trans;
+        List<int>? bytes = await Get.find<MainController>()
+            .CurrentClient
+            ?.value
+            .printReceipt(header);
+        if (bytes != null) Get.find<BluetoothManager>().printReceip(bytes);
+        cleartrans();
+        clearlines();
+        upload();
+      } catch (e) {
+        debugPrint("Print failed: $e");
+        Get.snackbar("Error", "Something went wrong during printing.");
+      } finally {
+        Get.back(); // close loading dialog
       }
-    }
- SettingsController().fetchWorkingDate();
-    Get.find<HeaderController>().trans.insert(0, header);
-    Get.find<ReportController>().daystrans.insert(0, header);
-    Get.find<HeaderController>().filteredTrans.value =
-        Get.find<HeaderController>().trans;
-    List<int>? bytes = await Get.find<MainController>()
-        .CurrentClient
-        ?.value
-        .printReceipt(header);
-    if (bytes != null) Get.find<BluetoothManager>().printReceip(bytes);
-    cleartrans();
-    clearlines();
-    upload();
-       } catch (e) {
-      debugPrint("Print failed: $e");
-      Get.snackbar("Error", "Something went wrong during printing.");
-    } finally {
-      Get.back(); // close loading dialog
-      } });
+    });
 
-  
-  Get.snackbar("Success", "Receipt saved and printed");
+    Get.snackbar("Success", "Receipt saved and printed");
   }
 
   void createline() {
@@ -170,23 +173,22 @@ class _ReceiptState extends State<Receipts> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
-     
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
             const Text('Receipt'),
-           Obx(() => Text(
-                    'Working Date: ${DateFormat('MMM-dd-yyyy').format(Get.find<SettingsController>().workingDate)}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),),
-          
+            Obx(
+              () => Text(
+                'Working Date: ${DateFormat('MMM-dd-yyyy').format(Get.find<SettingsController>().workingDate)}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ],
         ),
         elevation: 0,
@@ -241,7 +243,6 @@ class _ReceiptState extends State<Receipts> {
                               total >= 0 ? Colors.green[800] : Colors.red[800],
                         ),
                       ),
-                     
                     ],
                   ),
                 ),
@@ -308,7 +309,6 @@ class _ReceiptState extends State<Receipts> {
             scrollDirection: Axis.vertical,
             child: Obx(
               () => DataTable(
-                
                 dataTextStyle: const TextStyle(
                   fontWeight: FontWeight.w400,
                   color: AppColors.textColor,
@@ -603,7 +603,7 @@ class _ReceiptState extends State<Receipts> {
                     .text
                     .length,
               );
-            }, 
+            },
             style: const TextStyle(fontSize: 10),
             items: ttypes.map<DropdownMenuItem<TranTypes>>((TranTypes? value) {
               return DropdownMenuItem<TranTypes>(
@@ -729,8 +729,8 @@ class _ReceiptState extends State<Receipts> {
               scrollDirection: Axis.vertical,
               child: Obx(
                 () => DataTable(
-                                    horizontalMargin: 10.0, // Set global horizontal margin
-                                
+                  horizontalMargin: 10.0, // Set global horizontal margin
+
                   headingRowHeight: 30, // Set the height of the heading row
                   dataTextStyle: const TextStyle(
                     fontWeight: FontWeight.w400,
@@ -922,15 +922,15 @@ class _ReceiptState extends State<Receipts> {
                     // Handle vehicle selection
                     // Assuming 'vehicleno' is a TextEditingController
                     if (selection.id.isNotEmpty) {
-                      vehicleno.text = selection.id;  
+                      vehicleno.text = selection.id;
                       Get.find<HeaderController>().currHeader.value.Fleet =
-                        selection.id;
+                          selection.id;
                     }
                     memberController.getcurrentcrew(selection
                         .displayText); // Assuming this method sets the current crew based on vehicle ID
                     Get.find<HeaderController>().currHeader.value.Vehicle =
                         selection.displayText;
-                  
+
                     Get.find<VehiclesController>().getvehtrans(
                         selection.displayText,
                         DateTime.now()); // Re-initialize member controller
@@ -946,10 +946,11 @@ class _ReceiptState extends State<Receipts> {
                     decoration: InputDecoration(
                       hintText: 'Enter vehicle number or member name',
                       prefixIcon: Icon(Icons.search),
-                        suffixIcon: IconButton(    // Clear button
-        icon: Icon(Icons.clear,color: Colors.red),
-        onPressed: () => vehicleno.clear(),  // Clears text
-      ),
+                      suffixIcon: IconButton(
+                        // Clear button
+                        icon: Icon(Icons.clear, color: Colors.red),
+                        onPressed: () => vehicleno.clear(), // Clears text
+                      ),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
@@ -997,34 +998,53 @@ class _ReceiptState extends State<Receipts> {
                 },
               ),
               const SizedBox(height: 2),
-            if (Get.find<MainController>().CurrentClient?.value.Attach_crew == true) 
-            GetBuilder<MemberController>(
-                builder: (controller) => Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if(Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Both || Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Driver)
-                    Expanded(
-                        flex: 2,
-                        child: _buildCrewInfo(
-                            "Driver", controller.currentdriver.value)),
-                    if(Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Both || Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Condutor)
-                    Expanded(
-                        flex: 2,
-                        child: _buildCrewInfo(
-                            "Conductor", controller.currentcunductor.value)),
-                    Expanded(
-                      flex: 1,
-                      child: IconButton(
-                        onPressed: () => Get.to(() => CrewAssignment(
-                            vehicle: Get.find<VehiclesController>()
-                                .Currentvehicle
-                                .value)),
-                        icon: const Icon(Icons.edit, size: 30),
-                      ),
-                    )
-                  ],
+              if (Get.find<MainController>().CurrentClient?.value.Attach_crew ==
+                  true)
+                GetBuilder<MemberController>(
+                  builder: (controller) => Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (Get.find<MainController>()
+                                  .CurrentClient
+                                  ?.value
+                                  .Crew_to_attach ==
+                              CrewToattach.Both ||
+                          Get.find<MainController>()
+                                  .CurrentClient
+                                  ?.value
+                                  .Crew_to_attach ==
+                              CrewToattach.Driver)
+                        Expanded(
+                            flex: 2,
+                            child: _buildCrewInfo(
+                                "Driver", controller.currentdriver.value)),
+                      if (Get.find<MainController>()
+                                  .CurrentClient
+                                  ?.value
+                                  .Crew_to_attach ==
+                              CrewToattach.Both ||
+                          Get.find<MainController>()
+                                  .CurrentClient
+                                  ?.value
+                                  .Crew_to_attach ==
+                              CrewToattach.Condutor)
+                        Expanded(
+                            flex: 2,
+                            child: _buildCrewInfo("Conductor",
+                                controller.currentcunductor.value)),
+                      Expanded(
+                        flex: 1,
+                        child: IconButton(
+                          onPressed: () => Get.to(() => CrewAssignment(
+                              vehicle: Get.find<VehiclesController>()
+                                  .Currentvehicle
+                                  .value)),
+                          icon: const Icon(Icons.edit, size: 30),
+                        ),
+                      )
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -1108,8 +1128,7 @@ class _ReceiptState extends State<Receipts> {
                     ),
                     Text(
                         NumberFormat("#,##0.00", "en_US").format(
-                            Get.find<MainController>().vehsummary.fold<
-                                    double>(
+                            Get.find<MainController>().vehsummary.fold<double>(
                                 0.0,
                                 (double currentSum, TransSummary item) =>
                                     currentSum +
@@ -1141,8 +1160,8 @@ class _ReceiptState extends State<Receipts> {
                     ),
                     IconButton(
                         onPressed: () {
-                          Get.find<TransTypeController>().distribute(
-                              double.tryParse(recamount.text) ?? 0);
+                          Get.find<TransTypeController>()
+                              .distribute(double.tryParse(recamount.text) ?? 0);
                         },
                         icon: Icon(Icons.post_add_sharp))
                   ],
@@ -1172,8 +1191,7 @@ class _ReceiptState extends State<Receipts> {
                               Text(
                                 '${Get.find<TransTypeController>().vehicleTrantypes[index].Amountedited}',
                                 style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold),
+                                    fontSize: 14, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
@@ -1211,49 +1229,47 @@ class _ReceiptState extends State<Receipts> {
                                   },
                                 )),
                           ),
-                
+
                           //controlAffinity: ListTileControlAffinity.leading,
                           tristate: true,
                           checkColor: Colors.black,
                           activeColor: Colors.red,
                           value: controller.vehicleTrantypes[index].Checked,
-                
+
                           // Get.find<BluetoothController>().connected.value,
                           onChanged: (bool? value) {
                             controller.toggle(index);
                             if (value == true) {
                               double? vehicleamount = controller
                                   .vehicleTrantypes[index].VehicleAmount;
-                
+
                               double? bal = vehicleamount! > 0
                                   ? vehicleamount -
-                                      controller.vehicleTrantypes[index]
-                                          .Amounttoday!
+                                      controller
+                                          .vehicleTrantypes[index].Amounttoday!
                                   : 0;
                               bal = bal < 0 ? 0 : bal;
                               // controller.vehicleTrantypes[index].eAmount
                               // .text = '$bal';
-                              controller
-                                      .vehicleTrantypes[index].eAmount.text =
+                              controller.vehicleTrantypes[index].eAmount.text =
                                   '${controller.vehicleTrantypes[index].VehicleAmount}';
-                              controller
-                                      .vehicleTrantypes[index].Amountedited =
+                              controller.vehicleTrantypes[index].Amountedited =
                                   controller
                                       .vehicleTrantypes[index].VehicleAmount;
                             } else {
-                              controller.vehicleTrantypes[index].eAmount
-                                  .text = '0.0';
-                              controller
-                                  .vehicleTrantypes[index].Amountedited = 0.0;
+                              controller.vehicleTrantypes[index].eAmount.text =
+                                  '0.0';
+                              controller.vehicleTrantypes[index].Amountedited =
+                                  0.0;
                             }
-                
-                            FocusScope.of(context).requestFocus(controller
-                                .vehicleTrantypes[index].FocusNodes);
+
+                            FocusScope.of(context).requestFocus(
+                                controller.vehicleTrantypes[index].FocusNodes);
                             controller.vehicleTrantypes[index].eAmount
                                 .selection = TextSelection(
                               baseOffset: 0,
-                              extentOffset: controller.vehicleTrantypes[index]
-                                  .eAmount.text.length,
+                              extentOffset: controller
+                                  .vehicleTrantypes[index].eAmount.text.length,
                             );
                           },
                         ),

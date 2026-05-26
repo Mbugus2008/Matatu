@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/TypesController.dart';
 import 'package:t_matatu/controllers/main.dart';
-import 'package:t_matatu/models/expences.dart';
+import 'package:t_matatu/models/Utils/util.dart'; // Make sure this import is present
+import 'package:t_matatu/models/expenses/expenses.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/providers/db.dart';
-import 'package:t_matatu/models/Utils/util.dart';  // Make sure this import is present
 
 import '../../models/TransSummary.dart';
 import '../../models/Transaction.dart' as tmatatu;
@@ -21,7 +21,7 @@ class VehiclesController extends GetxController {
   RxList<tmatatu.Trans> vehcollections = <tmatatu.Trans>[].obs;
   RxList<Vehicles> vehdailycollectionsf = <Vehicles>[].obs;
   Rx<Vehicles?> Currentvehicle = Rx<Vehicles?>(null);
-  
+
   RxList<Expenses> NRODefects = <Expenses>[].obs;
   final RxBool onroute = false.obs;
 
@@ -52,7 +52,7 @@ class VehiclesController extends GetxController {
       final List<Map<String, dynamic>> maps =
           await db_Provider().getdata(Vehicles.table, Vehicles.columns);
       allVehicles.value = maps.map((row) => Vehicles.fromMap(row)).toList();
-      print('Loaded ${allVehicles.length} vehicles');  // Add this debug print
+      print('Loaded ${allVehicles.length} vehicles'); // Add this debug print
     } catch (e) {
       print('Error loading vehicles: $e');
     }
@@ -78,21 +78,21 @@ class VehiclesController extends GetxController {
 
             final groupedItems = groupBy(Get.find<MainController>().vehtrans,
                 (tmatatu.Trans item) => '${item.Description}');
-             // groupedItems.forEach((key, value) {
-                //print('Key: $key, Value: $value');
-             // });
+            // groupedItems.forEach((key, value) {
+            //print('Key: $key, Value: $value');
+            // });
             final types = [...Get.find<TransTypeController>().vehicleTrantypes];
             //  types.forEach((element) {
-              //  print('Type: ${element.Code}-${element.Account}');
-             // });
+            //  print('Type: ${element.Code}-${element.Account}');
+            // });
             Get.find<MainController>().vehsummary.value =
                 groupedItems.entries.map((entry) {
               final category = entry.key;
               final itemsInCategory = entry.value;
               final totalSum = itemsInCategory.fold(0.0,
                   (sum, item) => sum + num.tryParse(item.Amount.toString())!);
-              final expe = types.firstWhereOrNull(
-                  (o) => '${o.Name}' == entry.key);
+              final expe =
+                  types.firstWhereOrNull((o) => '${o.Name}' == entry.key);
               final bal = (expe == null ? 0 : expe.VehicleAmount)! - totalSum;
 
               return TransSummary(
@@ -101,18 +101,18 @@ class VehiclesController extends GetxController {
                   Expected: expe == null ? 0 : expe.VehicleAmount,
                   balance: bal);
             }).toList();
-Get.find<MainController>().vehsummary.forEach((element) {
-  print('Original:${element.toString()}');
-});
+            Get.find<MainController>().vehsummary.forEach((element) {
+              print('Original:${element.toString()}');
+            });
             Get.find<TransTypeController>().vehicleTrantypes.forEach((element) {
               print('${element.toString()}');
               TransSummary? summary = Get.find<MainController>()
                   .vehsummary
-                  .firstWhereOrNull(
-                      (e) => e.Type == '${element.Name}');
+                  .firstWhereOrNull((e) => e.Type == '${element.Name}');
               print('Summary:${summary.toString()}');
               if (summary != null) element.Amounttoday = summary.Amount;
-           print('${element.toString()}'); });
+              print('${element.toString()}');
+            });
           }
         }
       }
@@ -134,7 +134,8 @@ Get.find<MainController>().vehsummary.forEach((element) {
 
     Get.find<VehiclesController>().Currentvehicle.value = currentVehicle;
 
- await   Get.find<TransTypeController>().vehicleTypes(currentVehicle?.Vehicle_Type);
+    await Get.find<TransTypeController>()
+        .vehicleTypes(currentVehicle?.Vehicle_Type);
 
     return currentVehicle;
   }
@@ -151,12 +152,14 @@ Get.find<MainController>().vehsummary.forEach((element) {
   TextStyle summaryexpected() {
     return TextStyle(fontSize: 14, color: Colors.black87);
   }
+
   void filterVehicles(String query) {
     vehdailycollections.value = vehdailycollectionsf.where((item) {
       return item.toString().contains(query);
     }).toList();
     update();
   }
+
   Future<void> refreshVehicleDetails(String? vehicleNumber) async {
     if (vehicleNumber == null) return;
 
@@ -177,7 +180,7 @@ Get.find<MainController>().vehsummary.forEach((element) {
     }
   }
 
-Future<List<Vehicles>> VehicleSuggestions(String pattern) async {
+  Future<List<Vehicles>> VehicleSuggestions(String pattern) async {
     List<Vehicles> suggestions = [];
 
     // Get vehicle suggestions first
@@ -187,17 +190,15 @@ Future<List<Vehicles>> VehicleSuggestions(String pattern) async {
     }
     var matchingVehicles = vehiclesController.allVehicles
         .where((vehicle) =>
-          vehicle.toString().toLowerCase().contains(pattern.toLowerCase()) ?? false)
+            vehicle.toString().toLowerCase().contains(pattern.toLowerCase()) ??
+            false)
         .toList();
 
-      suggestions.addAll(matchingVehicles);
+    suggestions.addAll(matchingVehicles);
 
-  
     // Sort suggestions to ensure vehicles appear first
-    suggestions.sort((a, b) => a.Fleet_No?.compareTo(b.Fleet_No  ?? '') ?? 0);
+    suggestions.sort((a, b) => a.Fleet_No?.compareTo(b.Fleet_No ?? '') ?? 0);
 
     return suggestions;
   }
-
-
 }

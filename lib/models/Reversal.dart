@@ -78,22 +78,25 @@ class Reversal implements mapping, Tomaps, AbsDbUpdates {
   }
 
   Map<String, dynamic> toMap() {
+    final DateTime requestDate = Date ?? DateTime.now();
+    final DateTime transactionDate = Transction_Date ?? requestDate;
+
     return <String, dynamic>{
       'Key': Key,
       'No': No,
       'Receipt_No': Receipt_No,
-      'Date': formattedDate.format(Date!),
-      'Status': Status?.index,
+      'Date': formattedDate.format(requestDate),
+      'Status': (Status ?? STatus.Open).index,
       'Created_By': Created_By,
-      'Total_Amount': Total_Amount,
-      'Total_Trans': Total_Trans,
-      'Transction_Date': formattedDate.format(Transction_Date!),
+      'Total_Amount': (Total_Amount ?? 0).toDouble(),
+      'Total_Trans': Total_Trans ?? 0,
+      'Transction_Date': formattedDate.format(transactionDate),
       'Agent': Agent,
       'Reason_for_Reversal': Reason_for_Reversal,
       'Vehicle': Vehicle,
       'Account': Account,
       'Name': Name,
-      'Sent': Sent,
+      'Sent': Sent ?? false,
     };
   }
 
@@ -231,94 +234,148 @@ class Reversal implements mapping, Tomaps, AbsDbUpdates {
       var request =
           Request(Agent: Get.find<MainController>().agent.value.Agent_Code);
 
-      ApiClient().postdata("GetReversals", request.toJson()).then((r) async {
-        if (r.statusCode == 200) {
-          Results<Reversal> results =
-              Results<Reversal>.fromJson(r.body, Reversal.fromMap);
-          if (results.Code == 0) {
-            if (results.Contents != null) {
-              List<Reversal> reversals = results.Contents as List<Reversal>;
+      final r = await ApiClient().postdata("GetReversals", request.toJson());
+      if (r.statusCode == 200) {
+        Results<Reversal> results =
+            Results<Reversal>.fromJson(r.body, Reversal.fromMap);
+        if (results.Code == 0) {
+          if (results.Contents != null) {
+            List<Reversal> reversals = results.Contents as List<Reversal>;
 
-              for (var reversal in reversals) {
-                if (reversal.Status == STatus.Approved) {
-                  await processReversal(reversal);
-                }
+            for (var reversal in reversals) {
+              if (reversal.Status == STatus.Approved) {
+                await processReversal(reversal);
               }
-              ;
-              Get.find<db_Provider>().batchinsert(Reversal.table, reversals);
-              ReversalController().updatereversals(reversals);
-              Reversal().uploadreversal();
             }
+
+            await Get.find<db_Provider>()
+                .batchinsert(Reversal.table, reversals);
+            ReversalController().updatereversals(reversals);
+            await Reversal().uploadreversal();
           }
         }
-      });
+      }
     } on Exception catch (e) {
       Errors().report(e);
     }
   }
 
   Future<void> processReversal(Reversal reversal) async {
-    print('Approved');
-    var app = await Get.find<db_Provider>().getdata(
-        Header.table,
-        Header.columns,
-        '${Header.col_Receipt_No}=?',
-        [reversal.Receipt_No.toString()]);
+    final db = Get.find<db_Provider>();
+    final app = await db.getdata(
+      Header.table,
+      Header.columns,
+      '${Header.col_Receipt_No}=?',
+      [reversal.Receipt_No.toString()],
+    );
 
-    if (app.isNotEmpty) {
-      Header h = Header.fromMap_d2(app.first);
-      Header h2 = h.copyWith();
-
-      var app2 = await Get.find<db_Provider>().getdata(
-          tmatatu.Trans.tabletrans,
-          tmatatu.Trans.columns,
-          '${tmatatu.Trans.col_OTTN}=?',
-          [h.Receipt_No.toString()]);
-
-      List<tmatatu.Trans> trans = app2.map((row) {
-        return tmatatu.Trans.fromMap_d(row);
-      }).toList();
-
-      List<tmatatu.Trans> trans2 = [];
-      for (var tt in trans) {
-        tmatatu.Trans t = tt.copyWith();
-        t.OTTN = '${t.OTTN}R';
-        t.Document_No = '${t.Document_No}R';
-        t.Amount = t.Amount! * -1;
-        await Get.find<db_Provider>().insert(tmatatu.Trans.tabletrans, t);
-        trans2.add(t);
-      }
-
-      h.transtions = trans;
-      h.Reversal = true;
-      h.Reversed = true;
-      h2.Reversed = true;
-      h2.Receipt_No = '${h2.Receipt_No}R';
-      h2.Total_Amount = h2.Total_Amount! * -1;
-      h2.transtions = trans2;
-      await Get.find<db_Provider>().insert(Header.table, h2);
-      Get.find<HeaderController>().trans.add(h2);
-      Get.find<ReportController>().daystrans.add(h2);
-       upload();
-
-      reversal.Status = STatus.Released;
-      reversal.Sent = false;
+    if (app.isEmpty) {
+      return;
     }
+
+    final Header originalHeader = Header.fromMap_d2(app.first);
+    final Header mirroredHeader = originalHeader.copyWith();
+
+    await db.updatedata(
+      Header.table,
+      {
+        Header.col_Reversal: true,
+        Header.col_Reversed: true,
+      },
+      '${Header.col_Receipt_No} = ?',
+      [originalHeader.Receipt_No.toString()],
+    );
+
+    originalHeader.Reversal = true;
+    originalHeader.Reversed = true;
+
+    final app2 = await db.getdata(
+      tmatatu.Trans.tabletrans,
+      tmatatu.Trans.columns,
+      '${tmatatu.Trans.col_OTTN}=?',
+      [originalHeader.Receipt_No.toString()],
+    );
+
+    final List<tmatatu.Trans> trans = app2.map((row) {
+      return tmatatu.Trans.fromMap_d(row);
+    }).toList();
+
+    final List<tmatatu.Trans> mirroredTrans = [];
+    for (var tt in trans) {
+      final t = tt.copyWith();
+      t.OTTN = '${t.OTTN}R';
+      t.Document_No = '${t.Document_No}R';
+      t.Amount = (t.Amount ?? 0) * -1;
+      await db.insert(tmatatu.Trans.tabletrans, t);
+      mirroredTrans.add(t);
+    }
+
+    mirroredHeader.Reversal = true;
+    mirroredHeader.Reversed = true;
+    mirroredHeader.Receipt_No = '${originalHeader.Receipt_No}R';
+    mirroredHeader.Total_Amount = (originalHeader.Total_Amount ?? 0) * -1;
+    mirroredHeader.transtions = mirroredTrans;
+
+    await db.insert(Header.table, mirroredHeader);
+
+    final headerController = Get.find<HeaderController>();
+    final reportController = Get.find<ReportController>();
+
+    for (final h in headerController.trans) {
+      if (h.Receipt_No == originalHeader.Receipt_No) {
+        h.Reversal = true;
+        h.Reversed = true;
+      }
+    }
+
+    for (final h in reportController.daystrans) {
+      if (h.Receipt_No == originalHeader.Receipt_No) {
+        h.Reversal = true;
+        h.Reversed = true;
+      }
+    }
+
+    final bool hasMirroredInHeaderList = headerController.trans
+        .any((h) => h.Receipt_No == mirroredHeader.Receipt_No);
+    if (!hasMirroredInHeaderList) {
+      headerController.trans.add(mirroredHeader);
+    }
+
+    final bool hasMirroredInReportList = reportController.daystrans
+        .any((h) => h.Receipt_No == mirroredHeader.Receipt_No);
+    if (!hasMirroredInReportList) {
+      reportController.daystrans.add(mirroredHeader);
+    }
+
+    headerController.trans.refresh();
+    reportController.daystrans.refresh();
+
+    upload();
+
+    reversal.Status = STatus.Released;
+    reversal.Sent = false;
   }
 
   Future<List<Reversal>?> getreversals() async {
     Get.find<ReversalController>().reversals.clear();
-    Get.find<db_Provider>()
-        .getalltrans(Reversal.columns, Reversal.table)
-        .then((value) {
-      if (value.isNotEmpty) {
-        List<Reversal> tt = value.map((row) {
-          return Reversal.fromMap_d(row);
-        }).toList();
-        ReversalController().updatereversals(tt);
-      }
-    });
+    final value = await Get.find<db_Provider>().getalltrans(
+      Reversal.columns,
+      Reversal.table,
+    );
+    if (value.isNotEmpty) {
+      List<Reversal> tt = value.map((row) {
+        return Reversal.fromMap_d(row);
+      }).toList();
+      ReversalController().updatereversals(tt);
+    }
     return Future.value(null);
+  }
+
+  Future<void> syncReversals() async {
+    await getreversals();
+    await uploadreversal();
+    await downloadreversals();
+    await getreversals();
   }
 
   Future<void> uploadreversal() async {
@@ -368,8 +425,7 @@ class ReversalController extends GetxController {
   RxList<Reversal> reversals = <Reversal>[].obs;
 
   Future<void> refreshData() async {
-    // Simulate fetching data from an API or database
-    Reversal().downloadreversals();
+    await Reversal().syncReversals();
   }
 
   void updatereversals(List<Reversal> reversal) {
@@ -408,9 +464,6 @@ extension StatusDescription on STatus {
         return 'Approved';
       case STatus.Rejected:
         return 'Rejected';
-      default:
-        return 'Unknown status';
     }
   }
 }
-
