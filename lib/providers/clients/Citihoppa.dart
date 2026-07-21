@@ -64,17 +64,28 @@ class Cityhoppa extends BaseClients {
 
   @override
   AppBar? appBar() {
+    final mainController = Get.find<MainController>();
     return AppBar(
-      title: Text(
-        Get.find<MainController>().CurrentClient?.value.clientName ?? '',
-        style: TextStyle(
-          fontSize: _getTitleFontSize(Get.find<MainController>()
-                  .CurrentClient
-                  ?.value
-                  .clientName
-                  ?.length ??
-              0),
-        ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            mainController.CurrentClient?.value.clientName ?? '',
+            style: TextStyle(
+              fontSize: _getTitleFontSize(
+                  mainController.CurrentClient?.value.clientName?.length ?? 0),
+            ),
+          ),
+          Obx(() {
+            final agent = mainController.agent.value;
+            final code = agent.Agent_Code ?? '-';
+            final balance = agent.Account_Balance ?? 0.0;
+            return Text(
+              '$code | ${NumberFormat("#,##0.00", "en_US").format(balance)}',
+              style: const TextStyle(fontSize: 12),
+            );
+          }),
+        ],
       ),
     );
   }

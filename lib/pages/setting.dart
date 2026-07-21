@@ -1,30 +1,99 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:t_matatu/bluetooth/bluetoothManager.dart';
+import 'package:t_matatu/controllers/agent.dart';
+import 'package:t_matatu/controllers/expenses/expense_controller.dart';
+import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/models/Reversal.dart';
+import 'package:t_matatu/models/expenses/expenses.dart';
+import 'package:t_matatu/models/summary/Tsummary.dart';
+import 'package:t_matatu/models/summary/TsummaryDetails.dart';
+import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/pages/Reversals/ReversalsList.dart';
-import 'package:t_matatu/pages/widgets/Groupbox.dart';
+import 'package:t_matatu/pages/TwoTabScreen.dart';
+import 'package:t_matatu/pages/hires/hires_list.dart';
+import 'package:t_matatu/pages/pageloader.dart';
+import 'package:t_matatu/pages/vehicles/Depot.dart';
+import 'package:t_matatu/pages/vehicles/Fuel.dart';
 import 'package:t_matatu/reports/Daily%20Summary.dart';
 import 'package:t_matatu/reports/controller.dart';
 import 'package:t_matatu/reports/receipts.dart';
+import 'package:t_matatu/utils/updater.dart';
 
 import '../bluetooth/bluetoothscans.dart';
-import '../controllers/main.dart';
-import '../models/summary/Tsummary.dart';
-import '../models/summary/TsummaryDetails.dart';
 
 class CustomDrawer extends StatelessWidget {
   CustomDrawer({super.key});
 
+  Color? _primaryColor(BuildContext context) {
+    final hex = Get.find<MainController>()
+        .config
+        ?.value
+        .theme
+        ?.primaryColor;
+    if (hex == null) return null;
+    final clean = hex.replaceFirst('#', '');
+    final full = clean.length == 6 ? 'FF$clean' : clean;
+    return Color(int.parse(full, radix: 16));
+  }
+
+  Color _iconColor(BuildContext context) =>
+      _primaryColor(context) ?? Theme.of(context).primaryColor;
+
+  Future<String> _getVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    final clientName =
+        Get.find<MainController>().CurrentClient?.value.clientName ?? 'Matatu';
+    return 'v${info.version} © $clientName';
+  }
+
+  Widget _buildTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    required BuildContext context,
+    Color? iconColor,
+  }) {
+    final color = iconColor ?? _iconColor(context);
+    return ListTile(
+      leading: Icon(icon, color: color),
+      onTap: onTap,
+      title: Text(
+        title,
+        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+      ),
+      dense: true,
+    );
+  }
+
+  Widget _buildSectionHeader(String title, BuildContext context) {
+    final color = _primaryColor(context) ?? Colors.blueGrey;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: color,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Get.find<MainController>().getPreference("printer").toString();
-    GroupBox? menu =
-        Get.find<MainController>().CurrentClient!.value.clientMenu();
+    final primary = _primaryColor(context);
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: <Widget>[
+          // --- Printer Section ---
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
@@ -55,64 +124,242 @@ class CustomDrawer extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            height: 1, // height of the line
-            width: 100, // width of the line
-            color: Colors.black,
+          const Divider(height: 1, color: Colors.black26),
+
+          // --- Menu Section ---
+          _buildSectionHeader('MENU', context),
+          _buildTile(
+            icon: Icons.receipt,
+            title: 'Dispatch',
+            context: context,
+            onTap: () {
+              ReportController().gettransbydate(DateTime.now());
+              Get.find<ReportController>().selectedDate?.value =
+                  DateTime.now();
+              Get.to(() =>
+                  const PageLoader(page: Depot(), title: "Dispatch"));
+            },
           ),
-          GroupBox("Menu", [
-            ListTile(
-              leading: const Icon(
-                Icons.undo_outlined,
-                color: Colors.red,
-              ),
-              onTap: () async {
-                await Reversal().getreversals();
-                Get.to(() => ReversalListScreen(
-                      reversal:
-                          Get.find<ReversalController>().reversals.toList(),
-                    ));
-              },
-              title: const Text("Reversals"),
+          _buildTile(
+            icon: Icons.local_gas_station,
+            title: 'Fuel',
+            context: context,
+            onTap: () {
+              Get.find<ReportController>().selectedDate?.value =
+                  DateTime.now();
+              Get.to(() => const PageLoader(page: Fuel(), title: "Fuel"));
+            },
+          ),
+          _buildTile(
+            icon: Icons.monetization_on,
+            title: 'Expenses',
+            context: context,
+            onTap: () {
+              final expenses = Get.find<ExpenseController>().all;
+              Get.to(() => _ExpensesListScreen(expenses: expenses));
+            },
+          ),
+          _buildTile(
+            icon: Icons.people,
+            title: 'Hires',
+            context: context,
+            onTap: () {
+              Get.to(() => HiresListScreen());
+            },
+          ),
+          _buildTile(
+            icon: Icons.undo_outlined,
+            title: 'Reversals',
+            context: context,
+            iconColor: Colors.red.shade400,
+            onTap: () async {
+              await Reversal().getreversals();
+              Get.to(() => ReversalListScreen(
+                    reversal: Get.find<ReversalController>().reversals.toList(),
+                  ));
+            },
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+
+          // --- Reports Section ---
+          _buildSectionHeader('REPORTS', context),
+          _buildTile(
+            icon: Icons.receipt_long,
+            title: 'Receipts',
+            context: context,
+            onTap: () {
+              ReportController().gettransbydate(DateTime.now());
+              Get.find<ReportController>().selectedDate?.value =
+                  DateTime.now();
+              Get.to(() => const ReceiptReport());
+            },
+          ),
+          _buildTile(
+            icon: Icons.summarize,
+            title: 'Daily Summary',
+            context: context,
+            onTap: () {
+              TsummaryDetails().getall();
+              Tsummary().getall();
+              Get.to(() => const SummaryReport());
+            },
+          ),
+          _buildTile(
+            icon: Icons.directions_bus,
+            title: 'Vehicle Collections',
+            context: context,
+            onTap: () {
+              ReportController().gettransbydate(DateTime.now());
+              Get.find<ReportController>().selectedDate?.value =
+                  DateTime.now();
+              Get.to(() => const TwoTabScreen());
+            },
+          ),
+          _buildTile(
+            icon: Icons.account_balance_wallet,
+            title: 'Collections & Expenses',
+            context: context,
+            onTap: () {
+              TsummaryDetails().getall();
+              Tsummary().getall();
+              Get.to(() => const SummaryReport());
+            },
+          ),
+          _buildTile(
+            icon: Icons.print,
+            title: 'Z Report',
+            context: context,
+            onTap: () {
+              TsummaryDetails().getall();
+              Tsummary().getall();
+              Get.to(() => const SummaryReport());
+            },
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+
+          // --- Settings Section ---
+          _buildSectionHeader('SETTINGS', context),
+          _buildTile(
+            icon: Icons.lock_outline,
+            title: 'Change Password',
+            context: context,
+            onTap: () => _showChangePasswordDialog(context),
+          ),
+          _buildTile(
+            icon: Icons.system_update,
+            title: 'Check for Updates',
+            context: context,
+            onTap: () => Get.find<UpdateController>().checkForUpdate(),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+
+          // --- Version Footer ---
+          FutureBuilder<String>(
+            future: _getVersion(),
+            builder: (context, snapshot) {
+              final version = snapshot.data ?? '';
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: Text(
+                    version,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showChangePasswordDialog(BuildContext context) {
+    final oldPass = TextEditingController();
+    final newPass = TextEditingController();
+    final confirmPass = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Change Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: oldPass,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Old Password'),
             ),
-          ]),
-          GroupBox("Reports", [
-            ListTile(
-              leading: const Icon(Icons.receipt),
-              onTap: () {
-                ReportController().gettransbydate(DateTime.now());
-                Get.find<ReportController>().selectedDate?.value =
-                    DateTime.now();
-                Get.to(() => const ReceiptReport());
-              },
-              title: const Text("Receipts"),
+            TextField(
+              controller: newPass,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'New Password'),
             ),
-            ListTile(
-              leading: const Icon(Icons.summarize),
-              onTap: () {
-                TsummaryDetails().getall();
-                Tsummary().getall();
-                Get.to(() => const SummaryReport());
-              },
-              title: const Text("Daily Summary"),
+            TextField(
+              controller: confirmPass,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Confirm Password'),
             ),
-            ListTile(
-              leading: const Icon(Icons.summarize),
-              onTap: () {
-                Reversal().getreversals();
-                Reversal().uploadreversal();
-                Reversal().downloadreversals();
-                Get.to(() => ReversalListScreen(
-                      reversal: Get.find<ReversalController>().reversals,
-                    ));
-              },
-              title: const Text("Reversals"),
-            ),
-          ]),
-          if (menu != null) ...[menu]
-          // Add more drawer items as needed
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (newPass.text != confirmPass.text) {
+                Get.snackbar('Error', 'Passwords do not match');
+                return;
+              }
+              final agentCode =
+                  Get.find<MainController>().agent.value.Agent_Code;
+              final body = jsonEncode({
+                'Agent_Code': agentCode,
+                'Password': AgentController().encrypt(newPass.text),
+              });
+              final r = await ApiClient()
+                  .postdata('changepassword', body);
+              if (r.statusCode == 200) {
+                Get.back();
+                Get.snackbar('Success', 'Password changed');
+              } else {
+                Get.snackbar('Error', 'Failed to change password');
+              }
+            },
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
   }
 }
+
+/// Simple expenses list screen
+class _ExpensesListScreen extends StatelessWidget {
+  final RxList<Expenses> expenses;
+  const _ExpensesListScreen({required this.expenses});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Expenses')),
+      body: Obx(
+        () => expenses.isEmpty
+            ? const Center(child: Text('No expenses'))
+            : ListView.builder(
+                itemCount: expenses.length,
+                itemBuilder: (context, index) {
+                  final e = expenses[index];
+                  return ListTile(
+                    title: Text(e.Description ?? ''),
+                    trailing: Text(e.Code ?? ''),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+}
+

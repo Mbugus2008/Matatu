@@ -6,11 +6,9 @@ import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/init.dart';
-import 'package:t_matatu/pages/edit_phone.dart';
 import 'package:t_matatu/pages/login.dart';
 import 'package:t_matatu/providers/AppConfig.dart';
 import 'package:t_matatu/providers/colors.dart';
-import 'package:t_matatu/utils/updater.dart';
 
 
 const simplePeriodicTask =
@@ -93,23 +91,26 @@ class start {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  Color _parseHex(String hex) {
+    hex = hex.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    return Color(int.parse(hex, radix: 16));
+  }
+
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      //showPerformanceOverlay: true,
       debugShowCheckedModeBanner: false,
       title: 'Matatu',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color.fromARGB(255, 109, 107, 112)),
+            seedColor: AppColors.primaryColor),
         useMaterial3: true,
         primaryColor: AppColors.primaryColor,
         scaffoldBackgroundColor: AppColors.backgroundColor,
       ),
       home: const Login(),
-      getPages: [
-       
-      ],
+      getPages: [],
     );
   }
 }

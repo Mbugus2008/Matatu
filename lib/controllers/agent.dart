@@ -5,10 +5,10 @@ import 'package:t_matatu/models/agents.dart';
 class AgentController extends GetxController {
   RxList<Agent> agent = <Agent>[].obs;
 
-final String iv = "1234567890abcdef";
-final String keys = "kOFq5NYMkfiYPayzs3GntbP2mCT+39WLDcnuLJ5Rsrg="; 
+  final String iv = "1234567890abcdef";
+  final String keys = "kOFq5NYMkfiYPayzs3GntbP2mCT+39WLDcnuLJ5Rsrg=";
 
-   String decrypt(String encryptedText) {
+  String decrypt(String encryptedText) {
     try {
       // Convert the Base64 key to bytes
       final key = Key.fromBase64(keys);
@@ -22,9 +22,16 @@ final String keys = "kOFq5NYMkfiYPayzs3GntbP2mCT+39WLDcnuLJ5Rsrg=";
       return decrypted;
     } catch (e) {
       // Handle any errors that occur during decryption
-   print(e);
+      print(e);
       return '';
     }
   }
 
+  String encrypt(String plainText) {
+    final key = Key.fromBase64(keys);
+    final initializationVector = IV.fromUtf8(iv);
+    final encrypter = Encrypter(AES(key, mode: AESMode.cbc));
+    final encrypted = encrypter.encrypt(plainText, iv: initializationVector);
+    return encrypted.base64;
+  }
 }

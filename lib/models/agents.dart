@@ -1,7 +1,6 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/models/mappings.dart';
@@ -137,7 +136,7 @@ $col_Account_Balance	float )
       Account_type:
           map['Account_type'] != null ? map['Account_type'] as int : null,
       Account_Balance: map['Account_Balance'] != null
-          ? map['Account_Balance'] as double
+          ? (map['Account_Balance'] as num).toDouble()
           : null,
     );
   }
@@ -157,35 +156,38 @@ $col_Account_Balance	float )
       'Account_Balance': Account_Balance,
     };
   }
-Future<void> updatcurrentagent(List<Agent>   agent) async {
 
-Agent? ag = agent.firstWhereOrNull( (element) => 
-element.Agent_Code == Get.find<MainController>().agent.value.Agent_Code && element.Status == 2);
-if(ag != null){  Get.find<MainController>().agent.value = ag;
-}
-else{
-  Get.find<MainController>().agent.value = Agent();
-  Get.to(() => Login());
-}
+  Future<void> updatcurrentagent(List<Agent> agent) async {
+    Agent? ag = agent.firstWhereOrNull((element) =>
+        element.Agent_Code ==
+            Get.find<MainController>().agent.value.Agent_Code &&
+        element.Status == 2);
+    if (ag != null) {
+      Get.find<MainController>().agent.value = ag;
+    } else {
+      Get.find<MainController>().agent.value = Agent();
+      Get.to(() => Login());
+    }
+  }
 
-}
-  
   Future<void> getagents() async {
-    //var request = Request(header: RequestHeader(), body: null);
     ApiClient().postdata("agents", null).then((r) async {
       if (r.statusCode == 200) {
         Results<Agent> results = Results<Agent>.fromJson(r.body, Agent.fromMap);
         if (results.Code == 0) {
-          if (results.Contents != null) {
-            Get.find<db_Provider>().batchdelete(Agent.tableagents);
-            Get.find<db_Provider>().batchinsert(
+          if (results.Contents != null && results.Contents!.isNotEmpty) {
+            await Get.find<db_Provider>().batchdelete(Agent.tableagents);
+            await Get.find<db_Provider>().batchinsert(
                 Agent.tableagents, results.Contents as List<Agent>);
-                if (Get.find<MainController>().agent.value.Agent_Code != null){
-                updatcurrentagent(results.Contents as List<Agent>);
-                }
+            if (Get.find<MainController>().agent.value.Agent_Code != null) {
+              updatcurrentagent(results.Contents as List<Agent>);
+            }
           }
         }
       }
+    }).catchError((e, stackTrace) {
+      print('[MATATU-API] getagents error: $e');
+      print('[MATATU-API] $stackTrace');
     });
   }
 }

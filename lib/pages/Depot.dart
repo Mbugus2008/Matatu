@@ -1,6 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/models/Utils/util.dart';
 import 'package:t_matatu/models/expenses/expenses.dart';
@@ -8,28 +13,171 @@ import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/pages/crew.dart';
 
-class Depot extends StatelessWidget {
+class Depot extends StatefulWidget {
   const Depot({super.key});
 
   @override
+  State<Depot> createState() => _DepotState();
+}
+
+class _DepotState extends State<Depot> {
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = DateTime.now();
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  void _fetchData() {
+    DepotFuel().getNRODefects();
+    DepotFuel().getdata(_selectedDate);
+  }
+
+  void _shareDispatch() async {
+    final depot = Get.find<DepotController>().depottrans;
+    if (depot.isEmpty) {
+      Get.snackbar('No Data', 'No dispatch data to share');
+      return;
+    }
+
+    final date = DateFormat('dd-MMM-yyyy').format(_selectedDate);
+    final active = depot.where((d) => d.On_route == true).length;
+    final total = depot.length;
+
+    // Build CSV rows
+    final rows = <List<String>>[];
+    rows.add(['DISPATCH REPORT - $date']);
+    rows.add(['Active: $active / $total']);
+    rows.add(['']);
+    rows.add([
+      'On Route',
+      'Fleet',
+      'Vehicle',
+      'Capacity',
+      'Driver',
+      'Conductor',
+      'Description',
+      'Defects',
+      'Offload'
+    ]);
+
+    for (final d in depot) {
+      rows.add([
+        d.On_route == true ? 'Yes' : 'No',
+        d.Fleet ?? '',
+        d.Vehicle ?? '',
+        vehicle_type_desc.desc[d.Capacity] ?? '',
+        d.Driver_Name ?? '',
+        d.Conductor_Name ?? '',
+        d.Descrition ?? '',
+        d.Nro_Defects ?? '',
+        (d.Offload ?? 0).toString(),
+      ]);
+    }
+
+    // Build CSV manually
+    final csv = rows.map((r) => r.map((c) => '"$c"').join(',')).join('\n');
+
+    // Save & share
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/Dispatch_${date.replaceAll('-', '_')}.csv');
+    await file.writeAsString(csv);
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: 'Dispatch $date',
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // appBar: AppBar(
-      //   title: const Text('Depot Statistics', style: TextStyle(fontSize: 16)),
-      //   elevation: 4,
-      //   centerTitle: true,
-      //   toolbarHeight: 40,
-      // ),
-      body: GetBuilder<DepotController>(
-        init: Get.find<DepotController>(),
-        builder: (dp) => Column(
-          children: [
-            _buildSearchField(),
-            _buildActiveVehiclesInfo(dp),
-            Expanded(child: _buildVehicleList(dp)),
-            _buildUpdateButton(dp),
-          ],
+    return Stack(
+      children: [
+        GetBuilder<DepotController>(
+          init: Get.find<DepotController>(),
+          builder: (dp) => Column(
+            children: [
+              _buildDateSelector(),
+              _buildSearchField(),
+              _buildActiveVehiclesInfo(dp),
+              Expanded(child: _buildVehicleList(dp)),
+              _buildUpdateButton(dp),
+            ],
+          ),
         ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton.extended(
+            onPressed: _shareDispatch,
+            icon: const Icon(Icons.share),
+            label: const Text('Share'),
+            backgroundColor: Colors.green.shade600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => _selectDate(context),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_today,
+                        size: 18, color: Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    Text(
+                      DateFormat('dd-MMM-yyyy').format(_selectedDate),
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            onPressed: _fetchData,
+            icon: const Icon(Icons.download, size: 18),
+            label: const Text('Get'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -362,18 +510,13 @@ class Depot extends StatelessWidget {
               depotFuel.From = getdatetime();
             },
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                children: [
-                  Checkbox(
-                    value: depotFuel.On_route ?? false,
-                    onChanged: (bool? newValue) {
-                      Get.find<VehiclesController>().toggle(depotFuel);
-                      depotFuel.From = getdatetime();
-                    },
-                  ),
-                  //Text('On Route', style: TextStyle(fontSize: 12)),
-                ],
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Checkbox(
+                value: depotFuel.On_route ?? false,
+                onChanged: (bool? newValue) {
+                  Get.find<VehiclesController>().toggle(depotFuel);
+                  depotFuel.From = getdatetime();
+                },
               ),
             ),
           ),

@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:t_matatu/main.dart' as tmatatu;
 import 'package:t_matatu/providers/AppConfig.dart';
+import 'package:t_matatu/providers/client.dart';
+import 'package:t_matatu/providers/clients/Lopha.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  AppConfig config = AppConfig(); 
+  AppConfig config = AppConfig();
   if (Platform.isAndroid) {
     [
       Permission.location,
@@ -15,22 +17,32 @@ Future<void> main() async {
       Permission.bluetooth,
       Permission.bluetoothConnect,
       Permission.bluetoothScan
-      
     ].request().then((status) async {
-    config = AppConfig(
+      BaseClients client = Lopha(
+        clientName: "Lopha",
+        clientName_line2: "",
+        email: "info@lopha.co.ke",
+        telephone: "",
+        street: "",
+        address: "",
+        city: "Nairobi, Kenya",
+        Box: "",
+        Auto_Assign: false,
+        Attach_crew: true,
+      );
+
+      config = AppConfig(
         apiBaseUrl: 'http://trimline.co.ke:4010/api/Matatu/',
         clientId: "LOPHA_SACCO",
         clientName: "Lopha",
+        Client: client,
         logo: 'assets/logo.jpg',
       );
-
-     
     }).then((value) async {
-       await tmatatu.start(config);
-       runApp(tmatatu.MyApp());
+      await tmatatu.start(config);
+      runApp(tmatatu.MyApp());
     });
   }
- 
 }
 
 class MyApp extends StatelessWidget {

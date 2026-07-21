@@ -7,7 +7,9 @@ class ExpenseController extends GetxController {
   RxList<Expenses> all = <Expenses>[].obs;
 
   Future<void> getall() async {
-    Get.find<db_Provider>().getalltrans(Expenses.columns, Expenses.table).then((value) {
+    Get.find<db_Provider>()
+        .getalltrans(Expenses.columns, Expenses.table)
+        .then((value) {
       if (value.isNotEmpty) {
         List<Expenses> tt = value.map((row) {
           return Expenses.fromMap(row);
@@ -27,7 +29,7 @@ class ExpenseController extends GetxController {
   void onInit() {
     super.onInit();
     getall();
-    syncFromApi();
+    // syncFromApi() is called later after config is set
   }
 
   @override

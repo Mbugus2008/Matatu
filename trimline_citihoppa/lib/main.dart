@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:t_matatu/main.dart' as tmatatu;
 import 'package:t_matatu/providers/AppConfig.dart';
+import 'package:t_matatu/providers/client.dart';
+import 'package:t_matatu/providers/clients/Citihoppa.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,12 +17,31 @@ Future<void> main() async {
       Permission.bluetoothConnect,
       Permission.bluetoothScan
     ].request().then((status) async {
+      BaseClients client = Cityhoppa(
+        clientName: "CityHoppa Limited",
+        clientName_line2: "",
+        email: "info@cityhoppa.co.ke",
+        telephone: "",
+        street: "",
+        address: "",
+        city: "Nairobi, Kenya",
+        Box: "",
+        Auto_Assign: false,
+        Attach_crew: true,
+      );
+
       AppConfig config = AppConfig(
         // apiBaseUrl: 'http://trimline.co.ke:4005/City/api/',
-        apiBaseUrl: 'http://trimline.co.ke:4010/api/Matatu/',
+        // apiBaseUrl: 'http://trimline.co.ke:4010/api/Matatu/',
+        apiBaseUrl: 'http://services.trimline.co.ke:8092/api/Matatu/',
         clientId: "CITYHOPPER",
         clientName: "CityHoppa",
+        Client: client,
         logo: 'assets/logo.png',
+        theme: ThemeConfig(
+          primaryColor: '#046F42',
+          accentColor: '#FFC107',
+        ),
       );
 
       await tmatatu.start(config);

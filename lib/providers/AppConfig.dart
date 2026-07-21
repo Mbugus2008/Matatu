@@ -1,13 +1,9 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'dart:convert';
 
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/providers/client.dart';
-import 'package:t_matatu/providers/clients/Citihoppa.dart';
-import 'package:t_matatu/providers/clients/Kmos.dart';
-import 'package:t_matatu/providers/clients/Lopha.dart';
 
 class ThemeConfig {
   String primaryColor;
@@ -60,7 +56,11 @@ class AppConfig {
     this.Client,
   });
 
-init(AppConfig app){Get .find<MainController>().CurrentClient  ?.value = app.Client!;}
+init(AppConfig app) {
+  final client = app.Client;
+  if (client == null) return;
+  Get.find<MainController>().CurrentClient?.value = client;
+}
 
    
 

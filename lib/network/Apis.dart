@@ -1,6 +1,5 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -8,8 +7,6 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/providers/logger.dart';
-import 'package:t_matatu/utils/snackbar_service.dart';
-import 'dart:convert';
 
 
 class ApiClient extends ChangeNotifier {
@@ -22,7 +19,7 @@ class ApiClient extends ChangeNotifier {
   Future<http.Response> postdata(String url, String? data) async {
     http.Response? r = http.Response("", 200);
     try {
-String urls  = '${Get.find<MainController>().config?.value.apiBaseUrl}$url';
+      String urls = '${Get.find<MainController>().config?.value.apiBaseUrl}$url';
 
       logger.info(urls);
       logger.info("out: $data");

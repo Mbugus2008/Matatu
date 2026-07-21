@@ -266,16 +266,22 @@ class DepotFuel implements Tomaps {
       Millage: map['Millage'] != null ? map['Millage'] as int : null,
       Driver: map['Driver'] != null ? map['Driver'] as String : null,
       Conductor: map['Conductor'] != null ? map['Conductor'] as String : null,
-      Offload: map['Offload'] != null ? map['Offload'] as double : null,
-      Fuel: map['Fuel'] != null ? map['Fuel'] as double : null,
-      Amount_Paid:
-          map['Amount_Paid'] != null ? map['Amount_Paid'] as double : null,
-      Balance: map['Balance'] != null ? map['Balance'] as double : null,
-      Net_Offload:
-          map['Net_Offload'] != null ? map['Net_Offload'] as double : null,
-      Total_litres:
-          map['Total_Litres'] != null ? map['Total_Litres'] as double : null,
-      Km_Litre: map['Km_Litre'] != null ? map['Km_Litre'] as double : null,
+      Offload:
+          map['Offload'] != null ? (map['Offload'] as num).toDouble() : null,
+      Fuel: map['Fuel'] != null ? (map['Fuel'] as num).toDouble() : null,
+      Amount_Paid: map['Amount_Paid'] != null
+          ? (map['Amount_Paid'] as num).toDouble()
+          : null,
+      Balance:
+          map['Balance'] != null ? (map['Balance'] as num).toDouble() : null,
+      Net_Offload: map['Net_Offload'] != null
+          ? (map['Net_Offload'] as num).toDouble()
+          : null,
+      Total_litres: map['Total_Litres'] != null
+          ? (map['Total_Litres'] as num).toDouble()
+          : null,
+      Km_Litre:
+          map['Km_Litre'] != null ? (map['Km_Litre'] as num).toDouble() : null,
       Fuel_Agent:
           map['Fuel_Agent'] != null ? map['Fuel_Agent'] as String : null,
       Driver_Name: driver_name,
@@ -286,18 +292,19 @@ class DepotFuel implements Tomaps {
           ? Whos_to_blame.values[map['Whos_to_blame_for_Deficiet'] as int]
           : null,
       Offload_Target: map['Offload_Target'] != null
-          ? map['Offload_Target'] as double
+          ? (map['Offload_Target'] as num).toDouble()
           : null,
       Offload_Balance: map['Offload_Balance'] != null
-          ? map['Offload_Balance'] as double
+          ? (map['Offload_Balance'] as num).toDouble()
           : null,
       Management_Balance: map['Management_Balance'] != null
-          ? map['Management_Balance'] as double
+          ? (map['Management_Balance'] as num).toDouble()
           : null,
-      Management:
-          map['Management'] != null ? map['Management'] as double : null,
+      Management: map['Management'] != null
+          ? (map['Management'] as num).toDouble()
+          : null,
       Management_Target: map['Management_Target'] != null
-          ? map['Management_Target'] as double
+          ? (map['Management_Target'] as num).toDouble()
           : null,
     );
 

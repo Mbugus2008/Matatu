@@ -59,6 +59,7 @@ Future<void> initializedata() async {
     TranTypes().getttypes();
     Account_Types().get_account_Types();
     SettingsController().fetchWorkingDate();
+    ExpenseController().syncFromApi();
   } catch (e, stackTrace) {
     print('Initialization error: $e');
     print(stackTrace);

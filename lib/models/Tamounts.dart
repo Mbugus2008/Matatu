@@ -44,7 +44,7 @@ class Tamounts implements Tomaps, mapping, AbsDbUpdates {
       Vehicle_Type: map['Vehicle_Type'] != null
           ? vehicle_type.values[(map['Vehicle_Type'])]
           : null,
-      Amount: map['Amount'] != null ? map['Amount'] as double : null,
+      Amount: map['Amount'] != null ? (map['Amount'] as num).toDouble() : null,
       Name: map['Name'] != null ? map['Name'] as String : null,
     );
   }
@@ -108,14 +108,14 @@ PRIMARY KEY ($colCode, $colVehicleType)
             Results<Tamounts>.fromJson(r.body, Tamounts.fromMap);
         if (results.Code == 0) {
           if (results.Contents != null) {
-            Get.find<db_Provider>().batchinsert(
+            await Get.find<db_Provider>().batchinsert(
                 Tamounts.table, results.Contents as List<Tamounts>);
-            // for (TranTypes element in results.Contents as List<TranTypes>) {
-            //   db.insert(TranTypes.table, element);
-            // }
           }
         }
       }
+    }).catchError((e, stackTrace) {
+      print('[MATATU-API] getttypesamounts error: $e');
+      print('[MATATU-API] $stackTrace');
     });
   }
 }

@@ -4,10 +4,11 @@ import 'dart:convert';
 
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
+import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/mappings.dart';
 import 'package:t_matatu/models/member.dart';
 import 'package:t_matatu/providers/db.dart';
-import 'package:t_matatu/models/Transaction.dart' as tmatatu;
+
 import '../../network/Apis.dart';
 import '../../network/request.dart';
 import '../../network/results/results.dart';
@@ -95,14 +96,18 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
           map['Start_Date'] != null ? map['Start_Date'] as String : null,
       Code: map['Code'] != null ? map['Code'] as String : null,
       Id_Number: map['Id_Number'] != null ? map['Id_Number'] as String : null,
-      Penalty: map['Penalty'] != null ? map['Penalty'] as double : null,
-      Parking: map['Parking'] != null ? map['Parking'] as double : null,
+      Penalty:
+          map['Penalty'] != null ? (map['Penalty'] as num).toDouble() : null,
+      Parking:
+          map['Parking'] != null ? (map['Parking'] as num).toDouble() : null,
       Fleet_No: map['Fleet_No'] != null ? map['Fleet_No'] as String : null,
-      Offload: map['Offload'] != null ? map['Offload'] as double : null,
-      Management:
-          map['Management'] != null ? map['Management'] as double : null,
-      Mpesa: map['Mpesa'] != null ? map['Mpesa'] as double : null,
-      Cash: map['Cash'] != null ? map['Cash'] as double : null,
+      Offload:
+          map['Offload'] != null ? (map['Offload'] as num).toDouble() : null,
+      Management: map['Management'] != null
+          ? (map['Management'] as num).toDouble()
+          : null,
+      Mpesa: map['Mpesa'] != null ? (map['Mpesa'] as num).toDouble() : null,
+      Cash: map['Cash'] != null ? (map['Cash'] as num).toDouble() : null,
     );
   }
   @override
@@ -165,9 +170,11 @@ $col_Id_Number	text
       Daily_Contribution: map['Daily_Contribution'] != null
           ? (map['Daily_Contribution'] as num).toDouble()
           : null,
-      Offload: map['Offload'] != null ? map['Offload'] as double : null,
-      Management:
-          map['Management'] != null ? map['Management'] as double : null,
+      Offload:
+          map['Offload'] != null ? (map['Offload'] as num).toDouble() : null,
+      Management: map['Management'] != null
+          ? (map['Management'] as num).toDouble()
+          : null,
       Start_Date:
           map['Start_Date'] != null ? map['Start_Date'] as String : null,
       Code: map['Code'] != null ? map['Code'] as String : null,
@@ -189,49 +196,53 @@ $col_Id_Number	text
     };
   }
 
-  Future<List<Vehicles>> Daily_Contributions(DateTime date) async {
+  Future<void> Daily_Contributions(DateTime date) async {
     var request = Request(date: date);
-    ApiClient().postdata("Dailytrans", request.toJson()).then((r) async {
+    ApiClient().postdata("Dailytrans", request.toJson()).then((r) {
       if (r.statusCode == 200) {
         Results<Vehicles> results =
             Results<Vehicles>.fromJson(r.body, Vehicles.fromMap);
         if (results.Code == 0) {
-          if (results.Contents != null) {
+          if (results.Contents != null && results.Contents!.isNotEmpty) {
+            print(
+                '[MATATU-API] Daily_Contributions OK: ${results.Contents!.length} vehicles');
             Get.find<VehiclesController>().vehdailycollections.value =
                 (results.Contents as List<Vehicles>)
                   ..sort((a, b) => a.Fleet_No!.compareTo(b.Fleet_No as String));
             Get.find<VehiclesController>().vehdailycollectionsf.value =
                 (results.Contents as List<Vehicles>)
                   ..sort((a, b) => a.Fleet_No!.compareTo(b.Fleet_No as String));
-            return results.Contents as List<Vehicles>;
           }
         }
       }
+    }).catchError((e, stackTrace) {
+      print('[MATATU-API] Daily_Contributions error: $e');
+      print('[MATATU-API] $stackTrace');
+      // Clear spinner on failure
+      Get.find<VehiclesController>().vehdailycollections.value = [];
     });
-    return [];
-  }Future<List<tmatatu.Trans>> Daily_Veh_Contributions(DateTime date,String? vehicle) async {
-    var request = Request(date: date,vehicle: vehicle );
-    ApiClient().postdata("getvehicletrans", request.toJson()).then((r) async {
+  }
+
+  Future<void> Daily_Veh_Contributions(DateTime date, String? vehicle) async {
+    var request = Request(date: date, vehicle: vehicle);
+    ApiClient().postdata("getvehicletrans", request.toJson()).then((r) {
       if (r.statusCode == 200) {
         Results<tmatatu.Trans> results =
-        Results<tmatatu.Trans>.fromJson(r.body, tmatatu.Trans.fromMap);
+            Results<tmatatu.Trans>.fromJson(r.body, tmatatu.Trans.fromMap);
         if (results.Code == 0) {
           if (results.Contents != null) {
             Get.find<VehiclesController>().vehcollections.value =
-            (results.Contents as List<tmatatu.Trans>)
-              ..sort((a, b) => a.Transaction_Time!.compareTo(b.Transaction_Time as DateTime));
-
-            return results.Contents as List<tmatatu.Trans>;
+                (results.Contents as List<tmatatu.Trans>)
+                  ..sort((a, b) => a.Transaction_Time!
+                      .compareTo(b.Transaction_Time as DateTime));
           }
         }
       }
+    }).catchError((e, stackTrace) {
+      print('[MATATU-API] Daily_Veh_Contributions error: $e');
+      print('[MATATU-API] $stackTrace');
     });
-    return [];
   }
-
-
-
-
 
   Future<void> getvehicles() async {
     bool hasdata = true;
