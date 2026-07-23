@@ -17,25 +17,27 @@
       "type": "dart",
       "program": "D:\\Projects2\\Matatu\\trimline_kmos\\lib\\main.dart"
     },
- 
+
     {
-       "name": "Lopha",
+      "name": "Lopha",
       "request": "launch",
       "type": "dart",
       "program": "D:\\Projects2\\Matatu\\trimline_Lopha\\lib\\main.dart"
-    }, 
+    },
+
     {
-       "name": "KCS",
+      "name": "KCS",
       "request": "launch",
       "type": "dart",
       "program": "D:\\Projects2\\Matatu\\trimline_KCS\\lib\\main.dart"
-    }, 
+    },
+
     {
-       "name": "Rembo Classic",
+      "name": "Rembo Classic",
       "request": "launch",
       "type": "dart",
       "program": "D:\\Projects2\\Matatu\\trimline_RemboClassic\\lib\\main.dart"
-    }, 
+    },
     
     {
       "name": "Cityhoppa",

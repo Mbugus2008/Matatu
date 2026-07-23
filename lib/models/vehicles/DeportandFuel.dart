@@ -223,7 +223,9 @@ class DepotFuel implements Tomaps {
       'Run_Back': Run_Back,
       'Run_Bak_Time':
           Run_Bak_Time != null ? formattedTime.format(Run_Bak_Time!) : null,
-      'Whos_to_blame_for_Deficiet': Whos_to_blame_for_Deficiet?.index,
+      'Whos_to_blame_for_Deficiet': Whos_to_blame_for_Deficiet == null
+          ? null
+          : Whos_to_blame_for_Deficiet!.index,
       'Offload_Target': Offload_Target,
       'Offload_Balance': Offload_Balance,
       'Management_Balance': Management_Balance,
@@ -366,7 +368,19 @@ class DepotFuel implements Tomaps {
   Future<void> updatedepot(List<DepotFuel> depots) async {
     Get.find<DepotController>().updating.value = true;
     for (var depot in depots) {
-      ApiClient().postdata("setdepotdata", depot.toJson()).then((r) async {
+      // Ensure null decimals become 0 to satisfy ASP.NET model binder
+      depot.Km_Litre ??= 0;
+      depot.Total_litres ??= 0;
+      depot.Net_Offload ??= 0;
+      depot.Offload_Target ??= 0;
+      depot.Offload_Balance ??= 0;
+      depot.Management_Balance ??= 0;
+      depot.Management_Target ??= 0;
+      depot.Management ??= 0;
+
+      final json = depot.toJson();
+      print('[SETDEPOT] sending: ${json.substring(0, 200)}');
+      ApiClient().postdata("setdepotdata", json).then((r) async {
         if (r.statusCode == 200) {
           Results2<DepotFuel> results =
               Results2<DepotFuel>.fromJson(r.body, DepotFuel.fromMap);

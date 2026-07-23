@@ -147,7 +147,7 @@ class CustomDrawer extends StatelessWidget {
             onTap: () {
               Get.find<ReportController>().selectedDate?.value =
                   DateTime.now();
-              Get.to(() => const PageLoader(page: Fuel(), title: "Fuel"));
+              Get.to(() => const FuelScreen());
             },
           ),
           _buildTile(

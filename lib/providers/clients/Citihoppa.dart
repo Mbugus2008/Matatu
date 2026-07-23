@@ -65,7 +65,11 @@ class Cityhoppa extends BaseClients {
   @override
   AppBar? appBar() {
     final mainController = Get.find<MainController>();
+    final hex = mainController.config?.value.theme?.primaryColor;
+    final color = _parseColor(hex);
     return AppBar(
+      backgroundColor: color,
+      foregroundColor: Colors.white,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -956,5 +960,12 @@ class Cityhoppa extends BaseClients {
 
   double _getTitleFontSize(int length) {
     return 18.0; // Default title font size, adjust as needed
+  }
+
+  Color? _parseColor(String? hex) {
+    if (hex == null) return null;
+    final clean = hex.replaceFirst('#', '');
+    final full = clean.length == 6 ? 'FF$clean' : clean;
+    return Color(int.parse(full, radix: 16));
   }
 }

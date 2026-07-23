@@ -5,7 +5,6 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/models/Utils/util.dart';
 import 'package:t_matatu/models/expenses/expenses.dart';
@@ -47,7 +46,9 @@ class _DepotState extends State<Depot> {
   }
 
   void _shareDispatch() async {
+    print('[SHARE] _shareDispatch called');
     final depot = Get.find<DepotController>().depottrans;
+    print('[SHARE] depot count: ${depot.length}');
     if (depot.isEmpty) {
       Get.snackbar('No Data', 'No dispatch data to share');
       return;
@@ -56,6 +57,7 @@ class _DepotState extends State<Depot> {
     final date = DateFormat('dd-MMM-yyyy').format(_selectedDate);
     final active = depot.where((d) => d.On_route == true).length;
     final total = depot.length;
+    print('[SHARE] building CSV: active=$active total=$total');
 
     // Build CSV rows
     final rows = <List<String>>[];
@@ -90,20 +92,37 @@ class _DepotState extends State<Depot> {
 
     // Build CSV manually
     final csv = rows.map((r) => r.map((c) => '"$c"').join(',')).join('\n');
+    print('[SHARE] CSV length: ${csv.length}');
 
-    // Save & share
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/Dispatch_${date.replaceAll('-', '_')}.csv');
-    await file.writeAsString(csv);
+    // Save to Downloads (always works, no app needed)
+    final downloadDir = Directory('/storage/emulated/0/Download');
+    String savedPath;
 
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      subject: 'Dispatch $date',
+    if (await downloadDir.exists()) {
+      final file =
+          File('${downloadDir.path}/Dispatch_${date.replaceAll('-', '_')}.csv');
+      await file.writeAsString(csv);
+      savedPath = file.path;
+    } else {
+      // Fallback to app documents
+      final dir = await getApplicationDocumentsDirectory();
+      final file =
+          File('${dir.path}/Dispatch_${date.replaceAll('-', '_')}.csv');
+      await file.writeAsString(csv);
+      savedPath = file.path;
+    }
+
+    Get.snackbar(
+      'Exported',
+      'Saved to $savedPath\nOpen with Files app to share',
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 4),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    print('[DEPOT] build called');
     return Stack(
       children: [
         GetBuilder<DepotController>(
@@ -122,7 +141,10 @@ class _DepotState extends State<Depot> {
           right: 16,
           bottom: 16,
           child: FloatingActionButton.extended(
-            onPressed: _shareDispatch,
+            onPressed: () {
+              print('[SHARE] button tapped');
+              _shareDispatch();
+            },
             icon: const Icon(Icons.share),
             label: const Text('Share'),
             backgroundColor: Colors.green.shade600,
