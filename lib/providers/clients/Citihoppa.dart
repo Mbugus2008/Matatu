@@ -21,7 +21,9 @@ import 'package:t_matatu/pages/vehicles/vehdetails.dart';
 import 'package:t_matatu/providers/client.dart';
 
 import '../../controllers/vehicles/vehicles.dart';
-import '../../pages/vehicles/two_tab_screen.dart';
+import '../../controllers/wbridge_controller.dart';
+import '../../pages/disfuel_summary.dart';
+import '../../pages/weighbridge/wbridge_list.dart';
 import '../../pages/widgets/Groupbox.dart';
 import '../../reports/controller.dart';
 
@@ -56,6 +58,9 @@ class Cityhoppa extends BaseClients {
   Future<void> init() async {
     if (!Get.isRegistered<DepotController>()) {
       Get.put(DepotController());
+    }
+    if (!Get.isRegistered<WBridgeController>()) {
+      Get.put(WBridgeController());
     }
     Tamounts().getttypesamounts();
     await Vehicles().Daily_Contributions(getdate());
@@ -93,7 +98,6 @@ class Cityhoppa extends BaseClients {
       ),
     );
   }
-
   @override
   Widget homelist() {
     int? account_type = Get.find<MainController>().agent.value.Account_type;
@@ -102,8 +106,9 @@ class Cityhoppa extends BaseClients {
         ReportController().gettransbydate(DateTime.now());
         Get.find<ReportController>().selectedDate?.value = DateTime.now();
         DepotFuel().getNRODefects();
-        DepotFuel().getdata(Get.find<ReportController>().selectedDate!.value);
-        return const TwoTabScreen(); // Use the TwoTabScreen for account_type 3
+        DepotFuel().getdata(
+            Get.find<ReportController>().selectedDate?.value ?? DateTime.now());
+        return const DisFuelSummaryScreen(); // Use the TwoTabScreen for account_type 3
       default:
         return GetBuilder<VehiclesController>(
           builder: (controller) {
@@ -931,7 +936,9 @@ class Cityhoppa extends BaseClients {
           ReportController().gettransbydate(DateTime.now());
           Get.find<ReportController>().selectedDate?.value = DateTime.now();
           DepotFuel().getNRODefects();
-          DepotFuel().getdata(Get.find<ReportController>().selectedDate!.value);
+          DepotFuel().getdata(
+              Get.find<ReportController>().selectedDate?.value ??
+                  DateTime.now());
           Get.to(() => const PageLoader(page: Depot(), title: "Dispatch"));
         },
         title: const Text("Dispatch"),
@@ -940,7 +947,9 @@ class Cityhoppa extends BaseClients {
         leading: const Icon(Icons.summarize),
         onTap: () {
           Get.find<ReportController>().selectedDate?.value = DateTime.now();
-          DepotFuel().getdata(Get.find<ReportController>().selectedDate!.value);
+          DepotFuel().getdata(
+              Get.find<ReportController>().selectedDate?.value ??
+                  DateTime.now());
           Get.to(() => const PageLoader(page: Fuel(), title: "Fuel"));
         },
         title: const Text("Fuel"),
@@ -951,6 +960,21 @@ class Cityhoppa extends BaseClients {
           Get.to(() => PageLoader(page: HiresListScreen(), title: "Hires"));
         },
         title: const Text("Hires"),
+      ),
+      ListTile(
+        leading: const Icon(Icons.scale),
+        onTap: () {
+          Get.to(() =>
+              const PageLoader(page: WBridgeListPage(), title: "Weigh Bridge"));
+        },
+        title: const Text("Weigh Bridge"),
+      ),
+      ListTile(
+        leading: const Icon(Icons.summarize),
+        onTap: () {
+          Get.to(() => const DisFuelSummaryScreen());
+        },
+        title: const Text("Disp. & Fuel Summary"),
       ),
     ]);
   }

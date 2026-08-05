@@ -14,10 +14,12 @@ import 'package:t_matatu/models/summary/TsummaryDetails.dart';
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/pages/Reversals/ReversalsList.dart';
 import 'package:t_matatu/pages/TwoTabScreen.dart';
+import 'package:t_matatu/pages/disfuel_summary.dart';
 import 'package:t_matatu/pages/hires/hires_list.dart';
 import 'package:t_matatu/pages/pageloader.dart';
 import 'package:t_matatu/pages/vehicles/Depot.dart';
 import 'package:t_matatu/pages/vehicles/Fuel.dart';
+import 'package:t_matatu/pages/weighbridge/wbridge_list.dart';
 import 'package:t_matatu/reports/Daily%20Summary.dart';
 import 'package:t_matatu/reports/controller.dart';
 import 'package:t_matatu/reports/receipts.dart';
@@ -29,11 +31,7 @@ class CustomDrawer extends StatelessWidget {
   CustomDrawer({super.key});
 
   Color? _primaryColor(BuildContext context) {
-    final hex = Get.find<MainController>()
-        .config
-        ?.value
-        .theme
-        ?.primaryColor;
+    final hex = Get.find<MainController>().config?.value.theme?.primaryColor;
     if (hex == null) return null;
     final clean = hex.replaceFirst('#', '');
     final full = clean.length == 6 ? 'FF$clean' : clean;
@@ -129,28 +127,6 @@ class CustomDrawer extends StatelessWidget {
           // --- Menu Section ---
           _buildSectionHeader('MENU', context),
           _buildTile(
-            icon: Icons.receipt,
-            title: 'Dispatch',
-            context: context,
-            onTap: () {
-              ReportController().gettransbydate(DateTime.now());
-              Get.find<ReportController>().selectedDate?.value =
-                  DateTime.now();
-              Get.to(() =>
-                  const PageLoader(page: Depot(), title: "Dispatch"));
-            },
-          ),
-          _buildTile(
-            icon: Icons.local_gas_station,
-            title: 'Fuel',
-            context: context,
-            onTap: () {
-              Get.find<ReportController>().selectedDate?.value =
-                  DateTime.now();
-              Get.to(() => const FuelScreen());
-            },
-          ),
-          _buildTile(
             icon: Icons.monetization_on,
             title: 'Expenses',
             context: context,
@@ -165,6 +141,23 @@ class CustomDrawer extends StatelessWidget {
             context: context,
             onTap: () {
               Get.to(() => HiresListScreen());
+            },
+          ),
+          _buildTile(
+            icon: Icons.scale,
+            title: 'Weigh Bridge',
+            context: context,
+            onTap: () {
+              Get.to(() => const PageLoader(
+                  page: WBridgeListPage(), title: "Weigh Bridge"));
+            },
+          ),
+          _buildTile(
+            icon: Icons.summarize,
+            title: 'Dispatch & Fuel',
+            context: context,
+            onTap: () {
+              Get.to(() => const DisFuelSummaryScreen());
             },
           ),
           _buildTile(
@@ -189,8 +182,7 @@ class CustomDrawer extends StatelessWidget {
             context: context,
             onTap: () {
               ReportController().gettransbydate(DateTime.now());
-              Get.find<ReportController>().selectedDate?.value =
-                  DateTime.now();
+              Get.find<ReportController>().selectedDate?.value = DateTime.now();
               Get.to(() => const ReceiptReport());
             },
           ),
@@ -210,8 +202,7 @@ class CustomDrawer extends StatelessWidget {
             context: context,
             onTap: () {
               ReportController().gettransbydate(DateTime.now());
-              Get.find<ReportController>().selectedDate?.value =
-                  DateTime.now();
+              Get.find<ReportController>().selectedDate?.value = DateTime.now();
               Get.to(() => const TwoTabScreen());
             },
           ),
@@ -319,8 +310,7 @@ class CustomDrawer extends StatelessWidget {
                 'Agent_Code': agentCode,
                 'Password': AgentController().encrypt(newPass.text),
               });
-              final r = await ApiClient()
-                  .postdata('changepassword', body);
+              final r = await ApiClient().postdata('changepassword', body);
               if (r.statusCode == 200) {
                 Get.back();
                 Get.snackbar('Success', 'Password changed');
@@ -362,4 +352,3 @@ class _ExpensesListScreen extends StatelessWidget {
     );
   }
 }
-

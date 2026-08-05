@@ -21,9 +21,11 @@ import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/accounttypes.dart';
 import 'package:t_matatu/models/agents.dart';
 import 'package:t_matatu/models/member.dart';
+import 'package:t_matatu/models/route.dart';
 import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
+import 'package:t_matatu/models/weighbridge/wbridge.dart';
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/providers/colors.dart';
@@ -60,6 +62,7 @@ Future<void> initializedata() async {
     Account_Types().get_account_Types();
     SettingsController().fetchWorkingDate();
     ExpenseController().syncFromApi();
+    RouteService().syncRoutes(); // Sync routes from API on startup
   } catch (e, stackTrace) {
     print('Initialization error: $e');
     print(stackTrace);
@@ -70,6 +73,7 @@ Future<void> initializedata() async {
 Future<void> upload() async {
   sendtransdetails();
   sendtrans();
+  WBridgeService().syncPendingWBridges();
 }
 
 Future<void> sendtrans() async {

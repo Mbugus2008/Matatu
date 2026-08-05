@@ -15,8 +15,11 @@ import 'package:t_matatu/models/trantypes.dart';
 
 import '../models/Utils/util.dart';
 import '../models/expenses/vehicle_expenses.dart';
+import '../models/route.dart';
 import '../models/vehicles/Vehicle_crew.dart';
 import '../models/vehicles/vehicle.dart';
+import '../models/weighbridge/wbridge.dart';
+import '../pages/disfuel_summary.dart';
 
 class Dbtrans {
   String table;
@@ -48,6 +51,7 @@ class db_Provider extends GetxController {
     }
 
     _database = await open();
+    await _ensureNewTables(_database!);
     return _database!;
   }
 
@@ -83,7 +87,17 @@ class db_Provider extends GetxController {
       await db.execute(Account_Types.createtable);
       await db.execute(Reversal.createtable);
       await db.execute(Hires.createtable);
+      await db.execute(WBridge.createtable);
+      await db.execute(RouteModel.createtable);
+      await db.execute(DisFuelSummary.createtable);
     }, onUpgrade: _onUpgrade);
+  }
+
+  /// Ensure recent tables exist even for existing databases.
+  Future<void> _ensureNewTables(Database db) async {
+    await db.execute(WBridge.createtable);
+    await db.execute(RouteModel.createtable);
+    await db.execute(DisFuelSummary.createtable);
   }
 
   Future<void> close() async {
@@ -91,10 +105,9 @@ class db_Provider extends GetxController {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // if (newVersion == 5) {
-    //     await db.execute(
-    //       'ALTER TABLE ${TranTypes.table} ADD COLUMN ${TranTypes.col_Amount} float');
-    // }
+    // Ensure new tables exist on upgrade (safe with IF NOT EXISTS)
+    await db.execute(WBridge.createtable);
+    await db.execute(RouteModel.createtable);
 
     for (var i = oldVersion; i <= newVersion; i++) {
       for (var element in get_updates(newVersion)) {

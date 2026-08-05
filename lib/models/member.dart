@@ -3,7 +3,6 @@
 import 'dart:convert';
 
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:t_matatu/controllers/Members.dart';
 import 'package:t_matatu/models/mappings.dart';
 import 'package:t_matatu/network/Apis.dart';
@@ -90,7 +89,7 @@ class Member implements mapping, Tomaps, AbsDbUpdates {
           ? map['Customer_Posting_Group'] as String
           : null,
       Status:
-      map['Status'] != null ? status.values[(map['Status'] as int)] : null,
+          map['Status'] != null ? status.values[(map['Status'] as int)] : null,
       Crew_Type: map['Crew_Type'] != null
           ? Crew_type.values[(map['Crew_Type'] as int)]
           : null,
@@ -162,24 +161,21 @@ $col_Vehicle text
     return update;
   }
 
-
   Future<void> getmembers() async {
     bool hasdata = true;
     String? bookmark;
-    int? size = 10;
+    int? size = 50;
     var request = Request(body: null, bookmark: bookmark, size: size);
     while (hasdata) {
       await ApiClient().postdata("members", request.toJson()).then((r) async {
         if (r.statusCode == 200) {
-          
           Results<Member> results =
-          Results<Member>.fromJson(r.body, Member.fromMap);
+              Results<Member>.fromJson(r.body, Member.fromMap);
           if (results.Code == 0) {
             if (results.Contents != null) {
               hasdata = results.Contents!.isNotEmpty;
               if (results.Contents!.isNotEmpty) {
-                await Get.find<db_Provider>()
-                    .batchinsert(
+                await Get.find<db_Provider>().batchinsert(
                     Member.table, results.Contents as List<Member>);
                 bookmark = results.Contents!.last.Key;
                 request = Request(body: null, bookmark: bookmark, size: size);
@@ -194,13 +190,12 @@ $col_Vehicle text
         } else {
           hasdata = false;
         }
-        Get
-            .find<MemberController>()
-            .initialize;
+        Get.find<MemberController>().initialize;
       });
     }
   }
 }
+
 enum status {
   Active,
   Dormant,

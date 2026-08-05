@@ -8,9 +8,8 @@ import 'package:http/http.dart' as http;
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/providers/logger.dart';
 
-
 class ApiClient extends ChangeNotifier {
-   final LoggerService logger = Get.find();
+  final LoggerService logger = Get.find();
   String baseUrl = "http://trimline.co.ke:4005/City/api/";
   //String baseUrl = "http://192.168.100.47:898/api";
   //String baseUrl = "http://192.168.1.118:898/api";
@@ -19,42 +18,75 @@ class ApiClient extends ChangeNotifier {
   Future<http.Response> postdata(String url, String? data) async {
     http.Response? r = http.Response("", 200);
     try {
-      String urls = '${Get.find<MainController>().config?.value.apiBaseUrl}$url';
+      String urls =
+          '${Get.find<MainController>().config?.value.apiBaseUrl}$url';
 
       logger.info(urls);
       logger.info("out: $data");
-      
- 
-   
-final rawHeader = {
-  'Content-Type': 'application/json',
-  'X-Client-Identifier': Get.find<MainController>().config?.value.clientId,
-};
-logger.info(rawHeader.toString());
-// Convert to Map<String, String> by replacing nulls with empty string (or remove them)
-final header = rawHeader.map(
-  (key, value) => MapEntry(key, value ?? ''),
-);
 
-      r = await http.post(
-          Uri.parse(
-              urls),
-          body: data,
-          headers:header   );
-          
-   
-      logger.info( 'url: $url, status code: ${r.statusCode}');
-      logger.info(  'url: ${url}body: ${r.body}');
-      
+      final rawHeader = {
+        'Content-Type': 'application/json',
+        'X-Client-Identifier':
+            Get.find<MainController>().config?.value.clientId,
+        'X-Api-Key': 'gbsQcaCncEKpIIOn45tnpsynuAwW+sXvNhFl2ynk9+s=',
+      };
+      logger.info(rawHeader.toString());
+// Convert to Map<String, String> by replacing nulls with empty string (or remove them)
+      final header = rawHeader.map(
+        (key, value) => MapEntry(key, value ?? ''),
+      );
+
+      r = await http.post(Uri.parse(urls), body: data, headers: header);
+
+      logger.info('url: $url, status code: ${r.statusCode}');
+      logger.info('url: ${url}body: ${r.body}');
+
       if (r.statusCode != 200) {
-        logger.error (r.statusCode.toString());
-        logger.error (r.body);
-        
+        logger.error(r.statusCode.toString());
+        logger.error(r.body);
       }
-      
     } catch (e, stackTrace) {
       logger.error("API failed", error: e, stackTrace: stackTrace);
       rethrow; // Let the caller handle the error
+    }
+    return await Future.value(r);
+  }
+
+  Future<http.Response> getdata(String url,
+      {Map<String, String>? queryParams}) async {
+    http.Response? r = http.Response("", 200);
+    try {
+      String urls =
+          '${Get.find<MainController>().config?.value.apiBaseUrl}$url';
+
+      final rawHeader = {
+        'Content-Type': 'application/json',
+        'X-Client-Identifier':
+            Get.find<MainController>().config?.value.clientId,
+        'X-Api-Key': 'gbsQcaCncEKpIIOn45tnpsynuAwW+sXvNhFl2ynk9+s=',
+      };
+      final header = rawHeader.map(
+        (key, value) => MapEntry(key, value ?? ''),
+      );
+
+      var uri = Uri.parse(urls);
+      if (queryParams != null && queryParams.isNotEmpty) {
+        uri = uri.replace(queryParameters: queryParams);
+      }
+
+      logger.info('GET: $uri');
+      r = await http.get(uri, headers: header);
+
+      logger.info('url: $url, status code: ${r.statusCode}');
+      logger.info('url: ${url}body: ${r.body}');
+
+      if (r.statusCode != 200) {
+        logger.error(r.statusCode.toString());
+        logger.error(r.body);
+      }
+    } catch (e, stackTrace) {
+      logger.error("API GET failed", error: e, stackTrace: stackTrace);
+      rethrow;
     }
     return await Future.value(r);
   }

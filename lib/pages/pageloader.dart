@@ -15,8 +15,7 @@ class PageLoader extends StatelessWidget {
   final List<Widget>? actions;
 
   Color _primaryColor() {
-    final hex = Get.find<MainController>()
-        .config?.value.theme?.primaryColor;
+    final hex = Get.find<MainController>().config?.value.theme?.primaryColor;
     if (hex == null) return Colors.blue;
     final clean = hex.replaceFirst('#', '');
     final full = clean.length == 6 ? 'FF$clean' : clean;

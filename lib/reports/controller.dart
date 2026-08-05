@@ -7,7 +7,7 @@ import '../models/Header.dart';
 import '../providers/db.dart';
 
 class ReportController extends GetxController {
-  Rx<DateTime>? selectedDate = DateTime.now().obs;
+  Rx<DateTime?>? selectedDate = Rx<DateTime?>(null);
   RxBool searching = false.obs;
   RxList<Tsummary> tsummary = <Tsummary>[].obs;
   RxList<TsummaryDetails> tsummarydetails = <TsummaryDetails>[].obs;

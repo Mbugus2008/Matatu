@@ -94,12 +94,13 @@ class DepotFuel implements Tomaps {
   String? Driver_Name;
   String? Conductor_Name;
   double? Offload_Target;
-
   double? Offload_Balance;
-
   double? Management_Balance;
-
   Whos_to_blame? Whos_to_blame_for_Deficiet;
+  String? Comments;
+  double? Total_Collection;
+  double? Fuel_Balance;
+  double? Odometer_Reading;
 
   // TextEditingControllers
   late TextEditingController Nro_Defects_editor;
@@ -147,6 +148,10 @@ class DepotFuel implements Tomaps {
     this.Management_Balance,
     this.Management,
     this.Management_Target,
+    this.Comments,
+    this.Total_Collection,
+    this.Fuel_Balance,
+    this.Odometer_Reading,
   })  : _Millage = Millage,
         _Amount_Paid = Amount_Paid,
         _Fuel = Fuel,
@@ -226,11 +231,20 @@ class DepotFuel implements Tomaps {
       'Whos_to_blame_for_Deficiet': Whos_to_blame_for_Deficiet == null
           ? null
           : Whos_to_blame_for_Deficiet!.index,
+      'Whos_to_blame_for_DeficietSpecified':
+          Whos_to_blame_for_Deficiet != null,
       'Offload_Target': Offload_Target,
       'Offload_Balance': Offload_Balance,
       'Management_Balance': Management_Balance,
       'Management': Management,
       'Management_Target': Management_Target,
+      'Comments': Comments,
+      'Total_Collection': Total_Collection,
+      'Total_CollectionSpecified': Total_Collection != null,
+      'Fuel_Balance': Fuel_Balance,
+      'Fuel_BalanceSpecified': Fuel_Balance != null,
+      'Odometer_Reading': Odometer_Reading,
+      'Odometer_ReadingSpecified': Odometer_Reading != null,
     };
   }
 
@@ -308,6 +322,16 @@ class DepotFuel implements Tomaps {
       Management_Target: map['Management_Target'] != null
           ? (map['Management_Target'] as num).toDouble()
           : null,
+      Comments: map['Comments'] as String?,
+      Total_Collection: map['Total_Collection'] != null
+          ? (map['Total_Collection'] as num).toDouble()
+          : null,
+      Fuel_Balance: map['Fuel_Balance'] != null
+          ? (map['Fuel_Balance'] as num).toDouble()
+          : null,
+      Odometer_Reading: map['Odometer_Reading'] != null
+          ? (map['Odometer_Reading'] as num).toDouble()
+          : null,
     );
 
     print('Recieved Driver Name: ${df.Driver_Name}');
@@ -377,6 +401,10 @@ class DepotFuel implements Tomaps {
       depot.Management_Balance ??= 0;
       depot.Management_Target ??= 0;
       depot.Management ??= 0;
+      depot.Comments ??= '';
+      depot.Total_Collection ??= 0;
+      depot.Fuel_Balance ??= 0;
+      depot.Odometer_Reading ??= 0;
 
       final json = depot.toJson();
       print('[SETDEPOT] sending: ${json.substring(0, 200)}');
