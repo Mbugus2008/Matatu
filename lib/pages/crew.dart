@@ -7,16 +7,57 @@ import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/pages/widgets/autoc.dart';
 import 'package:t_matatu/providers/client.dart';
 
-class CrewAssignment extends StatelessWidget {
+class CrewAssignment extends StatefulWidget {
   final Vehicles? vehicle;
+
+  const CrewAssignment({Key? key, required this.vehicle}) : super(key: key);
+
+  @override
+  State<CrewAssignment> createState() => _CrewAssignmentState();
+}
+
+class _CrewAssignmentState extends State<CrewAssignment> {
   final TextEditingController driverController = TextEditingController();
   final TextEditingController conductorController = TextEditingController();
 
-  CrewAssignment({Key? key, required this.vehicle}) : super(key: key);
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentCrew();
+  }
+
+  void _loadCurrentCrew() {
+    final v = widget.vehicle;
+    if (v == null) return;
+    final memberController = Get.find<MemberController>();
+    memberController.getcurrentcrew(v.Vehicle_Number.toString());
+
+    final driver = memberController.currentcrew
+        .firstWhereOrNull((m) => m.Crew_Type == Crew_type.Driver);
+    final conductor = memberController.currentcrew
+        .firstWhereOrNull((m) => m.Crew_Type == Crew_type.Conductor);
+
+    if (driver != null) {
+      driverController.text = driver.No.toString();
+      memberController.currentdriver.value = driver;
+    }
+    if (conductor != null) {
+      conductorController.text = conductor.No.toString();
+      memberController.currentcunductor.value = conductor;
+    }
+  }
+
+  @override
+  void dispose() {
+    driverController.dispose();
+    conductorController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (vehicle == null) {
+    final v = widget.vehicle;
+    if (v == null) {
       return Scaffold(
         appBar: AppBar(title: Text('Error')),
         body: Center(child: Text('No vehicle data available')),
@@ -26,7 +67,7 @@ class CrewAssignment extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: Text('Assign Crew - ${vehicle!.Vehicle_Number}'),
+        title: Text('Assign Crew - ${v.Vehicle_Number}'),
       ),
       body: SafeArea(
         child: Padding(
@@ -47,6 +88,7 @@ class CrewAssignment extends StatelessWidget {
   }
 
   Widget _buildVehicleInfo() {
+    final v = widget.vehicle!;
     return Card(
       elevation: 4,
       child: Padding(
@@ -54,12 +96,14 @@ class CrewAssignment extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Vehicle Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Vehicle Details',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(height: 8),
-            Text('Number: ${vehicle!.Vehicle_Number}'),
-            if (vehicle!.Fleet_No != null && vehicle!.Fleet_No!.isNotEmpty)
-              Text('Fleet: ${vehicle!.Fleet_No}'),
-            Text('Type: ${vehicle_type_desc.desc[vehicle!.Vehicle_Type] ?? 'Unknown'}'),
+            Text('Number: ${v.Vehicle_Number}'),
+            if (v.Fleet_No != null && v.Fleet_No!.isNotEmpty)
+              Text('Fleet: ${v.Fleet_No}'),
+            Text(
+                'Type: ${vehicle_type_desc.desc[v.Vehicle_Type] ?? 'Unknown'}'),
           ],
         ),
       ),
@@ -69,22 +113,27 @@ class CrewAssignment extends StatelessWidget {
   Widget _buildCrewForm() {
     return Column(
       children: [
-        if(Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Both || Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Driver)
-                   
-        CustomAutocomplete(
-          textEditingController: driverController,
-          crew_type: Crew_type.Driver,
-          caption: "Driver",
-          leadingicon: Icon(Icons.person),
-        ),
+        if (Get.find<MainController>().CurrentClient?.value.Crew_to_attach ==
+                CrewToattach.Both ||
+            Get.find<MainController>().CurrentClient?.value.Crew_to_attach ==
+                CrewToattach.Driver)
+          CustomAutocomplete(
+            textEditingController: driverController,
+            crew_type: Crew_type.Driver,
+            caption: "Driver",
+            leadingicon: Icon(Icons.person),
+          ),
         SizedBox(height: 16),
-        if(Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Both || Get.find<MainController>().CurrentClient?.value.Crew_to_attach == CrewToattach.Condutor)
-        CustomAutocomplete(
-          textEditingController: conductorController,
-          crew_type: Crew_type.Conductor,
-          caption: "Conductor",
-          leadingicon: Icon(Icons.person_outline),
-        ),
+        if (Get.find<MainController>().CurrentClient?.value.Crew_to_attach ==
+                CrewToattach.Both ||
+            Get.find<MainController>().CurrentClient?.value.Crew_to_attach ==
+                CrewToattach.Condutor)
+          CustomAutocomplete(
+            textEditingController: conductorController,
+            crew_type: Crew_type.Conductor,
+            caption: "Conductor",
+            leadingicon: Icon(Icons.person_outline),
+          ),
       ],
     );
   }
@@ -103,32 +152,33 @@ class CrewAssignment extends StatelessWidget {
   }
 
   void _assignCrew() {
-    if (vehicle == null) return;
+    final v = widget.vehicle;
+    if (v == null) return;
 
     final memberController = Get.find<MemberController>();
-    
-    memberController.clearcrew(vehicle!.Vehicle_Number.toString());
+
+    memberController.clearcrew(v.Vehicle_Number.toString());
 
     if (memberController.currentdriver.value != null) {
-      memberController.currentdriver.value!.Vehicle = vehicle!.Vehicle_Number;
+      memberController.currentdriver.value!.Vehicle = v.Vehicle_Number;
       memberController.setcrew(
-        vehicle!.Vehicle_Number.toString(),
+        v.Vehicle_Number.toString(),
         memberController.currentdriver.value!.No.toString(),
         Crew_type.Driver,
       );
-      vehicle!.Driver = memberController.currentdriver.value;
+      v.Driver = memberController.currentdriver.value;
     }
 
     if (memberController.currentcunductor.value != null) {
-      memberController.currentcunductor.value!.Vehicle = vehicle!.Vehicle_Number;
+      memberController.currentcunductor.value!.Vehicle = v.Vehicle_Number;
       memberController.setcrew(
-        vehicle!.Vehicle_Number.toString(),
+        v.Vehicle_Number.toString(),
         memberController.currentcunductor.value!.No.toString(),
         Crew_type.Conductor,
       );
-      vehicle!.Conductor = memberController.currentcunductor.value;
+      v.Conductor = memberController.currentcunductor.value;
     }
-  memberController.getcurrentcrew(vehicle!.Vehicle_Number.toString());
-    Get.back(result: vehicle);
+    memberController.getcurrentcrew(v.Vehicle_Number.toString());
+    Get.back(result: v);
   }
 }

@@ -98,6 +98,19 @@ class db_Provider extends GetxController {
     await db.execute(WBridge.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
+    // Migration: new fields added to disfuel_summary
+    try {
+      await db.execute(
+          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Total_Collection REAL');
+    } catch (_) {}
+    try {
+      await db.execute(
+          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Net_Offload REAL');
+    } catch (_) {}
+    try {
+      await db.execute(
+          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Active_Vehicles INTEGER');
+    } catch (_) {}
   }
 
   Future<void> close() async {
@@ -108,6 +121,20 @@ class db_Provider extends GetxController {
     // Ensure new tables exist on upgrade (safe with IF NOT EXISTS)
     await db.execute(WBridge.createtable);
     await db.execute(RouteModel.createtable);
+    await db.execute(DisFuelSummary.createtable);
+    // Migration: new fields for disfuel_summary
+    try {
+      await db.execute(
+          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Total_Collection REAL');
+    } catch (_) {}
+    try {
+      await db.execute(
+          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Net_Offload REAL');
+    } catch (_) {}
+    try {
+      await db.execute(
+          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Active_Vehicles INTEGER');
+    } catch (_) {}
 
     for (var i = oldVersion; i <= newVersion; i++) {
       for (var element in get_updates(newVersion)) {

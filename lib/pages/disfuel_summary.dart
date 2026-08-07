@@ -26,6 +26,9 @@ class DisFuelSummary {
   double? Total_Mileage;
   double? Created_By;
   double? Total_Fuel_Arrears;
+  double? Total_Collection;
+  double? Net_Offload;
+  int? Active_Vehicles;
   bool sent = false;
 
   DisFuelSummary({
@@ -38,6 +41,9 @@ class DisFuelSummary {
     this.Total_Mileage,
     this.Created_By,
     this.Total_Fuel_Arrears,
+    this.Total_Collection,
+    this.Net_Offload,
+    this.Active_Vehicles,
     this.sent = false,
   });
 
@@ -50,6 +56,8 @@ class DisFuelSummary {
         'Total_Paid': Total_Paid,
         'Total_Mileage': Total_Mileage,
         'Total_Fuel_Arrears': Total_Fuel_Arrears,
+        'Total_Collection': Total_Collection,
+        'Net_Offload': Net_Offload,
       };
 
   static DisFuelSummary fromMap(Map<String, dynamic> map) => DisFuelSummary(
@@ -61,6 +69,9 @@ class DisFuelSummary {
         Total_Paid: (map['Total_Paid'] as num?)?.toDouble(),
         Total_Mileage: (map['Total_Mileage'] as num?)?.toDouble(),
         Total_Fuel_Arrears: (map['Total_Fuel_Arrears'] as num?)?.toDouble(),
+        Total_Collection: (map['Total_Collection'] as num?)?.toDouble(),
+        Net_Offload: (map['Net_Offload'] as num?)?.toDouble(),
+        Active_Vehicles: map['Active_Vehicles'] as int?,
       );
 
   Map<String, dynamic> toMap_fortable() => <String, dynamic>{
@@ -72,6 +83,9 @@ class DisFuelSummary {
         'Total_Paid': Total_Paid,
         'Total_Mileage': Total_Mileage,
         'Total_Fuel_Arrears': Total_Fuel_Arrears,
+        'Total_Collection': Total_Collection,
+        'Net_Offload': Net_Offload,
+        'Active_Vehicles': Active_Vehicles,
         'sent': sent ? 1 : 0,
       };
 
@@ -106,6 +120,8 @@ class DisFuelSummary {
       Total_Paid REAL,
       Total_Mileage REAL,
       Total_Fuel_Arrears REAL,
+      Total_Collection REAL,
+      Net_Offload REAL,
       sent INTEGER DEFAULT 0
     )
   ''';
@@ -119,6 +135,8 @@ class DisFuelSummary {
     'Total_Paid',
     'Total_Mileage',
     'Total_Fuel_Arrears',
+    'Total_Collection',
+    'Net_Offload',
     'sent',
   ];
 }
@@ -489,8 +507,8 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
             _statChip(Icons.local_gas_station,
                 NumberFormat('#,##0').format(totalFuel), 'Litres'),
             const SizedBox(width: 4),
-            _statChip(Icons.payments, NumberFormat('#,##0').format(totalAmount),
-                'Total'),
+            _statChip(Icons.payments,
+                NumberFormat('#,##0.00').format(totalAmount), 'Total'),
             const Spacer(),
             Text('${_summaries.length} days',
                 style: TextStyle(
@@ -595,12 +613,17 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                         GestureDetector(
                           onTap: () {
                             final text = '$dayOfWeek, $dateStr\n'
+                                'Collection: ${NumberFormat('#,##0.00').format(s.Total_Collection ?? 0)}\n'
                                 'Vehicles: ${s.Total_Vehicles ?? 0}\n'
                                 'Fuel: ${NumberFormat('#,##0.0').format(s.Total_Fuel_ltrs ?? 0)} L\n'
-                                'Amount: ${NumberFormat('#,##0').format(s.Total_Fuels_Amount ?? 0)}\n'
-                                'Paid: ${NumberFormat('#,##0').format(s.Total_Paid ?? 0)}\n'
+                                'Amount: ${NumberFormat('#,##0.00').format(s.Total_Fuels_Amount ?? 0)}\n'
+                                'Paid: ${NumberFormat('#,##0.00').format(s.Total_Paid ?? 0)}\n'
                                 'Mileage: ${NumberFormat('#,##0').format(s.Total_Mileage ?? 0)}\n'
-                                'Arrears: ${NumberFormat('#,##0').format(s.Total_Fuel_Arrears ?? 0)}';
+                                'Arrears: ${NumberFormat('#,##0.00').format(s.Total_Fuel_Arrears ?? 0)}\n'
+                                'Net Offload: ${NumberFormat('#,##0.00').format(s.Net_Offload ?? 0)}\n'
+                                'Active Vehicles: ${s.Active_Vehicles ?? 0}\n'
+                                '---\n'
+                                'View Dashboard: http://services.trimline.co.ke/fuel';
                             SharePlus.instance.share(ShareParams(text: text));
                           },
                           child: Padding(
@@ -618,6 +641,15 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                     Row(
                       children: [
                         Expanded(
+                            child: _tile(
+                                'Collection',
+                                NumberFormat('#,##0.00')
+                                    .format(s.Total_Collection ?? 0),
+                                Icons.monetization_on,
+                                Colors.teal)),
+                        Container(
+                            width: 1, height: 36, color: Colors.grey.shade200),
+                        Expanded(
                             child: _tile('Vehicles', '${s.Total_Vehicles ?? 0}',
                                 Icons.directions_bus, _green)),
                         Container(
@@ -629,15 +661,6 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                                     .format(s.Total_Fuel_ltrs ?? 0),
                                 Icons.local_gas_station,
                                 Colors.orange)),
-                        Container(
-                            width: 1, height: 36, color: Colors.grey.shade200),
-                        Expanded(
-                            child: _tile(
-                                'Amount',
-                                NumberFormat('#,##0')
-                                    .format(s.Total_Fuels_Amount ?? 0),
-                                Icons.payments,
-                                Colors.blue)),
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -647,8 +670,18 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                       children: [
                         Expanded(
                             child: _tile(
+                                'Amount',
+                                NumberFormat('#,##0.00')
+                                    .format(s.Total_Fuels_Amount ?? 0),
+                                Icons.payments,
+                                Colors.blue)),
+                        Container(
+                            width: 1, height: 36, color: Colors.grey.shade200),
+                        Expanded(
+                            child: _tile(
                                 'Paid',
-                                NumberFormat('#,##0').format(s.Total_Paid ?? 0),
+                                NumberFormat('#,##0.00')
+                                    .format(s.Total_Paid ?? 0),
                                 Icons.check_circle_outline,
                                 Colors.green)),
                         Container(
@@ -660,17 +693,34 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                                     .format(s.Total_Mileage ?? 0),
                                 Icons.speed,
                                 Colors.purple)),
-                        Container(
-                            width: 1, height: 36, color: Colors.grey.shade200),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
                         Expanded(
                             child: _tile(
                                 'Arrears',
-                                NumberFormat('#,##0')
+                                NumberFormat('#,##0.00')
                                     .format(s.Total_Fuel_Arrears ?? 0),
                                 Icons.warning_amber_rounded,
                                 (s.Total_Fuel_Arrears ?? 0) > 0
                                     ? Colors.red
                                     : _outline)),
+                        Container(
+                            width: 1, height: 36, color: Colors.grey.shade200),
+                        Expanded(
+                            child: _tile(
+                                'Net Offload',
+                                NumberFormat('#,##0.00')
+                                    .format(s.Net_Offload ?? 0),
+                                Icons.local_shipping,
+                                Colors.brown)),
+                        Container(
+                            width: 1, height: 36, color: Colors.grey.shade200),
+                        Expanded(
+                            child: _tile('Active', '${s.Active_Vehicles ?? 0}',
+                                Icons.directions_bus, Colors.indigo)),
                       ],
                     ),
                   ],

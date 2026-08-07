@@ -17,8 +17,6 @@ import 'package:t_matatu/pages/TwoTabScreen.dart';
 import 'package:t_matatu/pages/disfuel_summary.dart';
 import 'package:t_matatu/pages/hires/hires_list.dart';
 import 'package:t_matatu/pages/pageloader.dart';
-import 'package:t_matatu/pages/vehicles/Depot.dart';
-import 'package:t_matatu/pages/vehicles/Fuel.dart';
 import 'package:t_matatu/pages/weighbridge/wbridge_list.dart';
 import 'package:t_matatu/reports/Daily%20Summary.dart';
 import 'package:t_matatu/reports/controller.dart';
@@ -87,6 +85,9 @@ class CustomDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     Get.find<MainController>().getPreference("printer").toString();
     final primary = _primaryColor(context);
+    // Hide Receipts & Z Report for Depot/Fuel operators (account_type 3)
+    final isNotDepotFuel =
+        Get.find<MainController>().agent.value.Account_type != 3;
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -176,16 +177,18 @@ class CustomDrawer extends StatelessWidget {
 
           // --- Reports Section ---
           _buildSectionHeader('REPORTS', context),
-          _buildTile(
-            icon: Icons.receipt_long,
-            title: 'Receipts',
-            context: context,
-            onTap: () {
-              ReportController().gettransbydate(DateTime.now());
-              Get.find<ReportController>().selectedDate?.value = DateTime.now();
-              Get.to(() => const ReceiptReport());
-            },
-          ),
+          if (isNotDepotFuel)
+            _buildTile(
+              icon: Icons.receipt_long,
+              title: 'Receipts',
+              context: context,
+              onTap: () {
+                ReportController().gettransbydate(DateTime.now());
+                Get.find<ReportController>().selectedDate?.value =
+                    DateTime.now();
+                Get.to(() => const ReceiptReport());
+              },
+            ),
           _buildTile(
             icon: Icons.summarize,
             title: 'Daily Summary',
@@ -216,16 +219,17 @@ class CustomDrawer extends StatelessWidget {
               Get.to(() => const SummaryReport());
             },
           ),
-          _buildTile(
-            icon: Icons.print,
-            title: 'Z Report',
-            context: context,
-            onTap: () {
-              TsummaryDetails().getall();
-              Tsummary().getall();
-              Get.to(() => const SummaryReport());
-            },
-          ),
+          if (isNotDepotFuel)
+            _buildTile(
+              icon: Icons.print,
+              title: 'Z Report',
+              context: context,
+              onTap: () {
+                TsummaryDetails().getall();
+                Tsummary().getall();
+                Get.to(() => const SummaryReport());
+              },
+            ),
           const Divider(height: 1, indent: 16, endIndent: 16),
 
           // --- Settings Section ---

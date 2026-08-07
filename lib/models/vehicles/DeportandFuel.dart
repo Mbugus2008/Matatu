@@ -102,6 +102,9 @@ class DepotFuel implements Tomaps {
   double? Fuel_Balance;
   double? Odometer_Reading;
 
+  /// Track whether this record has been modified locally
+  bool dirty = false;
+
   // TextEditingControllers
   late TextEditingController Nro_Defects_editor;
   late TextEditingController desc_editor;
@@ -231,8 +234,7 @@ class DepotFuel implements Tomaps {
       'Whos_to_blame_for_Deficiet': Whos_to_blame_for_Deficiet == null
           ? null
           : Whos_to_blame_for_Deficiet!.index,
-      'Whos_to_blame_for_DeficietSpecified':
-          Whos_to_blame_for_Deficiet != null,
+      'Whos_to_blame_for_DeficietSpecified': Whos_to_blame_for_Deficiet != null,
       'Offload_Target': Offload_Target,
       'Offload_Balance': Offload_Balance,
       'Management_Balance': Management_Balance,
@@ -391,7 +393,13 @@ class DepotFuel implements Tomaps {
 
   Future<void> updatedepot(List<DepotFuel> depots) async {
     Get.find<DepotController>().updating.value = true;
-    for (var depot in depots) {
+    final dirty = depots.where((d) => d.dirty).toList();
+    if (dirty.isEmpty) {
+      Get.snackbar('Info', 'No changes to save');
+      Get.find<DepotController>().updating.value = false;
+      return;
+    }
+    for (var depot in dirty) {
       // Ensure null decimals become 0 to satisfy ASP.NET model binder
       depot.Km_Litre ??= 0;
       depot.Total_litres ??= 0;
@@ -413,10 +421,9 @@ class DepotFuel implements Tomaps {
           Results2<DepotFuel> results =
               Results2<DepotFuel>.fromJson(r.body, DepotFuel.fromMap);
           if (results.Code == 0) {
+            depot.dirty = false;
             if (results.Contents != null) {
-              if (results.Contents != null) {
-                depot = results.Contents!;
-              }
+              depot = results.Contents!;
             }
           }
         }

@@ -13,17 +13,15 @@ import 'package:t_matatu/models/Utils/util.dart';
 import 'package:t_matatu/models/summary/Tsummary.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
+import 'package:t_matatu/pages/Depot.dart';
+import 'package:t_matatu/pages/Fuel.dart';
+import 'package:t_matatu/pages/disfuel_summary.dart';
 import 'package:t_matatu/pages/hires/hires_list.dart';
 import 'package:t_matatu/pages/pageloader.dart';
-import 'package:t_matatu/pages/vehicles/depot.dart';
-import 'package:t_matatu/pages/vehicles/fuel.dart';
 import 'package:t_matatu/pages/vehicles/vehdetails.dart';
 import 'package:t_matatu/providers/client.dart';
 
 import '../../controllers/vehicles/vehicles.dart';
-import '../../controllers/wbridge_controller.dart';
-import '../../pages/disfuel_summary.dart';
-import '../../pages/weighbridge/wbridge_list.dart';
 import '../../pages/widgets/Groupbox.dart';
 import '../../reports/controller.dart';
 
@@ -58,9 +56,6 @@ class Cityhoppa extends BaseClients {
   Future<void> init() async {
     if (!Get.isRegistered<DepotController>()) {
       Get.put(DepotController());
-    }
-    if (!Get.isRegistered<WBridgeController>()) {
-      Get.put(WBridgeController());
     }
     Tamounts().getttypesamounts();
     await Vehicles().Daily_Contributions(getdate());
@@ -98,6 +93,7 @@ class Cityhoppa extends BaseClients {
       ),
     );
   }
+
   @override
   Widget homelist() {
     int? account_type = Get.find<MainController>().agent.value.Account_type;
@@ -108,7 +104,43 @@ class Cityhoppa extends BaseClients {
         DepotFuel().getNRODefects();
         DepotFuel().getdata(
             Get.find<ReportController>().selectedDate?.value ?? DateTime.now());
-        return const DisFuelSummaryScreen(); // Use the TwoTabScreen for account_type 3
+        return Stack(
+          children: [
+            const DisFuelSummaryPage(),
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FloatingActionButton.small(
+                    heroTag: 'home_fuel',
+                    backgroundColor: Colors.orange,
+                    onPressed: () {
+                      Get.find<ReportController>().selectedDate?.value = null;
+                      Get.find<DepotController>().depottrans.clear();
+                      Get.find<DepotController>().depottrans1.clear();
+                      Get.to(() => const FuelScreen());
+                    },
+                    child: const Icon(Icons.local_gas_station,
+                        color: Colors.white),
+                  ),
+                  const SizedBox(height: 10),
+                  FloatingActionButton.small(
+                    heroTag: 'home_dispatch',
+                    backgroundColor: const Color(0xFF006B3F),
+                    onPressed: () {
+                      Get.to(() =>
+                          const PageLoader(page: Depot(), title: "Dispatch"));
+                    },
+                    child:
+                        const Icon(Icons.local_shipping, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ); // Use the TwoTabScreen for account_type 3
       default:
         return GetBuilder<VehiclesController>(
           builder: (controller) {
@@ -931,56 +963,20 @@ class Cityhoppa extends BaseClients {
   GroupBox? clientMenu() {
     return GroupBox("", [
       ListTile(
-        leading: const Icon(Icons.receipt),
-        onTap: () {
-          ReportController().gettransbydate(DateTime.now());
-          Get.find<ReportController>().selectedDate?.value = DateTime.now();
-          DepotFuel().getNRODefects();
-          DepotFuel().getdata(
-              Get.find<ReportController>().selectedDate?.value ??
-                  DateTime.now());
-          Get.to(() => const PageLoader(page: Depot(), title: "Dispatch"));
-        },
-        title: const Text("Dispatch"),
-      ),
-      ListTile(
-        leading: const Icon(Icons.summarize),
-        onTap: () {
-          Get.find<ReportController>().selectedDate?.value = DateTime.now();
-          DepotFuel().getdata(
-              Get.find<ReportController>().selectedDate?.value ??
-                  DateTime.now());
-          Get.to(() => const PageLoader(page: Fuel(), title: "Fuel"));
-        },
-        title: const Text("Fuel"),
-      ),
-      ListTile(
         leading: const Icon(Icons.summarize),
         onTap: () {
           Get.to(() => PageLoader(page: HiresListScreen(), title: "Hires"));
         },
         title: const Text("Hires"),
       ),
-      ListTile(
-        leading: const Icon(Icons.scale),
-        onTap: () {
-          Get.to(() =>
-              const PageLoader(page: WBridgeListPage(), title: "Weigh Bridge"));
-        },
-        title: const Text("Weigh Bridge"),
-      ),
-      ListTile(
-        leading: const Icon(Icons.summarize),
-        onTap: () {
-          Get.to(() => const DisFuelSummaryScreen());
-        },
-        title: const Text("Disp. & Fuel Summary"),
-      ),
     ]);
   }
 
   @override
   bool? Attach_crew = true;
+
+  @override
+  CrewToattach? Crew_to_attach = CrewToattach.Both;
 
   double _getTitleFontSize(int length) {
     return 18.0; // Default title font size, adjust as needed
