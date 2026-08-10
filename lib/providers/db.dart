@@ -93,24 +93,24 @@ class db_Provider extends GetxController {
     }, onUpgrade: _onUpgrade);
   }
 
+  /// Add a column only if it doesn't already exist (avoids SQLite duplicate column errors)
+  Future<void> _addColumnIfMissing(Database db, String table, String column, String type) async {
+    final result = await db.rawQuery("PRAGMA table_info('$table')");
+    final exists = result.any((row) => (row['name'] as String).toLowerCase() == column.toLowerCase());
+    if (!exists) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+    }
+  }
+
   /// Ensure recent tables exist even for existing databases.
   Future<void> _ensureNewTables(Database db) async {
     await db.execute(WBridge.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
     // Migration: new fields added to disfuel_summary
-    try {
-      await db.execute(
-          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Total_Collection REAL');
-    } catch (_) {}
-    try {
-      await db.execute(
-          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Net_Offload REAL');
-    } catch (_) {}
-    try {
-      await db.execute(
-          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Active_Vehicles INTEGER');
-    } catch (_) {}
+    await _addColumnIfMissing(db, DisFuelSummary.table, 'Total_Collection', 'REAL');
+    await _addColumnIfMissing(db, DisFuelSummary.table, 'Net_Offload', 'REAL');
+    await _addColumnIfMissing(db, DisFuelSummary.table, 'Active_Vehicles', 'INTEGER');
   }
 
   Future<void> close() async {
@@ -123,18 +123,9 @@ class db_Provider extends GetxController {
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
     // Migration: new fields for disfuel_summary
-    try {
-      await db.execute(
-          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Total_Collection REAL');
-    } catch (_) {}
-    try {
-      await db.execute(
-          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Net_Offload REAL');
-    } catch (_) {}
-    try {
-      await db.execute(
-          'ALTER TABLE ${DisFuelSummary.table} ADD COLUMN Active_Vehicles INTEGER');
-    } catch (_) {}
+    await _addColumnIfMissing(db, DisFuelSummary.table, 'Total_Collection', 'REAL');
+    await _addColumnIfMissing(db, DisFuelSummary.table, 'Net_Offload', 'REAL');
+    await _addColumnIfMissing(db, DisFuelSummary.table, 'Active_Vehicles', 'INTEGER');
 
     for (var i = oldVersion; i <= newVersion; i++) {
       for (var element in get_updates(newVersion)) {

@@ -623,7 +623,7 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                                 'Net Offload: ${NumberFormat('#,##0.00').format(s.Net_Offload ?? 0)}\n'
                                 'Active Vehicles: ${s.Active_Vehicles ?? 0}\n'
                                 '---\n'
-                                'View Dashboard: http://services.trimline.co.ke/fuel';
+                                'View Dashboard: https://services.trimline.co.ke:8094/fuelsummary/${DateFormat('yyyy-MM-dd').format(s.Date!)}';
                             SharePlus.instance.share(ShareParams(text: text));
                           },
                           child: Padding(
