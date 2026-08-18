@@ -628,9 +628,16 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            child: Icon(Icons.share,
-                                size: 18, color: Colors.grey.shade500),
+                                horizontal: 10, vertical: 6),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: _green.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.share,
+                                  size: 26, color: _green),
+                            ),
                           ),
                         ),
                         Icon(Icons.chevron_right,

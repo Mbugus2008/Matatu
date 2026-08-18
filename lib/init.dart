@@ -14,6 +14,7 @@ import 'package:t_matatu/controllers/header.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/trans.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
+import 'package:t_matatu/controllers/wbridge_controller.dart';
 import 'package:t_matatu/models/Header.dart';
 import 'package:t_matatu/models/Hires.dart';
 import 'package:t_matatu/models/Reversal.dart';
@@ -180,6 +181,7 @@ Future<void> init() async {
   Get.put(MemberController(), permanent: true);
   Get.put(BluetoothManager(), permanent: true);
   Get.put(HiresController(), permanent: true);
+  Get.put(WBridgeController(), permanent: true);
   Get.put(SettingsController(), permanent: true);
   BluetoothManager().Scan();
   BluetoothManager().Subscriptionstatus();

@@ -95,7 +95,7 @@ class _FuelScreenState extends State<FuelScreen> {
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.save, color: Colors.white),
-          label: Text(ctrl.isUpdating ? 'Saving...' : 'Update',
+          label: Text(ctrl.isUpdating ? 'Updating...' : 'Update',
               style: const TextStyle(color: Colors.white)),
         ),
       ),
@@ -521,13 +521,26 @@ class _FuelState extends State<Fuel> {
           SizedBox(height: 10),
           _buildTextField(
             vehicle.milleage_editor,
-            'Millage',
+            'Odometer Reading',
             (value) {
-              vehicle.Millage = int.tryParse(value) ?? 0;
+              vehicle.Odometer_Reading = double.tryParse(value) ?? 0;
               vehicle.dirty = true;
             },
-            vehicle.Millage?.toString() ?? "",
+            vehicle.Odometer_Reading == null || vehicle.Odometer_Reading == 0
+                ? ""
+                : vehicle.Odometer_Reading!.toStringAsFixed(0),
             keyboardType: TextInputType.number,
+          ),
+          SizedBox(height: 10),
+          _buildTextField(
+            vehicle.desc_editor,
+            'Comments',
+            (value) {
+              vehicle.Comments = value;
+              vehicle.dirty = true;
+            },
+            vehicle.Comments ?? "",
+            keyboardType: TextInputType.multiline,
           ),
         ],
       ),

@@ -171,7 +171,10 @@ class DepotFuel implements Tomaps {
     fuel_editor = TextEditingController(text: _Fuel?.toStringAsFixed(2) ?? '');
     amountpaid_editor =
         TextEditingController(text: _Amount_Paid?.toStringAsFixed(2) ?? '');
-    milleage_editor = TextEditingController(text: _Millage?.toString() ?? '');
+    milleage_editor = TextEditingController(
+        text: Odometer_Reading != null && Odometer_Reading! > 0
+            ? Odometer_Reading!.toStringAsFixed(0)
+            : '');
     litres_editor =
         TextEditingController(text: _Total_litres?.toStringAsFixed(2) ?? '');
 
@@ -416,7 +419,8 @@ class DepotFuel implements Tomaps {
 
       final json = depot.toJson();
       print('[SETDEPOT] sending: ${json.substring(0, 200)}');
-      ApiClient().postdata("setdepotdata", json).then((r) async {
+      try {
+        final r = await ApiClient().postdata("setdepotdata", json);
         if (r.statusCode == 200) {
           Results2<DepotFuel> results =
               Results2<DepotFuel>.fromJson(r.body, DepotFuel.fromMap);
@@ -427,7 +431,9 @@ class DepotFuel implements Tomaps {
             }
           }
         }
-      });
+      } catch (e) {
+        print('[SETDEPOT] failed: $e');
+      }
     }
     Get.find<DepotController>().updating.value = false;
   }

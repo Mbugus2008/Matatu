@@ -94,9 +94,11 @@ class db_Provider extends GetxController {
   }
 
   /// Add a column only if it doesn't already exist (avoids SQLite duplicate column errors)
-  Future<void> _addColumnIfMissing(Database db, String table, String column, String type) async {
+  Future<void> _addColumnIfMissing(
+      Database db, String table, String column, String type) async {
     final result = await db.rawQuery("PRAGMA table_info('$table')");
-    final exists = result.any((row) => (row['name'] as String).toLowerCase() == column.toLowerCase());
+    final exists = result.any(
+        (row) => (row['name'] as String).toLowerCase() == column.toLowerCase());
     if (!exists) {
       await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
     }
@@ -108,9 +110,11 @@ class db_Provider extends GetxController {
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
     // Migration: new fields added to disfuel_summary
-    await _addColumnIfMissing(db, DisFuelSummary.table, 'Total_Collection', 'REAL');
+    await _addColumnIfMissing(
+        db, DisFuelSummary.table, 'Total_Collection', 'REAL');
     await _addColumnIfMissing(db, DisFuelSummary.table, 'Net_Offload', 'REAL');
-    await _addColumnIfMissing(db, DisFuelSummary.table, 'Active_Vehicles', 'INTEGER');
+    await _addColumnIfMissing(
+        db, DisFuelSummary.table, 'Active_Vehicles', 'INTEGER');
   }
 
   Future<void> close() async {
@@ -123,9 +127,11 @@ class db_Provider extends GetxController {
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
     // Migration: new fields for disfuel_summary
-    await _addColumnIfMissing(db, DisFuelSummary.table, 'Total_Collection', 'REAL');
+    await _addColumnIfMissing(
+        db, DisFuelSummary.table, 'Total_Collection', 'REAL');
     await _addColumnIfMissing(db, DisFuelSummary.table, 'Net_Offload', 'REAL');
-    await _addColumnIfMissing(db, DisFuelSummary.table, 'Active_Vehicles', 'INTEGER');
+    await _addColumnIfMissing(
+        db, DisFuelSummary.table, 'Active_Vehicles', 'INTEGER');
 
     for (var i = oldVersion; i <= newVersion; i++) {
       for (var element in get_updates(newVersion)) {
