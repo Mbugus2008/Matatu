@@ -29,6 +29,7 @@ class VehiclesController extends GetxController {
 
   void toggle(DepotFuel depotFuel) {
     depotFuel.On_route = !(depotFuel.On_route ?? false);
+    depotFuel.dirty = true;
     Get.find<DepotController>().updateCheckAll();
     update();
   }

@@ -6,21 +6,21 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/Members.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
-import 'package:t_matatu/controllers/wbridge_controller.dart';
+import 'package:t_matatu/controllers/waybill_controller.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
-import 'package:t_matatu/models/weighbridge/wbridge.dart';
+import 'package:t_matatu/models/waybill/waybill.dart';
 
-class WBridgeFormPage extends StatefulWidget {
-  final WBridge? wbridge;
+class WaybillFormPage extends StatefulWidget {
+  final Waybill? waybill;
 
-  const WBridgeFormPage({super.key, this.wbridge});
+  const WaybillFormPage({super.key, this.waybill});
 
   @override
-  State<WBridgeFormPage> createState() => _WBridgeFormPageState();
+  State<WaybillFormPage> createState() => _WaybillFormPageState();
 }
 
-class _WBridgeFormPageState extends State<WBridgeFormPage> {
-  late final WBridgeController _controller;
+class _WaybillFormPageState extends State<WaybillFormPage> {
+  late final WaybillController _controller;
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _fleetCtrl;
@@ -49,7 +49,7 @@ class _WBridgeFormPageState extends State<WBridgeFormPage> {
   static const _summaryBg = Color(0xFFF8FAFC);
   static const _successGreen = Color(0xFF166534);
 
-  bool get isEditing => widget.wbridge != null;
+  bool get isEditing => widget.waybill != null;
 
   double get _target => double.tryParse(_targetCtrl.text) ?? 0;
   double get _actual => double.tryParse(_actualCtrl.text) ?? 0;
@@ -60,9 +60,9 @@ class _WBridgeFormPageState extends State<WBridgeFormPage> {
   @override
   void initState() {
     super.initState();
-    _controller = Get.find<WBridgeController>();
+    _controller = Get.find<WaybillController>();
 
-    final wb = widget.wbridge;
+    final wb = widget.waybill;
     _fleetCtrl = TextEditingController(text: wb?.Fleet_No ?? '');
     _vehicleCtrl = TextEditingController(text: wb?.Vehicle_No ?? '');
     _driverCtrl = TextEditingController(text: wb?.Driver ?? '');
@@ -157,8 +157,8 @@ class _WBridgeFormPageState extends State<WBridgeFormPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
 
-    final wbridge = WBridge(
-      Key: widget.wbridge?.Key,
+    final waybill = Waybill(
+      Key: widget.waybill?.Key,
       Vehicle_No: _vehicleCtrl.text.trim(),
       Fleet_No: _fleetCtrl.text.trim(),
       Driver: _driverCtrl.text.trim(),
@@ -172,7 +172,7 @@ class _WBridgeFormPageState extends State<WBridgeFormPage> {
       Cash: double.tryParse(_cashCtrl.text) ?? 0,
     );
 
-    final saved = await _controller.saveWBridge(wbridge);
+    final saved = await _controller.saveWaybill(waybill);
     if (mounted) {
       setState(() => _isSaving = false);
       if (saved != null) Get.back(result: true);
@@ -187,7 +187,7 @@ class _WBridgeFormPageState extends State<WBridgeFormPage> {
         backgroundColor: _primaryGreen,
         foregroundColor: _onPrimary,
         elevation: 0,
-        title: const Text('CityHoppa WeighBridge',
+        title: const Text('CityHoppa Waybill',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
         actions: [
           IconButton(

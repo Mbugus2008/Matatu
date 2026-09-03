@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/main.dart';
-import 'package:t_matatu/controllers/wbridge_controller.dart';
-import 'package:t_matatu/models/weighbridge/wbridge.dart';
-import 'package:t_matatu/pages/weighbridge/trip_form.dart';
-import 'package:t_matatu/pages/weighbridge/trip_list.dart';
-import 'package:t_matatu/pages/weighbridge/wbridge_form.dart';
-import 'package:t_matatu/pages/weighbridge/wbridge_list.dart';
+import 'package:t_matatu/controllers/waybill_controller.dart';
+import 'package:t_matatu/models/waybill/waybill.dart';
+import 'package:t_matatu/network/results/results.dart';
+import 'package:t_matatu/pages/waybill/trip_form.dart';
+import 'package:t_matatu/pages/waybill/trip_list.dart';
+import 'package:t_matatu/pages/waybill/waybill_form.dart';
+import 'package:t_matatu/pages/waybill/waybill_list.dart';
 import 'package:t_matatu/providers/AppConfig.dart';
 import 'package:t_matatu/providers/logger.dart';
 
@@ -38,7 +39,7 @@ void _teardownGetX() {
 
 // ─── Helpers ────────────────────────────────────────────
 
-WBridge _sampleWBridge({String key = ''}) => WBridge(
+Waybill _sampleWaybill({String key = ''}) => Waybill(
       Key: key.isEmpty ? null : key,
       Vehicle_No: 'KAA 001A',
       Fleet_No: 'F01',
@@ -54,7 +55,7 @@ WBridge _sampleWBridge({String key = ''}) => WBridge(
       sent: false,
     );
 
-WbridgeTrip _sampleTrip({String key = ''}) => WbridgeTrip(
+WaybillTrip _sampleTrip({String key = ''}) => WaybillTrip(
       Key: key.isEmpty ? null : key,
       Weign_Bridge_id: 1,
       Trip_No: 1,
@@ -76,16 +77,16 @@ void main() {
   // MODEL TESTS
   // ═══════════════════════════════════════════════════════
 
-  group('WBridge model — CRUD', () {
-    test('create new WBridge with defaults', () {
-      final wb = WBridge();
+  group('Waybill model — CRUD', () {
+    test('create new Waybill with defaults', () {
+      final wb = Waybill();
       expect(wb.Key, isNull);
       expect(wb.sent, false);
       expect(wb.Target_Revenue, isNull);
     });
 
-    test('create WBridge with all fields', () {
-      final wb = _sampleWBridge();
+    test('create Waybill with all fields', () {
+      final wb = _sampleWaybill();
       expect(wb.Vehicle_No, 'KAA 001A');
       expect(wb.Fleet_No, 'F01');
       expect(wb.Driver, 'John Doe');
@@ -97,8 +98,8 @@ void main() {
       expect(wb.sent, false);
     });
 
-    test('edit WBridge fields', () {
-      final wb = _sampleWBridge();
+    test('edit Waybill fields', () {
+      final wb = _sampleWaybill();
       wb.Actual_Revenue = 5200;
       wb.Shortage = -200;
       wb.Cash = 5200;
@@ -110,7 +111,7 @@ void main() {
     });
 
     test('toMap produces correct API format', () {
-      final wb = _sampleWBridge();
+      final wb = _sampleWaybill();
       final map = wb.toMap();
       expect(map['Vehicle_No'], 'KAA 001A');
       expect(map['Fleet_No'], 'F01');
@@ -122,9 +123,9 @@ void main() {
     });
 
     test('fromMap roundtrip preserves values', () {
-      final original = _sampleWBridge(key: 'KEY123');
+      final original = _sampleWaybill(key: 'KEY123');
       final map = original.toMap();
-      final restored = WBridge.fromMap(map);
+      final restored = Waybill.fromMap(map);
       expect(restored.Vehicle_No, original.Vehicle_No);
       expect(restored.Fleet_No, original.Fleet_No);
       expect(restored.Driver, original.Driver);
@@ -136,7 +137,7 @@ void main() {
     });
 
     test('toMap_fortable stores Date as milliseconds', () {
-      final wb = _sampleWBridge();
+      final wb = _sampleWaybill();
       final map = wb.toMap_fortable();
       expect(map['Date'], isA<int>());
       expect(map['sent'], 0); // false → 0
@@ -145,9 +146,9 @@ void main() {
     });
 
     test('fromMap_db restores Date from milliseconds', () {
-      final wb = _sampleWBridge();
+      final wb = _sampleWaybill();
       final dbMap = wb.toMap_fortable();
-      final restored = WBridge.fromMap_db(dbMap);
+      final restored = Waybill.fromMap_db(dbMap);
       expect(restored.Date?.year, 2026);
       expect(restored.Date?.month, 7);
       expect(restored.Date?.day, 28);
@@ -155,7 +156,7 @@ void main() {
     });
 
     test('shortage calculation: target - actual', () {
-      final wb = _sampleWBridge();
+      final wb = _sampleWaybill();
       wb.Target_Revenue = 5000;
       wb.Actual_Revenue = 4200;
       wb.Shortage = (wb.Target_Revenue! - wb.Actual_Revenue!);
@@ -167,15 +168,15 @@ void main() {
     });
 
     test('JSON roundtrip', () {
-      final wb = _sampleWBridge(key: 'J01');
+      final wb = _sampleWaybill(key: 'J01');
       final json = wb.toJson();
-      final restored = WBridge.fromJson(json);
+      final restored = Waybill.fromJson(json);
       expect(restored.Vehicle_No, wb.Vehicle_No);
       expect(restored.Target_Revenue, wb.Target_Revenue);
     });
   });
 
-  group('WbridgeTrip model — CRUD', () {
+  group('WaybillTrip model — CRUD', () {
     test('create trip with all fields', () {
       final trip = _sampleTrip();
       expect(trip.From, 'Nairobi');
@@ -211,7 +212,7 @@ void main() {
     test('fromMap roundtrip', () {
       final original = _sampleTrip(key: 'T123');
       final map = original.toMap();
-      final restored = WbridgeTrip.fromMap(map);
+      final restored = WaybillTrip.fromMap(map);
       expect(restored.From, original.From);
       expect(restored.To, original.To);
       expect(restored.Pax_No, original.Pax_No);
@@ -232,7 +233,7 @@ void main() {
     test('JSON roundtrip', () {
       final trip = _sampleTrip(key: 'T01');
       final json = trip.toJson();
-      final restored = WbridgeTrip.fromJson(json);
+      final restored = WaybillTrip.fromJson(json);
       expect(restored.From, trip.From);
       expect(restored.Pax_No, trip.Pax_No);
     });
@@ -242,8 +243,8 @@ void main() {
   // JSON DESERIALIZATION TESTS
   // ═══════════════════════════════════════════════════════
 
-  group('WBridge — JSON deserialization', () {
-    test('parses WBridge entry from JSON', () {
+  group('Waybill — JSON deserialization', () {
+    test('parses Waybill entry from JSON', () {
       const json = '''{
         "Key": "WB001;abc123;",
         "Vehicle_No": "KAA 001A",
@@ -276,7 +277,7 @@ void main() {
       expect(map['Conductor'], isNull);
     });
 
-    test('parses WBridge with int values as double', () {
+    test('parses Waybill with int values as double', () {
       const json = '''{
         "Key": "INT001;", "Vehicle_No": "KAR 492Y",
         "Target_Revenue": 5000, "Actual_Revenue": 4800,
@@ -309,10 +310,31 @@ void main() {
       expect(map['Desc'], 'Service unavailable');
       expect(map['Contents'], isNull);
     });
+
+    test('Results parses single-object Contents (add endpoints)', () {
+      const json =
+          '{"Code":0,"Desc":"Successful","Contents":{"Key":"T1;","Trip_No":1,'
+          '"Weign_Bridge_id":100,"From":"Nairobi","To":"Mombasa","Pax_No":1,'
+          '"Fare_Amount":100,"Total":100}}';
+      final r = Results<WaybillTrip>.fromJson(json, WaybillTrip.fromMap);
+      expect(r.Code, 0);
+      expect(r.Contents, isNotNull);
+      expect(r.Contents!.length, 1);
+      expect(r.Contents!.first.Trip_No, 1);
+      expect(r.Contents!.first.From, 'Nairobi');
+      expect(r.Contents!.first.Total, 100);
+    });
+
+    test('Results parses list Contents unchanged', () {
+      const json = '{"Code":0,"Contents":[{"Trip_No":1},{"Trip_No":2}]}';
+      final r = Results<WaybillTrip>.fromJson(json, WaybillTrip.fromMap);
+      expect(r.Code, 0);
+      expect(r.Contents!.length, 2);
+    });
   });
 
-  group('WbridgeTrip — JSON deserialization', () {
-    test('parses WbridgeTrip from JSON', () {
+  group('WaybillTrip — JSON deserialization', () {
+    test('parses WaybillTrip from JSON', () {
       const json = '''{
         "Key":"TRIP001;", "Weign_Bridge_id":1, "Trip_No":1,
         "From":"Nairobi", "To":"Mombasa", "Pax_No":32,
@@ -343,36 +365,36 @@ void main() {
   // CONTROLLER TESTS
   // ═══════════════════════════════════════════════════════
 
-  group('WBridgeController', () {
+  group('WaybillController', () {
     setUp(() {
       _setupGetX();
-      Get.put(WBridgeController(), permanent: true);
+      Get.put(WaybillController(), permanent: true);
     });
     tearDown(_teardownGetX);
 
     test('initial state is correct', () {
-      final ctrl = Get.find<WBridgeController>();
-      expect(ctrl.wbridges, isEmpty);
+      final ctrl = Get.find<WaybillController>();
+      expect(ctrl.waybills, isEmpty);
       expect(ctrl.trips, isEmpty);
       expect(ctrl.isLoading.value, false);
-      expect(ctrl.selectedWBridge.value, isNull);
+      expect(ctrl.selectedWaybill.value, isNull);
     });
 
     test('calculateShortage computes target - actual', () {
-      final ctrl = Get.find<WBridgeController>();
+      final ctrl = Get.find<WaybillController>();
       expect(ctrl.calculateShortage(5000, 4800), 200);
       expect(ctrl.calculateShortage(5000, 5200), -200);
       expect(ctrl.calculateShortage(0, 0), 0);
     });
 
     test('calculateTripTotal computes pax × fare', () {
-      final ctrl = Get.find<WBridgeController>();
+      final ctrl = Get.find<WaybillController>();
       expect(ctrl.calculateTripTotal(500, 32), 16000);
       expect(ctrl.calculateTripTotal(0, 10), 0);
     });
 
     test('selectedDate defaults to today', () {
-      final ctrl = Get.find<WBridgeController>();
+      final ctrl = Get.find<WaybillController>();
       final today = DateTime.now();
       expect(ctrl.selectedDate.value.year, today.year);
       expect(ctrl.selectedDate.value.month, today.month);
@@ -384,24 +406,24 @@ void main() {
   // WIDGET TESTS
   // ═══════════════════════════════════════════════════════
 
-  group('WBridgeListPage — widget', () {
+  group('WaybillListPage — widget', () {
     setUp(() {
       _setupGetX();
-      Get.put(WBridgeController(), permanent: true);
+      Get.put(WaybillController(), permanent: true);
     });
     tearDown(_teardownGetX);
 
     testWidgets('renders AppBar with title', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeListPage()),
+        const GetMaterialApp(home: WaybillListPage()),
       );
       await tester.pump();
-      expect(find.text('CityHoppa WeighBridge'), findsOneWidget);
+      expect(find.text('CityHoppa Waybill'), findsOneWidget);
     });
 
     testWidgets('renders date bar', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeListPage()),
+        const GetMaterialApp(home: WaybillListPage()),
       );
       await tester.pump();
       // Should show a day-of-week date
@@ -410,7 +432,7 @@ void main() {
 
     testWidgets('renders search bar', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeListPage()),
+        const GetMaterialApp(home: WaybillListPage()),
       );
       await tester.pump();
       expect(find.byIcon(Icons.search), findsWidgets);
@@ -418,7 +440,7 @@ void main() {
 
     testWidgets('shows empty state when no entries', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeListPage()),
+        const GetMaterialApp(home: WaybillListPage()),
       );
       await tester.pump();
       expect(find.text('No entries yet'), findsOneWidget);
@@ -426,7 +448,7 @@ void main() {
 
     testWidgets('renders New Entry FAB', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeListPage()),
+        const GetMaterialApp(home: WaybillListPage()),
       );
       await tester.pump();
       expect(find.text('New Entry'), findsOneWidget);
@@ -434,32 +456,32 @@ void main() {
 
     testWidgets('renders bottom navigation bar', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeListPage()),
+        const GetMaterialApp(home: WaybillListPage()),
       );
       await tester.pump();
       expect(find.byType(BottomNavigationBar), findsOneWidget);
     });
   });
 
-  group('WBridgeFormPage — widget', () {
+  group('WaybillFormPage — widget', () {
     setUp(() {
       _setupGetX();
-      Get.put(WBridgeController(), permanent: true);
+      Get.put(WaybillController(), permanent: true);
     });
     tearDown(_teardownGetX);
 
     testWidgets('renders in create mode', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeFormPage()),
+        const GetMaterialApp(home: WaybillFormPage()),
       );
       await tester.pump();
       expect(find.text('New Entry'), findsOneWidget);
     });
 
     testWidgets('renders in edit mode with pre-filled data', (tester) async {
-      final wb = _sampleWBridge(key: 'EDIT1');
+      final wb = _sampleWaybill(key: 'EDIT1');
       await tester.pumpWidget(
-        GetMaterialApp(home: WBridgeFormPage(wbridge: wb)),
+        GetMaterialApp(home: WaybillFormPage(waybill: wb)),
       );
       await tester.pump();
       expect(find.text('Edit Entry'), findsOneWidget);
@@ -467,7 +489,7 @@ void main() {
 
     testWidgets('renders all section headers', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeFormPage()),
+        const GetMaterialApp(home: WaybillFormPage()),
       );
       await tester.pump();
       expect(find.text('Vehicle'), findsOneWidget);
@@ -479,7 +501,7 @@ void main() {
 
     testWidgets('renders Fleet No field with search icon', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeFormPage()),
+        const GetMaterialApp(home: WaybillFormPage()),
       );
       await tester.pump();
       expect(find.byIcon(Icons.search), findsWidgets);
@@ -487,7 +509,7 @@ void main() {
 
     testWidgets('renders Save Entry button', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeFormPage()),
+        const GetMaterialApp(home: WaybillFormPage()),
       );
       await tester.pump();
       expect(find.text('Save Entry'), findsOneWidget);
@@ -495,7 +517,7 @@ void main() {
 
     testWidgets('renders revenue summary bar', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeFormPage()),
+        const GetMaterialApp(home: WaybillFormPage()),
       );
       await tester.pump();
       expect(find.text('TARGET'), findsOneWidget);
@@ -505,7 +527,7 @@ void main() {
 
     testWidgets('renders KSh prefix on cash field', (tester) async {
       await tester.pumpWidget(
-        const GetMaterialApp(home: WBridgeFormPage()),
+        const GetMaterialApp(home: WaybillFormPage()),
       );
       await tester.pump();
       expect(find.text('KSh'), findsOneWidget);
@@ -515,8 +537,8 @@ void main() {
   group('TripListPage — widget', () {
     setUp(() {
       _setupGetX();
-      final ctrl = WBridgeController();
-      ctrl.selectedWBridge.value = _sampleWBridge(key: 'WB1');
+      final ctrl = WaybillController();
+      ctrl.selectedWaybill.value = _sampleWaybill(key: 'WB1');
       Get.put(ctrl, permanent: true);
     });
     tearDown(_teardownGetX);
@@ -538,20 +560,49 @@ void main() {
       expect(find.text('No trips recorded'), findsOneWidget);
     });
 
-    testWidgets('renders Add Trip FAB', (tester) async {
+    testWidgets('renders Start Trip FAB', (tester) async {
       await tester.pumpWidget(
         const GetMaterialApp(home: TripListPage()),
       );
       await tester.pump();
-      expect(find.text('Add Trip'), findsOneWidget);
+      expect(find.text('Start Trip'), findsOneWidget);
+    });
+
+    testWidgets('Start Trip FAB opens the popup', (tester) async {
+      final ctrl = Get.find<WaybillController>();
+      ctrl.selectedWaybill.value = _sampleWaybill(key: 'WB1')..Entry_No = 100;
+      await tester.pumpWidget(
+        const GetMaterialApp(home: TripListPage()),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Start Trip'));
+      await tester.pumpAndSettle();
+      expect(find.text('Departure'), findsOneWidget);
+      expect(find.text('Passengers'), findsOneWidget);
+      expect(find.text('Fare Amount'), findsOneWidget);
+      expect(find.text('Total'), findsOneWidget);
+      expect(find.text('Comments'), findsOneWidget);
+    });
+
+    testWidgets('Start Trip FAB opens popup even without Entry_No',
+        (tester) async {
+      // setUp waybill has Entry_No null — the popup must still open instantly
+      await tester.pumpWidget(
+        const GetMaterialApp(home: TripListPage()),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Start Trip'));
+      await tester.pumpAndSettle();
+      expect(find.text('Departure'), findsOneWidget);
+      expect(find.text('Passengers'), findsOneWidget);
     });
   });
 
   group('TripFormPage — widget', () {
     setUp(() {
       _setupGetX();
-      final ctrl = WBridgeController();
-      ctrl.selectedWBridge.value = _sampleWBridge(key: 'WB1');
+      final ctrl = WaybillController();
+      ctrl.selectedWaybill.value = _sampleWaybill(key: 'WB1');
       Get.put(ctrl, permanent: true);
     });
     tearDown(_teardownGetX);

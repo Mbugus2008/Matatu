@@ -9,8 +9,8 @@ import 'package:t_matatu/network/request.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/providers/db.dart';
 
-/// Weigh Bridge entry model — represents a daily vehicle weigh bridge record
-class WBridge extends Tomaps implements mapping {
+/// Waybill entry model — represents a daily vehicle waybill record
+class Waybill extends Tomaps implements mapping {
   String? Key;
   String? Vehicle_No;
   String? Fleet_No;
@@ -28,7 +28,7 @@ class WBridge extends Tomaps implements mapping {
   double? Total_Collected;
   bool sent = false;
 
-  WBridge({
+  Waybill({
     this.Key,
     this.Vehicle_No,
     this.Fleet_No,
@@ -68,8 +68,8 @@ class WBridge extends Tomaps implements mapping {
     };
   }
 
-  static WBridge fromMap(Map<String, dynamic> map) {
-    return WBridge(
+  static Waybill fromMap(Map<String, dynamic> map) {
+    return Waybill(
       Key: map['Key'] as String?,
       Vehicle_No: map['Vehicle_No'] as String?,
       Fleet_No: map['Fleet_No'] as String?,
@@ -89,7 +89,7 @@ class WBridge extends Tomaps implements mapping {
   }
 
   @override
-  WBridge fromMap_table(Map<String, dynamic> map) => WBridge.fromMap(map);
+  Waybill fromMap_table(Map<String, dynamic> map) => Waybill.fromMap(map);
 
   /// Parse a date field that may be a String (API) or int milliseconds (DB).
   static DateTime? _parseDate(dynamic value) {
@@ -122,6 +122,7 @@ class WBridge extends Tomaps implements mapping {
   }
 
   // ──────── Database ────────
+  // Table name kept as 'wbridge' so existing devices keep their local data.
   static const String table = 'wbridge';
   static const String col_Key = 'Key';
   static const String col_Vehicle_No = 'Vehicle_No';
@@ -181,20 +182,20 @@ class WBridge extends Tomaps implements mapping {
   ''';
 
   String toJson() => json.encode(toMap());
-  factory WBridge.fromJson(String source) =>
-      WBridge.fromMap(json.decode(source) as Map<String, dynamic>);
+  factory Waybill.fromJson(String source) =>
+      Waybill.fromMap(json.decode(source) as Map<String, dynamic>);
 
   /// Create from DB row (millisecond timestamps).
   /// _parseDate handles both int (DB) and String (API) formats.
-  factory WBridge.fromMap_db(Map<String, dynamic> map) {
-    final wb = WBridge.fromMap(map);
+  factory Waybill.fromMap_db(Map<String, dynamic> map) {
+    final wb = Waybill.fromMap(map);
     wb.sent = (map[col_sent] as int?) == 1;
     return wb;
   }
 }
 
-/// Weigh Bridge Trip model — represents an individual trip within a wbridge entry
-class WbridgeTrip extends Tomaps {
+/// Waybill Trip model — represents an individual trip within a waybill entry
+class WaybillTrip extends Tomaps {
   String? Key;
   int? Weign_Bridge_id;
   int? Trip_No;
@@ -211,7 +212,7 @@ class WbridgeTrip extends Tomaps {
   double? Expenses;
   String? Comments;
 
-  WbridgeTrip({
+  WaybillTrip({
     this.Key,
     this.Weign_Bridge_id,
     this.Trip_No,
@@ -250,8 +251,8 @@ class WbridgeTrip extends Tomaps {
     };
   }
 
-  static WbridgeTrip fromMap(Map<String, dynamic> map) {
-    return WbridgeTrip(
+  static WaybillTrip fromMap(Map<String, dynamic> map) {
+    return WaybillTrip(
       Key: map['Key'] as String?,
       Weign_Bridge_id: map['Weign_Bridge_id'] as int?,
       Trip_No: map['Trip_No'] as int?,
@@ -275,29 +276,29 @@ class WbridgeTrip extends Tomaps {
   }
 
   @override
-  WbridgeTrip fromMap_table(Map<String, dynamic> map) =>
-      WbridgeTrip.fromMap(map);
+  WaybillTrip fromMap_table(Map<String, dynamic> map) =>
+      WaybillTrip.fromMap(map);
 
   String toJson() => json.encode(toMap());
-  factory WbridgeTrip.fromJson(String source) =>
-      WbridgeTrip.fromMap(json.decode(source) as Map<String, dynamic>);
+  factory WaybillTrip.fromJson(String source) =>
+      WaybillTrip.fromMap(json.decode(source) as Map<String, dynamic>);
 }
 
-/// API service for WBridge/WTrip endpoints.
+/// API service for Waybill endpoints.
 /// Saves locally first (offline-first), then syncs to server.
-class WBridgeService {
+class WaybillService {
   final ApiClient _api = ApiClient();
 
-  /// Fetch weigh bridge entries — tries API first, falls back to local DB
-  Future<List<WBridge>> getWBridges(DateTime date, {String? vehicle}) async {
+  /// Fetch waybill entries — tries API first, falls back to local DB
+  Future<List<Waybill>> getWaybills(DateTime date, {String? vehicle}) async {
     // Try API first
     try {
       final request = Request(date: date, vehicle: vehicle);
       final response = await _api.postdata(
-        'Matatu/wbridges',
+        'Matatu/waybills',
         request.toJson(),
       );
-      final result = Results<WBridge>.fromJson(response.body, WBridge.fromMap);
+      final result = Results<Waybill>.fromJson(response.body, Waybill.fromMap);
       if (result.Code == 0 && result.Contents != null) {
         return result.Contents!;
       }
@@ -306,86 +307,106 @@ class WBridgeService {
     }
 
     // Fallback: fetch from local DB
-    return _getLocalWBridges(date);
+    return _getLocalWaybills(date);
   }
 
-  /// Fetch pending (unsent) WBridge entries from local DB
-  Future<List<WBridge>> _getLocalWBridges(DateTime date) async {
+  /// Fetch pending (unsent) waybill entries from local DB
+  Future<List<Waybill>> _getLocalWaybills(DateTime date) async {
     try {
       final db = db_Provider();
       final startOfDay = DateTime(date.year, date.month, date.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
       final rows = await db.getdata(
-        WBridge.table,
-        WBridge.columns,
-        '${WBridge.col_Date} >= ? AND ${WBridge.col_Date} < ?',
+        Waybill.table,
+        Waybill.columns,
+        '${Waybill.col_Date} >= ? AND ${Waybill.col_Date} < ?',
         [startOfDay.millisecondsSinceEpoch, endOfDay.millisecondsSinceEpoch],
       );
-      return rows.map((m) => WBridge.fromMap_db(m)).toList();
+      return rows.map((m) => Waybill.fromMap_db(m)).toList();
     } catch (_) {
       return [];
     }
   }
 
-  /// Save weigh bridge entry — persists locally, then attempts API sync
-  Future<WBridge?> saveWBridge(WBridge wbridge) async {
+  /// Save waybill entry — persists locally, then attempts API sync
+  Future<Waybill?> saveWaybill(Waybill waybill) async {
     final db = db_Provider();
 
     // 1. Always save locally first
-    wbridge.sent = false;
-    if (wbridge.Key == null || wbridge.Key!.isEmpty) {
-      wbridge.Key = DateTime.now().millisecondsSinceEpoch.toString();
+    waybill.sent = false;
+    if (waybill.Key == null || waybill.Key!.isEmpty) {
+      waybill.Key = DateTime.now().millisecondsSinceEpoch.toString();
     }
-    await db.insert(WBridge.table, wbridge);
+    await db.insert(Waybill.table, waybill);
 
     // 2. Attempt API sync in background
-    _syncSingle(wbridge);
+    _syncSingle(waybill);
 
-    return wbridge;
+    return waybill;
   }
 
   /// Background sync for a single entry
-  Future<void> _syncSingle(WBridge wbridge) async {
+  Future<void> _syncSingle(Waybill waybill) async {
     try {
       final response = await _api.postdata(
-        'Matatu/addwbridge',
-        wbridge.toJson(),
+        'Matatu/addwaybill',
+        waybill.toJson(),
       );
-      final result = Results<WBridge>.fromJson(response.body, WBridge.fromMap);
-      if (result.Code == 0 && result.Contents != null) {
+      final result = Results<Waybill>.fromJson(response.body, Waybill.fromMap);
+      if (result.Code == 0 &&
+          result.Contents != null &&
+          result.Contents!.isNotEmpty) {
+        // Keep the BC-assigned Entry_No and Key so trips can link to it.
+        final serverWaybill = result.Contents!.first;
+        if (serverWaybill.Entry_No != null) {
+          waybill.Entry_No = serverWaybill.Entry_No;
+        }
+        if (serverWaybill.Key != null && serverWaybill.Key!.isNotEmpty) {
+          waybill.Key = serverWaybill.Key;
+        }
         // Mark as sent in local DB
-        wbridge.sent = true;
-        await db_Provider().insert(WBridge.table, wbridge);
+        waybill.sent = true;
+        await db_Provider().insert(Waybill.table, waybill);
       }
     } catch (_) {
-      // Will be picked up by syncPendingWBridges later
+      // Will be picked up by syncPendingWaybills later
     }
   }
 
-  /// Sync all pending (unsent) weigh bridge entries to the server
-  Future<int> syncPendingWBridges() async {
+  /// Sync all pending (unsent) waybill entries to the server
+  Future<int> syncPendingWaybills() async {
     final db = db_Provider();
     int synced = 0;
 
     try {
       final rows = await db.getdata(
-        WBridge.table,
-        WBridge.columns,
-        '${WBridge.col_sent} = 0',
+        Waybill.table,
+        Waybill.columns,
+        '${Waybill.col_sent} = 0',
       );
-      final pending = rows.map((m) => WBridge.fromMap_db(m)).toList();
+      final pending = rows.map((m) => Waybill.fromMap_db(m)).toList();
 
       for (final wb in pending) {
         try {
           final response = await _api.postdata(
-            'Matatu/addwbridge',
+            'Matatu/addwaybill',
             wb.toJson(),
           );
           final result =
-              Results<WBridge>.fromJson(response.body, WBridge.fromMap);
-          if (result.Code == 0) {
+              Results<Waybill>.fromJson(response.body, Waybill.fromMap);
+          if (result.Code == 0 &&
+              result.Contents != null &&
+              result.Contents!.isNotEmpty) {
+            // Keep the BC-assigned Entry_No and Key.
+            final serverWaybill = result.Contents!.first;
+            if (serverWaybill.Entry_No != null) {
+              wb.Entry_No = serverWaybill.Entry_No;
+            }
+            if (serverWaybill.Key != null && serverWaybill.Key!.isNotEmpty) {
+              wb.Key = serverWaybill.Key;
+            }
             wb.sent = true;
-            await db.insert(WBridge.table, wb);
+            await db.insert(Waybill.table, wb);
             synced++;
           }
         } catch (_) {
@@ -399,17 +420,17 @@ class WBridgeService {
     return synced;
   }
 
-  /// Fetch trips for a specific weigh bridge entry ID
-  Future<List<WbridgeTrip>> getTrips(int weighBridgeId) async {
-    final body = json.encode({'weighBridgeId': weighBridgeId});
+  /// Fetch trips for a specific waybill entry ID
+  Future<List<WaybillTrip>> getTrips(int waybillId) async {
+    final body = json.encode({'waybillId': waybillId});
 
     final response = await _api.postdata(
-      'Matatu/wbridgetrips',
+      'Matatu/waybilltrips',
       body,
     );
 
     final result =
-        Results<WbridgeTrip>.fromJson(response.body, WbridgeTrip.fromMap);
+        Results<WaybillTrip>.fromJson(response.body, WaybillTrip.fromMap);
 
     if (result.Code == 0 && result.Contents != null) {
       return result.Contents!;
@@ -417,15 +438,15 @@ class WBridgeService {
     return [];
   }
 
-  /// Create or update a weigh bridge trip
-  Future<WbridgeTrip?> saveTrip(WbridgeTrip trip) async {
+  /// Create or update a waybill trip
+  Future<WaybillTrip?> saveTrip(WaybillTrip trip) async {
     final response = await _api.postdata(
-      'Matatu/addwbridgetrip',
+      'Matatu/addwaybilltrip',
       trip.toJson(),
     );
 
     final result =
-        Results<WbridgeTrip>.fromJson(response.body, WbridgeTrip.fromMap);
+        Results<WaybillTrip>.fromJson(response.body, WaybillTrip.fromMap);
 
     if (result.Code == 0 && result.Contents != null) {
       return result.Contents!.firstOrNull;

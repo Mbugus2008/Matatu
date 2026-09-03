@@ -798,14 +798,28 @@ class FuelController extends GetxController {
   bool isLoading = false;
   bool isUpdating = false;
 
+  /// Shows a snackbar only when an Overlay is actually available.
+  /// Called after awaits, so the page may have been popped by then.
+  void _notify(String title, String message) {
+    try {
+      if (Get.overlayContext != null) {
+        Get.snackbar(title, message);
+      } else {
+        print('No overlay available - snackbar skipped: $title: $message');
+      }
+    } catch (e) {
+      print('Snackbar failed: $e');
+    }
+  }
+
   Future<void> updateDepot() async {
     isUpdating = true;
     update();
     try {
       await DepotFuel().updatedepot(Get.find<DepotController>().depottrans);
-      Get.snackbar('Success', 'Depot updated successfully');
+      _notify('Success', 'Depot updated successfully');
     } catch (e) {
-      Get.snackbar('Error', 'Failed to update depot: $e');
+      _notify('Error', 'Failed to update depot: $e');
     } finally {
       isUpdating = false;
       update();

@@ -18,6 +18,7 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
   String? Key;
   String? Vehicle_Number;
   vehicle_type? Vehicle_Type;
+  vehicle_status? Status;
   double? Daily_Contribution;
   String? Start_Date;
   String? Code;
@@ -47,6 +48,7 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
     this.Key,
     this.Vehicle_Number,
     this.Vehicle_Type,
+    this.Status,
     this.Daily_Contribution,
     this.Start_Date,
     this.Code,
@@ -89,6 +91,9 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
       Vehicle_Type: map['Vehicle_Type'] != null
           ? vehicle_type.values[(map['Vehicle_Type']) as int]
           : null,
+      Status: map['Status'] != null
+          ? vehicle_status.values[(map['Status']) as int]
+          : null,
       Daily_Contribution: map['Daily_Contribution'] != null
           ? (map['Daily_Contribution'] as num).toDouble()
           : null,
@@ -112,7 +117,7 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
   }
   @override
   String toString() {
-    return '$Code $Vehicle_Number $Fleet_No $Vehicle_Type ';
+    return '$Code $Vehicle_Number $Fleet_No $Vehicle_Type $Status';
   }
 
   String toJson() => json.encode(toMap());
@@ -355,4 +360,21 @@ class vehicle_type_desc {
     vehicle_type._x0033_6_Seater: '36 Seater',
     vehicle_type._x0033_9_Seater: '39 Seater',
   };
+}
+
+/// Mirrors the Status enum on the BC VehiclesBasics page.
+/// BC returns: 0 = Active, 1 = Dormant, 2 = Left.
+enum vehicle_status { Active, Dormant, Left }
+
+String vehicle_status_desc(vehicle_status? s) {
+  switch (s) {
+    case vehicle_status.Active:
+      return 'Active';
+    case vehicle_status.Dormant:
+      return 'Dormant';
+    case vehicle_status.Left:
+      return 'Left';
+    case null:
+      return '';
+  }
 }

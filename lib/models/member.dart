@@ -45,20 +45,10 @@ class Member implements mapping, Tomaps, AbsDbUpdates {
 
   @override
   Map<String, dynamic> toMap_fortable() {
-    return toMap();
-    // <String, dynamic>{
-    //   'Key': Key,
-    //   'No': No,
-    //   'Name': Name,
-    //   'Phone_No': Phone_No,
-    //   'ID_No': ID_No,
-    //   'E_Mail': E_Mail,
-    //   'Status': Status?.index,
-    //   'Customer_Posting_Group': Customer_Posting_Group,
-    //   'Vehicle': Vehicle,
-    //   'Loans': Loans,
-    //   'Crew_Type': Crew_Type?.index,
-    // };
+    // DB rows must not contain API-only fields (e.g. Crew_TypeSpecified).
+    final map = toMap();
+    map.remove('Crew_TypeSpecified');
+    return map;
   }
 
   Map<String, dynamic> toMap() {
@@ -74,6 +64,7 @@ class Member implements mapping, Tomaps, AbsDbUpdates {
       'Vehicle': Vehicle,
       'Loans': Loans,
       'Crew_Type': Crew_Type?.index,
+      'Crew_TypeSpecified': Crew_Type != null,
     };
   }
 

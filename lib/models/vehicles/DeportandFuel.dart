@@ -101,6 +101,12 @@ class DepotFuel implements Tomaps {
   double? Total_Collection;
   double? Fuel_Balance;
   double? Odometer_Reading;
+  DateTime? Tlb_Expiry;
+  DateTime? Insurance_expiry;
+  DateTime? Driver_Licence_Expiry;
+  DateTime? Conductor_Licence_Expiry;
+  DateTime? Driver_Badge_Expiry;
+  DateTime? Conductor_Badge_Expiry;
 
   /// Track whether this record has been modified locally
   bool dirty = false;
@@ -155,6 +161,12 @@ class DepotFuel implements Tomaps {
     this.Total_Collection,
     this.Fuel_Balance,
     this.Odometer_Reading,
+    this.Tlb_Expiry,
+    this.Insurance_expiry,
+    this.Driver_Licence_Expiry,
+    this.Conductor_Licence_Expiry,
+    this.Driver_Badge_Expiry,
+    this.Conductor_Badge_Expiry,
   })  : _Millage = Millage,
         _Amount_Paid = Amount_Paid,
         _Fuel = Fuel,
@@ -337,6 +349,13 @@ class DepotFuel implements Tomaps {
       Odometer_Reading: map['Odometer_Reading'] != null
           ? (map['Odometer_Reading'] as num).toDouble()
           : null,
+      Tlb_Expiry: _tryParseExpiry(map['Tlb_Expiry']),
+      Insurance_expiry: _tryParseExpiry(map['Insurance_expiry']),
+      Driver_Licence_Expiry: _tryParseExpiry(map['Driver_Licence_Expiry']),
+      Conductor_Licence_Expiry:
+          _tryParseExpiry(map['Conductor_Licence_Expiry']),
+      Driver_Badge_Expiry: _tryParseExpiry(map['Driver_Badge_Expiry']),
+      Conductor_Badge_Expiry: _tryParseExpiry(map['Conductor_Badge_Expiry']),
     );
 
     print('Recieved Driver Name: ${df.Driver_Name}');
@@ -344,6 +363,18 @@ class DepotFuel implements Tomaps {
     return df;
   }
   String toJson() => json.encode(toMap());
+
+  /// Parse an expiry date from the API (MM/dd/yyyy HH:mm:ss) or DB value.
+  static DateTime? _tryParseExpiry(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return DateTime.fromMillisecondsSinceEpoch(v.toInt());
+    final s = v.toString();
+    if (s.trim().isEmpty) return null;
+    return DateFormat('MM/dd/yyyy HH:mm:ss').tryParse(s) ??
+        DateFormat('MM/dd/yyyy').tryParse(s) ??
+        DateTime.tryParse(s);
+  }
+
   factory DepotFuel.fromJson(String source) =>
       DepotFuel.fromMap(json.decode(source) as Map<String, dynamic>);
 
@@ -395,15 +426,19 @@ class DepotFuel implements Tomaps {
   }
 
   Future<void> updatedepot(List<DepotFuel> depots) async {
-    Get.find<DepotController>().updating.value = true;
+    final ctrl = Get.find<DepotController>();
+    ctrl.updating.value = true;
     final dirty = depots.where((d) => d.dirty).toList();
     if (dirty.isEmpty) {
       Get.snackbar('Info', 'No changes to save');
-      Get.find<DepotController>().updating.value = false;
+      ctrl.updating.value = false;
       return;
     }
+    ctrl.updateTotal.value = dirty.length;
+    ctrl.updateProgress.value = 0;
+
+    // Ensure null decimals become 0 to satisfy ASP.NET model binder
     for (var depot in dirty) {
-      // Ensure null decimals become 0 to satisfy ASP.NET model binder
       depot.Km_Litre ??= 0;
       depot.Total_litres ??= 0;
       depot.Net_Offload ??= 0;
@@ -416,7 +451,39 @@ class DepotFuel implements Tomaps {
       depot.Total_Collection ??= 0;
       depot.Fuel_Balance ??= 0;
       depot.Odometer_Reading ??= 0;
+    }
 
+    // Send all dirty records in a single batch request.
+    final payload = json.encode(dirty.map((d) => d.toMap()).toList());
+    print('[SETDEPOT] batch sending ${dirty.length} records');
+    try {
+      final r = await ApiClient().postdata("setdepotdatabatch", payload);
+      if (r.statusCode == 200) {
+        Results<DepotFuel> results =
+            Results<DepotFuel>.fromJson(r.body, DepotFuel.fromMap);
+        if (results.Code == 0) {
+          for (final d in dirty) {
+            d.dirty = false;
+          }
+        } else {
+          Get.snackbar('Error',
+              'Failed to update depot: ${results.Desc ?? 'Unknown error'}');
+        }
+      } else {
+        Get.snackbar('Error', 'Server error ${r.statusCode} while updating');
+      }
+    } catch (e) {
+      print('[SETDEPOT] batch failed: $e');
+      // Fall back to one-by-one saving for compatibility.
+      await _updatedepotOneByOne(dirty, ctrl);
+    }
+    ctrl.updateProgress.value = ctrl.updateTotal.value;
+    ctrl.updating.value = false;
+  }
+
+  Future<void> _updatedepotOneByOne(
+      List<DepotFuel> dirty, DepotController ctrl) async {
+    for (var depot in dirty) {
       final json = depot.toJson();
       print('[SETDEPOT] sending: ${json.substring(0, 200)}');
       try {
@@ -434,8 +501,8 @@ class DepotFuel implements Tomaps {
       } catch (e) {
         print('[SETDEPOT] failed: $e');
       }
+      ctrl.updateProgress.value++;
     }
-    Get.find<DepotController>().updating.value = false;
   }
 
   String serializeDepotList(List<DepotFuel> depots) {
@@ -448,6 +515,8 @@ class DepotFuel implements Tomaps {
 class DepotController extends GetxController {
   RxBool checkall = false.obs;
   RxBool updating = false.obs;
+  RxInt updateProgress = 0.obs;
+  RxInt updateTotal = 0.obs;
   final RxList<DepotFuel> depottrans = <DepotFuel>[].obs;
   final RxList<DepotFuel> depottrans1 = <DepotFuel>[].obs;
 
@@ -495,6 +564,7 @@ class DepotController extends GetxController {
     for (var element in Get.find<DepotController>().depottrans) {
       element.On_route = check;
       element.From = getdatetime();
+      element.dirty = true;
     }
     updateCheckAll();
   }

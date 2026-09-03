@@ -19,10 +19,10 @@ import 'package:t_matatu/pages/disfuel_summary.dart';
 import 'package:t_matatu/pages/hires/hires_list.dart';
 import 'package:t_matatu/pages/pageloader.dart';
 import 'package:t_matatu/pages/vehicles/vehdetails.dart';
+import 'package:t_matatu/pages/waybill/waybill_list.dart';
 import 'package:t_matatu/providers/client.dart';
 
 import '../../controllers/vehicles/vehicles.dart';
-import '../../pages/widgets/Groupbox.dart';
 import '../../reports/controller.dart';
 
 enum Receipttype { Member, Crew, Both }
@@ -141,6 +141,8 @@ class Cityhoppa extends BaseClients {
             ),
           ],
         ); // Use the TwoTabScreen for account_type 3
+      case 6: // Hires
+        return HiresListScreen();
       default:
         return GetBuilder<VehiclesController>(
           builder: (controller) {
@@ -960,8 +962,8 @@ class Cityhoppa extends BaseClients {
   }
 
   @override
-  GroupBox? clientMenu() {
-    return GroupBox("", [
+  List<Widget>? clientMenu() {
+    return [
       ListTile(
         leading: const Icon(Icons.summarize),
         onTap: () {
@@ -969,7 +971,23 @@ class Cityhoppa extends BaseClients {
         },
         title: const Text("Hires"),
       ),
-    ]);
+      ListTile(
+        leading: const Icon(Icons
+            .scale), //Todo: Change the icon to a more appropriate one for Way Bill if available
+        title: Text('Waybill'),
+        onTap: () {
+          Get.to(() =>
+              const PageLoader(page: WaybillListPage(), title: "Waybill"));
+        },
+      ),
+      ListTile(
+        leading: const Icon(Icons.summarize),
+        title: Text('Dispatch & Fuel'),
+        onTap: () {
+          Get.to(() => const DisFuelSummaryScreen());
+        },
+      ),
+    ];
   }
 
   @override

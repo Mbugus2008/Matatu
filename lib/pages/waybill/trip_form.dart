@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:t_matatu/controllers/wbridge_controller.dart';
+import 'package:t_matatu/controllers/waybill_controller.dart';
 import 'package:t_matatu/models/route.dart';
-import 'package:t_matatu/models/weighbridge/wbridge.dart';
+import 'package:t_matatu/models/waybill/waybill.dart';
 
 class TripFormPage extends StatefulWidget {
-  final WbridgeTrip? trip;
+  final WaybillTrip? trip;
 
   const TripFormPage({super.key, this.trip});
 
@@ -18,7 +18,7 @@ class TripFormPage extends StatefulWidget {
 }
 
 class _TripFormPageState extends State<TripFormPage> {
-  late final WBridgeController _controller;
+  late final WaybillController _controller;
   final _formKey = GlobalKey<FormState>();
   final RouteService _routeService = RouteService();
 
@@ -41,7 +41,7 @@ class _TripFormPageState extends State<TripFormPage> {
   @override
   void initState() {
     super.initState();
-    _controller = Get.find<WBridgeController>();
+    _controller = Get.find<WaybillController>();
     _loadRoutes();
 
     final t = widget.trip;
@@ -105,10 +105,10 @@ class _TripFormPageState extends State<TripFormPage> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final wb = _controller.selectedWBridge.value;
+    final wb = _controller.selectedWaybill.value;
     final now = DateTime.now();
 
-    final trip = WbridgeTrip(
+    final trip = WaybillTrip(
       Key: widget.trip?.Key,
       Weign_Bridge_id: widget.trip?.Weign_Bridge_id ?? wb?.Entry_No,
       Trip_No: widget.trip?.Trip_No,

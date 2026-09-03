@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/init.dart';
 import 'package:t_matatu/models/Header.dart';
-import 'package:t_matatu/pages/widgets/Groupbox.dart';
 import 'package:t_matatu/providers/client.dart';
 import 'package:t_matatu/reports/controller.dart';
 
@@ -71,7 +70,7 @@ class Kmos extends BaseClients {
   }
 
   @override
-  GroupBox? clientMenu() {
+  List<Widget>? clientMenu() {
     return null;
   }
 }

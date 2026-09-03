@@ -8,16 +8,14 @@ import 'package:t_matatu/controllers/agent.dart';
 import 'package:t_matatu/controllers/expenses/expense_controller.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/models/Reversal.dart';
+import 'package:t_matatu/models/agents.dart';
 import 'package:t_matatu/models/expenses/expenses.dart';
 import 'package:t_matatu/models/summary/Tsummary.dart';
 import 'package:t_matatu/models/summary/TsummaryDetails.dart';
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/pages/Reversals/ReversalsList.dart';
 import 'package:t_matatu/pages/TwoTabScreen.dart';
-import 'package:t_matatu/pages/disfuel_summary.dart';
-import 'package:t_matatu/pages/hires/hires_list.dart';
-import 'package:t_matatu/pages/pageloader.dart';
-import 'package:t_matatu/pages/weighbridge/wbridge_list.dart';
+import 'package:t_matatu/providers/db.dart';
 import 'package:t_matatu/reports/Daily%20Summary.dart';
 import 'package:t_matatu/reports/controller.dart';
 import 'package:t_matatu/reports/receipts.dart';
@@ -88,6 +86,9 @@ class CustomDrawer extends StatelessWidget {
     // Hide Receipts & Z Report for Depot/Fuel operators (account_type 3)
     final isNotDepotFuel =
         Get.find<MainController>().agent.value.Account_type != 3;
+    // Client-specific menu (Hires, Waybill, Dispatch & Fuel, etc.)
+    final clientMenu =
+        Get.find<MainController>().CurrentClient?.value.clientMenu();
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -136,31 +137,7 @@ class CustomDrawer extends StatelessWidget {
               Get.to(() => _ExpensesListScreen(expenses: expenses));
             },
           ),
-          _buildTile(
-            icon: Icons.people,
-            title: 'Hires',
-            context: context,
-            onTap: () {
-              Get.to(() => HiresListScreen());
-            },
-          ),
-          _buildTile(
-            icon: Icons.scale,
-            title: 'Weigh Bridge',
-            context: context,
-            onTap: () {
-              Get.to(() => const PageLoader(
-                  page: WBridgeListPage(), title: "Weigh Bridge"));
-            },
-          ),
-          _buildTile(
-            icon: Icons.summarize,
-            title: 'Dispatch & Fuel',
-            context: context,
-            onTap: () {
-              Get.to(() => const DisFuelSummaryScreen());
-            },
-          ),
+
           _buildTile(
             icon: Icons.undo_outlined,
             title: 'Reversals',
@@ -173,8 +150,10 @@ class CustomDrawer extends StatelessWidget {
                   ));
             },
           ),
+          if (clientMenu != null) ...[
+            ...clientMenu,
+          ],
           const Divider(height: 1, indent: 16, endIndent: 16),
-
           // --- Reports Section ---
           _buildSectionHeader('REPORTS', context),
           if (isNotDepotFuel)
@@ -304,22 +283,48 @@ class CustomDrawer extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (newPass.text != confirmPass.text) {
-                Get.snackbar('Error', 'Passwords do not match');
-                return;
-              }
-              final agentCode =
-                  Get.find<MainController>().agent.value.Agent_Code;
-              final body = jsonEncode({
-                'Agent_Code': agentCode,
-                'Password': AgentController().encrypt(newPass.text),
-              });
-              final r = await ApiClient().postdata('changepassword', body);
-              if (r.statusCode == 200) {
+              try {
+                if (newPass.text != confirmPass.text) {
+                  Get.snackbar('Error', 'Passwords do not match');
+                  return;
+                }
+                final agentCode =
+                    Get.find<MainController>().agent.value.Agent_Code;
+                // NAV's Users page encrypts the Password field itself on
+                // every Modify - sending an already-encrypted value makes BC
+                // store a double-encrypted blob and login breaks. So send the
+                // PLAINTEXT here; NAV stores the single-encrypted value.
+                final encrypted = AgentController().encrypt(newPass.text);
+                final body = jsonEncode({
+                  'Agent_Code': agentCode,
+                  'Password': newPass.text,
+                });
+                final r = await ApiClient().postdata('changepassword', body);
+                if (r.statusCode != 200) {
+                  Get.snackbar('Error', 'Failed to change password');
+                  return;
+                }
+                final map = jsonDecode(r.body) as Map<String, dynamic>;
+                if (map['Code'] != 0) {
+                  Get.snackbar('Error',
+                      map['Desc']?.toString() ?? 'Failed to change password');
+                  return;
+                }
+                // Update the local agents table too - login compares the
+                // entered password against the LOCAL copy, so without this
+                // the new password would not work until a full re-sync.
+                final local = await Get.find<db_Provider>().getagent(
+                    Agent.columns, Agent.tableagents, agentCode ?? '');
+                if (local != null) {
+                  final ag = Agent.fromMap(local);
+                  ag.Password = encrypted;
+                  await Get.find<db_Provider>().insert(Agent.tableagents, ag);
+                }
+                Get.find<MainController>().agent.value.Password = encrypted;
                 Get.back();
                 Get.snackbar('Success', 'Password changed');
-              } else {
-                Get.snackbar('Error', 'Failed to change password');
+              } catch (e) {
+                Get.snackbar('Error', 'Failed to change password: $e');
               }
             },
             child: const Text('Save'),

@@ -26,32 +26,28 @@ class Results<T extends Tomaps> {
   factory Results.fromMap(
       Map<String, dynamic> map, T Function(Map<String, dynamic>) createT) {
     print("map: $map");
+    final raw = map['Contents'];
+    List<T>? contents;
+    if (raw is List) {
+      contents = raw.map((x) => createT(x as Map<String, dynamic>)).toList();
+    } else if (raw is Map<String, dynamic>) {
+      // Add/update endpoints return a single object instead of an array.
+      contents = [createT(raw)];
+    }
     Results<T> results = Results(
       Code: map['Code'] != null ? map['Code'] as int : null,
       Desc: map['Desc'] != null ? map['Desc'] as String : null,
-      Contents: map['Contents'] != null
-          ? (map['Contents'] as List<dynamic>)
-              .map((x) => createT(x as Map<String, dynamic>))
-              .toList()
-          : null,
+      Contents: contents,
     );
     print("results: ${results.Contents}");
-    return results; 
-    // return Results(
-    //   Code: map['Code'] != null ? map['Code'] as int : null,
-    //   Desc: map['Desc'] != null ? map['Desc'] as String : null,
-    //   Contents: map['Contents'] != null
-    //       ? (map['Contents'] as List<dynamic>)
-    //           .map((x) => createT(x as Map<String, dynamic>))
-    //           .toList()
-    //       : null,
-    // );
+    return results;
   }
   String toJson() => json.encode(toMap());
   factory Results.fromJson(
-          String source, T Function(Map<String, dynamic>) createT) {
+      String source, T Function(Map<String, dynamic>) createT) {
     print("source: $source");
-    return Results.fromMap(json.decode(source) as Map<String, dynamic>, createT);
+    return Results.fromMap(
+        json.decode(source) as Map<String, dynamic>, createT);
   }
 }
 

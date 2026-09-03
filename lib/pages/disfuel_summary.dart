@@ -317,6 +317,20 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
     }
   }
 
+  /// Separate share action: dispatch summary (active / total vehicles).
+  void _shareDispatch(DisFuelSummary s) {
+    if (s.Date == null) return;
+    final dateStr = DateFormat('dd MMM yyyy').format(s.Date!);
+    final dayOfWeek = DateFormat('EEEE').format(s.Date!);
+    final text = '$dayOfWeek, $dateStr\n'
+        'Dispatch Summary\n'
+        'Active Vehicles: ${s.Active_Vehicles ?? 0}\n'
+        'Total Vehicles: ${s.Total_Vehicles ?? 0}\n'
+        '---\n'
+        'View Dashboard: https://services.trimline.co.ke:8094/dispatchsummary/${DateFormat('yyyy-MM-dd').format(s.Date!)}';
+    SharePlus.instance.share(ShareParams(text: text));
+  }
+
   Future<void> _load() async {
     _loading.value = true;
     _hasMore.value = true;
@@ -628,7 +642,7 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
+                                horizontal: 6, vertical: 6),
                             child: Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
@@ -637,6 +651,22 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                               ),
                               child: const Icon(Icons.share,
                                   size: 26, color: _green),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => _shareDispatch(s),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 6),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.local_shipping,
+                                  size: 26, color: Colors.orange),
                             ),
                           ),
                         ),

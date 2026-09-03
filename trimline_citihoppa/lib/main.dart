@@ -26,7 +26,7 @@ Future<void> main() async {
         address: "",
         city: "Nairobi, Kenya",
         Box: "",
-        Auto_Assign: false,
+        Auto_Assign: true,
         Attach_crew: true,
       );
 

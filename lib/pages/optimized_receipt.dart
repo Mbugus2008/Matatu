@@ -179,41 +179,20 @@ class _ReceiptState extends State<Receipt> {
   Widget _buildBody() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final bool compactLayout = constraints.maxHeight < 700 ||
-            MediaQuery.of(context).viewInsets.bottom > 0;
+        // NOTE: never switch between different widget-tree branches based on
+        // MediaQuery.viewInsets - opening the keyboard changes those insets,
+        // which would recreate the vehicle Autocomplete field and lose focus
+        // (keyboard flicker). Keep ONE stable layout branch.
+        final double transactionsHeight =
+            (constraints.maxHeight * 0.4).clamp(220.0, 420.0);
 
-        if (compactLayout) {
-          final double transactionsHeight =
-              (constraints.maxHeight * 0.34).clamp(220.0, 320.0);
-
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              2.0,
-              2.0,
-              2.0,
-              MediaQuery.of(context).viewInsets.bottom + 8.0,
-            ),
-            child: Column(
-              children: [
-                _buildVehicleMemberSection(),
-                const SizedBox(height: 1.0),
-                _buildTodayTransactionsButton(),
-                const SizedBox(height: 1.0),
-                _buildNewEntrySection(),
-                const SizedBox(height: 1.0),
-                SizedBox(
-                  height: transactionsHeight,
-                  child: _buildCurrentTransactions(),
-                ),
-                const SizedBox(height: 1.0),
-                _buildPrintButtons(),
-              ],
-            ),
-          );
-        }
-
-        return Padding(
-          padding: const EdgeInsets.all(2.0),
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            2.0,
+            2.0,
+            2.0,
+            MediaQuery.of(context).viewInsets.bottom + 8.0,
+          ),
           child: Column(
             children: [
               _buildVehicleMemberSection(),
@@ -222,7 +201,10 @@ class _ReceiptState extends State<Receipt> {
               const SizedBox(height: 1.0),
               _buildNewEntrySection(),
               const SizedBox(height: 1.0),
-              Expanded(child: _buildCurrentTransactions()),
+              SizedBox(
+                height: transactionsHeight,
+                child: _buildCurrentTransactions(),
+              ),
               const SizedBox(height: 1.0),
               _buildPrintButtons(),
             ],

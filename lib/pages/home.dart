@@ -21,7 +21,8 @@ class HomePage extends GetView<MainController> {
           : Get.find<MainController>().CurrentClient?.value.homelist() ??
               Container(),
       drawer: CustomDrawer(),
-      floatingActionButton: controller.agent.value.Account_type == 3
+      floatingActionButton: (controller.agent.value.Account_type == 3 ||
+              controller.agent.value.Account_type == 6)
           ? null
           : Container(
               alignment: Alignment.bottomCenter,

@@ -3,21 +3,21 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:t_matatu/controllers/wbridge_controller.dart';
-import 'package:t_matatu/models/weighbridge/wbridge.dart';
+import 'package:t_matatu/controllers/waybill_controller.dart';
+import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/pages/setting.dart';
-import 'package:t_matatu/pages/weighbridge/trip_list.dart';
-import 'package:t_matatu/pages/weighbridge/wbridge_form.dart';
+import 'package:t_matatu/pages/waybill/trip_list.dart';
+import 'package:t_matatu/pages/waybill/waybill_form.dart';
 
-class WBridgeListPage extends StatefulWidget {
-  const WBridgeListPage({super.key});
+class WaybillListPage extends StatefulWidget {
+  const WaybillListPage({super.key});
 
   @override
-  State<WBridgeListPage> createState() => _WBridgeListPageState();
+  State<WaybillListPage> createState() => _WaybillListPageState();
 }
 
-class _WBridgeListPageState extends State<WBridgeListPage> {
-  late final WBridgeController _controller;
+class _WaybillListPageState extends State<WaybillListPage> {
+  late final WaybillController _controller;
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
@@ -36,7 +36,7 @@ class _WBridgeListPageState extends State<WBridgeListPage> {
   @override
   void initState() {
     super.initState();
-    _controller = Get.find<WBridgeController>();
+    _controller = Get.find<WaybillController>();
     _searchCtrl.addListener(() {
       setState(() => _searchQuery = _searchCtrl.text.toUpperCase());
     });
@@ -48,9 +48,9 @@ class _WBridgeListPageState extends State<WBridgeListPage> {
     super.dispose();
   }
 
-  List<WBridge> get _filteredBridges {
-    if (_searchQuery.isEmpty) return _controller.wbridges;
-    return _controller.wbridges.where((wb) {
+  List<Waybill> get _filteredBridges {
+    if (_searchQuery.isEmpty) return _controller.waybills;
+    return _controller.waybills.where((wb) {
       return (wb.Fleet_No ?? '').toUpperCase().contains(_searchQuery) ||
           (wb.Vehicle_No ?? '').toUpperCase().contains(_searchQuery);
     }).toList();
@@ -69,9 +69,9 @@ class _WBridgeListPageState extends State<WBridgeListPage> {
     }
   }
 
-  void _navigateToForm({WBridge? wb}) {
-    // Controller.saveWBridge() already updates the list directly — no need to re-fetch
-    Get.to(() => WBridgeFormPage(wbridge: wb));
+  void _navigateToForm({Waybill? wb}) {
+    // Controller.saveWaybill() already updates the list directly — no need to re-fetch
+    Get.to(() => WaybillFormPage(waybill: wb));
   }
 
   @override
@@ -89,7 +89,7 @@ class _WBridgeListPageState extends State<WBridgeListPage> {
           ),
         ),
         title: const Text(
-          'CityHoppa WeighBridge',
+          'CityHoppa Waybill',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
         ),
         actions: [
@@ -175,7 +175,7 @@ class _WBridgeListPageState extends State<WBridgeListPage> {
   // ─── Summary Bento Grid ───
   Widget _buildSummaryGrid() {
     return Obx(() {
-      final bridges = _controller.wbridges;
+      final bridges = _controller.waybills;
       if (bridges.isEmpty) return const SizedBox.shrink();
 
       final totalTarget =
@@ -279,7 +279,7 @@ class _WBridgeListPageState extends State<WBridgeListPage> {
 
       final items = _filteredBridges;
 
-      if (items.isEmpty && _controller.wbridges.isEmpty) {
+      if (items.isEmpty && _controller.waybills.isEmpty) {
         return const SliverFillRemaining(child: _EmptyState());
       }
 
@@ -305,13 +305,13 @@ class _WBridgeListPageState extends State<WBridgeListPage> {
   }
 
   // ─── Vehicle Card ───
-  Widget _buildVehicleCard(WBridge wb) {
+  Widget _buildVehicleCard(Waybill wb) {
     final hasShortage = (wb.Shortage ?? 0) > 0;
     final borderColor = hasShortage ? _errorRed : _successGreen;
 
     return GestureDetector(
       onTap: () {
-        _controller.selectedWBridge.value = wb;
+        _controller.selectedWaybill.value = wb;
         Get.to(() => const TripListPage());
       },
       child: Container(

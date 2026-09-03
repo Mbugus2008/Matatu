@@ -1,23 +1,23 @@
 // ignore_for_file: public_member_api_docs
 
 import 'package:get/get.dart';
-import 'package:t_matatu/models/weighbridge/wbridge.dart';
+import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/providers/db.dart';
 
-/// Controller for managing Weigh Bridge data state and operations
-class WBridgeController extends GetxController {
-  final WBridgeService _service = WBridgeService();
+/// Controller for managing Waybill data state and operations
+class WaybillController extends GetxController {
+  final WaybillService _service = WaybillService();
 
-  final RxList<WBridge> wbridges = <WBridge>[].obs;
-  final RxList<WbridgeTrip> trips = <WbridgeTrip>[].obs;
+  final RxList<Waybill> waybills = <Waybill>[].obs;
+  final RxList<WaybillTrip> trips = <WaybillTrip>[].obs;
   final Rx<DateTime> selectedDate = DateTime.now().obs;
   final RxBool isLoading = false.obs;
   final Rx<String?> selectedVehicle = Rx<String?>(null);
-  final Rx<WBridge?> selectedWBridge = Rx<WBridge?>(null);
+  final Rx<Waybill?> selectedWaybill = Rx<Waybill?>(null);
 
   // ─── Load from local DB ──────────────────────────────
 
-  /// Load weigh bridge entries from the local SQLite DB for the selected date.
+  /// Load waybill entries from the local SQLite DB for the selected date.
   /// This is the primary data source — API is only used for sync, not reads.
   Future<void> loadFromLocalDB() async {
     isLoading.value = true;
@@ -28,14 +28,14 @@ class WBridgeController extends GetxController {
 
       final db = db_Provider();
       final rows = await db.getdata(
-        WBridge.table,
-        WBridge.columns,
-        '${WBridge.col_Date} >= ? AND ${WBridge.col_Date} < ?',
+        Waybill.table,
+        Waybill.columns,
+        '${Waybill.col_Date} >= ? AND ${Waybill.col_Date} < ?',
         [startOfDay.millisecondsSinceEpoch, endOfDay.millisecondsSinceEpoch],
       );
 
       if (rows.isNotEmpty) {
-        wbridges.assignAll(rows.map((m) => WBridge.fromMap_db(m)).toList());
+        waybills.assignAll(rows.map((m) => Waybill.fromMap_db(m)).toList());
       }
     } catch (_) {
       // Keep existing data on failure
@@ -49,13 +49,13 @@ class WBridgeController extends GetxController {
   Future<void> syncFromAPI() async {
     isLoading.value = true;
     try {
-      final result = await _service.getWBridges(selectedDate.value);
+      final result = await _service.getWaybills(selectedDate.value);
       if (result.isNotEmpty) {
         // Merge API results into local DB
         final db = db_Provider();
         for (final wb in result) {
           wb.sent = true;
-          await db.insert(WBridge.table, wb);
+          await db.insert(Waybill.table, wb);
         }
         // Reload from local DB for consistent view
         await loadFromLocalDB();
@@ -71,22 +71,22 @@ class WBridgeController extends GetxController {
 
   /// Save to local DB first, then attempt background API sync.
   /// Updates the list immediately for instant UI feedback.
-  Future<WBridge?> saveWBridge(WBridge wbridge) async {
+  Future<Waybill?> saveWaybill(Waybill waybill) async {
     isLoading.value = true;
     try {
       // 1. Always save to local DB first
-      final saved = await _service.saveWBridge(wbridge);
+      final saved = await _service.saveWaybill(waybill);
 
       // 2. Update list immediately
       if (saved != null) {
-        final idx = wbridges.indexWhere(
+        final idx = waybills.indexWhere(
             (w) => w.Key == saved.Key || w.Vehicle_No == saved.Vehicle_No);
         if (idx >= 0) {
-          wbridges[idx] = saved;
+          waybills[idx] = saved;
         } else {
-          wbridges.insert(0, saved);
+          waybills.insert(0, saved);
         }
-        wbridges.refresh();
+        waybills.refresh();
       }
       return saved;
     } finally {
@@ -96,10 +96,10 @@ class WBridgeController extends GetxController {
 
   // ─── Trips ───────────────────────────────────────────
 
-  Future<void> fetchTrips(int weighBridgeId) async {
+  Future<void> fetchTrips(int waybillId) async {
     isLoading.value = true;
     try {
-      final result = await _service.getTrips(weighBridgeId);
+      final result = await _service.getTrips(waybillId);
       trips.assignAll(result);
     } catch (e) {
       trips.clear();
@@ -108,7 +108,7 @@ class WBridgeController extends GetxController {
     }
   }
 
-  Future<WbridgeTrip?> saveTrip(WbridgeTrip trip) async {
+  Future<WaybillTrip?> saveTrip(WaybillTrip trip) async {
     isLoading.value = true;
     try {
       final saved = await _service.saveTrip(trip);

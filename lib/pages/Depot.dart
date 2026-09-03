@@ -1,10 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/models/Utils/util.dart';
 import 'package:t_matatu/models/expenses/expenses.dart';
@@ -37,6 +34,7 @@ class _DepotState extends State<Depot> {
     );
     if (picked != null && picked != _selectedDate) {
       setState(() => _selectedDate = picked);
+      _fetchData();
     }
   }
 
@@ -45,112 +43,55 @@ class _DepotState extends State<Depot> {
     DepotFuel().getdata(_selectedDate);
   }
 
-  void _shareDispatch() async {
-    print('[SHARE] _shareDispatch called');
-    final depot = Get.find<DepotController>().depottrans;
-    print('[SHARE] depot count: ${depot.length}');
-    if (depot.isEmpty) {
-      Get.snackbar('No Data', 'No dispatch data to share');
-      return;
-    }
-
-    final date = DateFormat('dd-MMM-yyyy').format(_selectedDate);
-    final active = depot.where((d) => d.On_route == true).length;
-    final total = depot.length;
-    print('[SHARE] building CSV: active=$active total=$total');
-
-    // Build CSV rows
-    final rows = <List<String>>[];
-    rows.add(['DISPATCH REPORT - $date']);
-    rows.add(['Active: $active / $total']);
-    rows.add(['']);
-    rows.add([
-      'On Route',
-      'Fleet',
-      'Vehicle',
-      'Capacity',
-      'Driver',
-      'Conductor',
-      'Description',
-      'Defects',
-      'Offload'
-    ]);
-
-    for (final d in depot) {
-      rows.add([
-        d.On_route == true ? 'Yes' : 'No',
-        d.Fleet ?? '',
-        d.Vehicle ?? '',
-        vehicle_type_desc.desc[d.Capacity] ?? '',
-        d.Driver_Name ?? '',
-        d.Conductor_Name ?? '',
-        d.Descrition ?? '',
-        d.Nro_Defects ?? '',
-        (d.Offload ?? 0).toString(),
-      ]);
-    }
-
-    // Build CSV manually
-    final csv = rows.map((r) => r.map((c) => '"$c"').join(',')).join('\n');
-    print('[SHARE] CSV length: ${csv.length}');
-
-    // Save to Downloads (always works, no app needed)
-    final downloadDir = Directory('/storage/emulated/0/Download');
-    String savedPath;
-
-    if (await downloadDir.exists()) {
-      final file =
-          File('${downloadDir.path}/Dispatch_${date.replaceAll('-', '_')}.csv');
-      await file.writeAsString(csv);
-      savedPath = file.path;
-    } else {
-      // Fallback to app documents
-      final dir = await getApplicationDocumentsDirectory();
-      final file =
-          File('${dir.path}/Dispatch_${date.replaceAll('-', '_')}.csv');
-      await file.writeAsString(csv);
-      savedPath = file.path;
-    }
-
-    Get.snackbar(
-      'Exported',
-      'Saved to $savedPath\nOpen with Files app to share',
-      snackPosition: SnackPosition.BOTTOM,
-      duration: const Duration(seconds: 4),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    print('[DEPOT] build called');
-    return Stack(
-      children: [
-        GetBuilder<DepotController>(
-          init: Get.find<DepotController>(),
-          builder: (dp) => Column(
+    return GetBuilder<DepotController>(
+      init: Get.find<DepotController>(),
+      builder: (dp) => Stack(
+        children: [
+          Column(
             children: [
               _buildDateSelector(),
               _buildSearchField(),
               _buildActiveVehiclesInfo(dp),
               Expanded(child: _buildVehicleList(dp)),
-              _buildUpdateButton(dp),
+              const SizedBox(height: 84), // keep list clear of the FAB
             ],
           ),
-        ),
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: FloatingActionButton.extended(
-            onPressed: () {
-              print('[SHARE] button tapped');
-              _shareDispatch();
-            },
-            icon: const Icon(Icons.share),
-            label: const Text('Share'),
-            backgroundColor: Colors.green.shade600,
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 16,
+            child: Obx(() {
+              final isUpdating = dp.updating.value;
+              final progress = dp.updateProgress.value;
+              final total = dp.updateTotal.value;
+              return FloatingActionButton.extended(
+                onPressed: isUpdating ? null : update,
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                icon: isUpdating
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: Colors.white),
+                      )
+                    : const Icon(Icons.save),
+                label: Text(
+                  isUpdating
+                      ? (total > 0
+                          ? 'Updating $progress/$total...'
+                          : 'Updating...')
+                      : 'Update',
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w600),
+                ),
+              );
+            }),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -460,6 +401,7 @@ class _DepotState extends State<Depot> {
   }
 
   Widget _buildDefectField(DepotFuel depotFuel) {
+    TextEditingController? internal;
     if (depotFuel.On_route == null || depotFuel.On_route == false) {
       return Container(
         width: 150,
@@ -476,10 +418,21 @@ class _DepotState extends State<Depot> {
           onSelected: (Expenses nro) {
             depotFuel.Nro_Defects = nro.Code;
             depotFuel.Nro_Defects_editor.text = nro.Code.toString();
+            depotFuel.dirty = true;
+            // flutter_typeahead does not update its own controller on pick,
+            // so set it explicitly to show the chosen defect.
+            internal?.text = nro.Code.toString();
           },
           builder: (context, controller, focusNode) {
+            internal = controller;
+            // Prefill the typeahead's own controller if the editor has a value,
+            // so previously picked defects still show after rebuilds.
+            if (controller.text.isEmpty &&
+                depotFuel.Nro_Defects_editor.text.isNotEmpty) {
+              controller.text = depotFuel.Nro_Defects_editor.text;
+            }
             return TextField(
-              controller: depotFuel.Nro_Defects_editor,
+              controller: controller,
               focusNode: focusNode,
               style: const TextStyle(fontSize: 12),
               decoration: const InputDecoration(
@@ -487,6 +440,11 @@ class _DepotState extends State<Depot> {
                     EdgeInsets.symmetric(vertical: 0.0, horizontal: 10.0),
                 hintText: 'Defect',
               ),
+              onChanged: (value) {
+                depotFuel.Nro_Defects = value;
+                depotFuel.Nro_Defects_editor.text = value;
+                depotFuel.dirty = true;
+              },
             );
           },
         ),
@@ -514,6 +472,7 @@ class _DepotState extends State<Depot> {
             print("New description: $newValue");
             depotFuel.Descrition = newValue ?? '';
             depotFuel.desc_editor.text = newValue ?? '';
+            depotFuel.dirty = true;
           },
         ),
       ),
@@ -570,38 +529,31 @@ class _DepotState extends State<Depot> {
     );
   }
 
-  Widget _buildUpdateButton(DepotController dp) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      child: Obx(() {
-        final isUpdating = dp.updating.value;
-        return ElevatedButton(
-          onPressed: isUpdating ? null : update,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          ),
-          child: isUpdating
-              ? SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    strokeWidth: 2,
-                  ),
-                )
-              : Text('Update', style: TextStyle(fontSize: 14)),
-        );
-      }),
-    );
-  }
-
   void update() {
-    DepotFuel().updatedepot(Get.find<DepotController>().depottrans);
+    final depots = Get.find<DepotController>().depottrans;
+
+    // Enforce: every modified vehicle must be ticked "On route" OR have a defect.
+    final invalid = depots
+        .where((d) =>
+            d.dirty &&
+            d.On_route != true &&
+            (d.Nro_Defects == null || d.Nro_Defects!.trim().isEmpty))
+        .toList();
+
+    if (invalid.isNotEmpty) {
+      final vehicles = invalid.map((d) => d.Vehicle ?? '?').take(5).join(', ');
+      Get.snackbar(
+        'Validation',
+        'Tick "On route" or select a defect for: $vehicles${invalid.length > 5 ? ' (+${invalid.length - 5} more)' : ''}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+      );
+      return;
+    }
+
+    DepotFuel().updatedepot(depots);
   }
 
   Future<void> setvehicle(String vehicle, DepotFuel depotFuel) async {
@@ -613,6 +565,7 @@ class _DepotState extends State<Depot> {
       depotFuel.Driver_Name = v.Driver?.Name;
       depotFuel.Conductor = v.Conductor?.No;
       depotFuel.Conductor_Name = v.Conductor?.Name;
+      depotFuel.dirty = true;
       Get.find<DepotController>().update();
     }
   }

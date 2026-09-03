@@ -14,7 +14,7 @@ import 'package:t_matatu/controllers/header.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/trans.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
-import 'package:t_matatu/controllers/wbridge_controller.dart';
+import 'package:t_matatu/controllers/waybill_controller.dart';
 import 'package:t_matatu/models/Header.dart';
 import 'package:t_matatu/models/Hires.dart';
 import 'package:t_matatu/models/Reversal.dart';
@@ -26,7 +26,7 @@ import 'package:t_matatu/models/route.dart';
 import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
-import 'package:t_matatu/models/weighbridge/wbridge.dart';
+import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/providers/colors.dart';
@@ -74,7 +74,7 @@ Future<void> initializedata() async {
 Future<void> upload() async {
   sendtransdetails();
   sendtrans();
-  WBridgeService().syncPendingWBridges();
+  WaybillService().syncPendingWaybills();
 }
 
 Future<void> sendtrans() async {
@@ -181,7 +181,7 @@ Future<void> init() async {
   Get.put(MemberController(), permanent: true);
   Get.put(BluetoothManager(), permanent: true);
   Get.put(HiresController(), permanent: true);
-  Get.put(WBridgeController(), permanent: true);
+  Get.put(WaybillController(), permanent: true);
   Get.put(SettingsController(), permanent: true);
   BluetoothManager().Scan();
   BluetoothManager().Subscriptionstatus();
