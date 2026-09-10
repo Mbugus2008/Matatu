@@ -237,6 +237,24 @@ void main() {
       expect(restored.From, trip.From);
       expect(restored.Pax_No, trip.Pax_No);
     });
+
+    test('toMap_fortable / fromMap_db roundtrip', () {
+      final trip = _sampleTrip();
+      final dbMap = trip.toMap_fortable();
+      expect(dbMap['From_Route'], 'Nairobi');
+      expect(dbMap['To_Route'], 'Mombasa');
+      expect(dbMap['From_Time'], isA<int>());
+      expect(dbMap['sent'], 0);
+
+      final restored = WaybillTrip.fromMap_db(dbMap);
+      expect(restored.From, 'Nairobi');
+      expect(restored.To, 'Mombasa');
+      expect(restored.From_Time?.year, 2026);
+      expect(restored.sent, false);
+
+      final sentMap = (trip..sent = true).toMap_fortable();
+      expect(WaybillTrip.fromMap_db(sentMap).sent, true);
+    });
   });
 
   // ═══════════════════════════════════════════════════════

@@ -84,7 +84,7 @@ class RouteService {
   /// Fetch routes from API
   Future<List<RouteModel>> fetchFromAPI() async {
     try {
-      final response = await _api.postdata('Matatu/routes', '{}');
+      final response = await _api.postdata('routes', '{}');
       final result =
           Results<RouteModel>.fromJson(response.body, RouteModel.fromMap);
       if (result.Code == 0 && result.Contents != null) {

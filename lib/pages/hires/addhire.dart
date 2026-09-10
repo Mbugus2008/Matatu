@@ -275,11 +275,14 @@ class AddHireScreen extends StatelessWidget {
               return;
             }
             Get.back(); // Navigate back after saving
-            Get.snackbar(
-                'Success',
-                hire == null
-                    ? 'New hire added successfully'
-                    : 'Hire updated successfully');
+            final hireMsg = hire == null
+                ? 'New hire added successfully'
+                : 'Hire updated successfully';
+            Future.delayed(const Duration(milliseconds: 350), () {
+              if (!Get.isSnackbarOpen) {
+                Get.snackbar('Success', hireMsg);
+              }
+            });
           } catch (e) {
             _log('exception during save: $e');
             Get.snackbar('Error', 'Something went wrong: $e',

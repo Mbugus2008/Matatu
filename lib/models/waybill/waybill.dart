@@ -195,7 +195,7 @@ class Waybill extends Tomaps implements mapping {
 }
 
 /// Waybill Trip model — represents an individual trip within a waybill entry
-class WaybillTrip extends Tomaps {
+class WaybillTrip extends Tomaps implements mapping {
   String? Key;
   int? Weign_Bridge_id;
   int? Trip_No;
@@ -211,6 +211,7 @@ class WaybillTrip extends Tomaps {
   String? Amount_Received;
   double? Expenses;
   String? Comments;
+  bool sent = false;
 
   WaybillTrip({
     this.Key,
@@ -228,6 +229,7 @@ class WaybillTrip extends Tomaps {
     this.Amount_Received,
     this.Expenses,
     this.Comments,
+    this.sent = false,
   });
 
   @override
@@ -257,13 +259,9 @@ class WaybillTrip extends Tomaps {
       Weign_Bridge_id: map['Weign_Bridge_id'] as int?,
       Trip_No: map['Trip_No'] as int?,
       From: map['From'] as String?,
-      From_Time: map['From_Time'] != null
-          ? DateTime.tryParse(map['From_Time'] as String)
-          : null,
+      From_Time: _parseTripDate(map['From_Time']),
       To: map['To'] as String?,
-      To_Time: map['To_Time'] != null
-          ? DateTime.tryParse(map['To_Time'] as String)
-          : null,
+      To_Time: _parseTripDate(map['To_Time']),
       Pax_No: map['Pax_No'] as int?,
       Fare_Amount: (map['Fare_Amount'] as num?)?.toDouble(),
       Total: (map['Total'] as num?)?.toDouble(),
@@ -275,13 +273,115 @@ class WaybillTrip extends Tomaps {
     );
   }
 
+  /// Parse a date field that may be a String (API) or int milliseconds (DB).
+  static DateTime? _parseTripDate(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
   @override
   WaybillTrip fromMap_table(Map<String, dynamic> map) =>
       WaybillTrip.fromMap(map);
 
+  /// Local SQLite row (offline-first). 'From'/'To' are SQL keywords, so the
+  /// local columns are stored as From_Route / To_Route.
+  @override
+  Map<String, dynamic> toMap_fortable() {
+    return <String, dynamic>{
+      'Key': Key ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      'Weign_Bridge_id': Weign_Bridge_id,
+      'Trip_No': Trip_No,
+      'From_Route': From,
+      'From_Time': From_Time?.millisecondsSinceEpoch,
+      'To_Route': To,
+      'To_Time': To_Time?.millisecondsSinceEpoch,
+      'Pax_No': Pax_No,
+      'Fare_Amount': Fare_Amount,
+      'Total': Total,
+      'Started_By': Started_By,
+      'Ended_by': Ended_by,
+      'Amount_Received': Amount_Received,
+      'Expenses': Expenses,
+      'Comments': Comments,
+      'sent': sent ? 1 : 0,
+    };
+  }
+
+  // ──────── Database ────────
+  static const String table = 'waybill_trip';
+  static const String col_Key = 'Key';
+  static const String col_Weign_Bridge_id = 'Weign_Bridge_id';
+  static const String col_Trip_No = 'Trip_No';
+  static const String col_From = 'From_Route';
+  static const String col_From_Time = 'From_Time';
+  static const String col_To = 'To_Route';
+  static const String col_To_Time = 'To_Time';
+  static const String col_Pax_No = 'Pax_No';
+  static const String col_Fare_Amount = 'Fare_Amount';
+  static const String col_Total = 'Total';
+  static const String col_Started_By = 'Started_By';
+  static const String col_Ended_by = 'Ended_by';
+  static const String col_Amount_Received = 'Amount_Received';
+  static const String col_Expenses = 'Expenses';
+  static const String col_Comments = 'Comments';
+  static const String col_sent = 'sent';
+
+  static const List<String> columns = [
+    col_Key,
+    col_Weign_Bridge_id,
+    col_Trip_No,
+    col_From,
+    col_From_Time,
+    col_To,
+    col_To_Time,
+    col_Pax_No,
+    col_Fare_Amount,
+    col_Total,
+    col_Started_By,
+    col_Ended_by,
+    col_Amount_Received,
+    col_Expenses,
+    col_Comments,
+    col_sent,
+  ];
+
+  static const String createtable = '''
+    CREATE TABLE IF NOT EXISTS $table (
+      $col_Key TEXT PRIMARY KEY,
+      $col_Weign_Bridge_id INTEGER,
+      $col_Trip_No INTEGER,
+      $col_From TEXT,
+      $col_From_Time INTEGER,
+      $col_To TEXT,
+      $col_To_Time INTEGER,
+      $col_Pax_No INTEGER,
+      $col_Fare_Amount REAL,
+      $col_Total REAL,
+      $col_Started_By TEXT,
+      $col_Ended_by TEXT,
+      $col_Amount_Received TEXT,
+      $col_Expenses REAL,
+      $col_Comments TEXT,
+      $col_sent INTEGER DEFAULT 0
+    )
+  ''';
+
   String toJson() => json.encode(toMap());
   factory WaybillTrip.fromJson(String source) =>
       WaybillTrip.fromMap(json.decode(source) as Map<String, dynamic>);
+
+  /// Create from DB row (millisecond timestamps, From_Route/To_Route columns).
+  factory WaybillTrip.fromMap_db(Map<String, dynamic> map) {
+    final trip = WaybillTrip.fromMap({
+      ...map,
+      'From': map[col_From],
+      'To': map[col_To],
+    });
+    trip.sent = (map[col_sent] as int?) == 1;
+    return trip;
+  }
 }
 
 /// API service for Waybill endpoints.
@@ -295,7 +395,7 @@ class WaybillService {
     try {
       final request = Request(date: date, vehicle: vehicle);
       final response = await _api.postdata(
-        'Matatu/waybills',
+        'waybills',
         request.toJson(),
       );
       final result = Results<Waybill>.fromJson(response.body, Waybill.fromMap);
@@ -345,12 +445,24 @@ class WaybillService {
     return waybill;
   }
 
+  /// Serializes a map without null entries. The API's model binder rejects
+  /// nulls for non-nullable numeric fields (Entry_No, totals) with HTTP 400.
+  String _jsonWithoutNulls(Map<String, dynamic> map) {
+    map.removeWhere((_, value) => value == null);
+    return json.encode(map);
+  }
+
   /// Background sync for a single entry
   Future<void> _syncSingle(Waybill waybill) async {
     try {
+      final map = waybill.toMap();
+      if (_isTempKey(map['Key'] as String?)) {
+        // Force BC Create for locally-created entries.
+        map.remove('Key');
+      }
       final response = await _api.postdata(
-        'Matatu/addwaybill',
-        waybill.toJson(),
+        'addwaybill',
+        _jsonWithoutNulls(map),
       );
       final result = Results<Waybill>.fromJson(response.body, Waybill.fromMap);
       if (result.Code == 0 &&
@@ -388,9 +500,14 @@ class WaybillService {
 
       for (final wb in pending) {
         try {
+          final map = wb.toMap();
+          if (_isTempKey(map['Key'] as String?)) {
+            // Force BC Create for locally-created entries.
+            map.remove('Key');
+          }
           final response = await _api.postdata(
-            'Matatu/addwaybill',
-            wb.toJson(),
+            'addwaybill',
+            _jsonWithoutNulls(map),
           );
           final result =
               Results<Waybill>.fromJson(response.body, Waybill.fromMap);
@@ -420,37 +537,161 @@ class WaybillService {
     return synced;
   }
 
-  /// Fetch trips for a specific waybill entry ID
+  /// Fetch trips for a waybill entry — local first, then merge from BC.
   Future<List<WaybillTrip>> getTrips(int waybillId) async {
-    final body = json.encode({'waybillId': waybillId});
+    final local = await _getLocalTrips(waybillId);
 
-    final response = await _api.postdata(
-      'Matatu/waybilltrips',
-      body,
-    );
-
-    final result =
-        Results<WaybillTrip>.fromJson(response.body, WaybillTrip.fromMap);
-
-    if (result.Code == 0 && result.Contents != null) {
-      return result.Contents!;
+    List<WaybillTrip> remote = [];
+    try {
+      final body = json.encode({'waybillId': waybillId});
+      final response = await _api.postdata(
+        'waybilltrips',
+        body,
+      );
+      final result =
+          Results<WaybillTrip>.fromJson(response.body, WaybillTrip.fromMap);
+      if (result.Code == 0 && result.Contents != null) {
+        remote = result.Contents!;
+      }
+    } catch (_) {
+      // API failed — fall back to local
     }
-    return [];
+
+    final db = db_Provider();
+    final remoteTripNos = remote.map((t) => t.Trip_No).whereType<int>().toSet();
+
+    final merged = <String, WaybillTrip>{};
+    for (final t in local) {
+      if (!t.sent && t.Trip_No != null && remoteTripNos.contains(t.Trip_No)) {
+        // Same trip is already on BC — drop the local temp row.
+        if (t.Key != null) {
+          await db.deletedata(
+              WaybillTrip.table, '${WaybillTrip.col_Key} = ?', [t.Key!]);
+        }
+        continue;
+      }
+      if (t.Key != null) merged[t.Key!] = t;
+    }
+    for (final t in remote) {
+      t.sent = true;
+      if (t.Key != null && t.Key!.isNotEmpty) {
+        await db.insert(WaybillTrip.table, t);
+        merged[t.Key!] = t;
+      }
+    }
+
+    final list = merged.values.toList()
+      ..sort((a, b) {
+        final an = a.Trip_No ?? 0;
+        final bn = b.Trip_No ?? 0;
+        if (an != bn) return an.compareTo(bn);
+        final at = a.From_Time?.millisecondsSinceEpoch ?? 0;
+        final bt = b.From_Time?.millisecondsSinceEpoch ?? 0;
+        return at.compareTo(bt);
+      });
+    return list;
   }
 
-  /// Create or update a waybill trip
-  Future<WaybillTrip?> saveTrip(WaybillTrip trip) async {
-    final response = await _api.postdata(
-      'Matatu/addwaybilltrip',
-      trip.toJson(),
-    );
-
-    final result =
-        Results<WaybillTrip>.fromJson(response.body, WaybillTrip.fromMap);
-
-    if (result.Code == 0 && result.Contents != null) {
-      return result.Contents!.firstOrNull;
+  /// Local rows for a waybill entry.
+  Future<List<WaybillTrip>> _getLocalTrips(int waybillId) async {
+    try {
+      final db = db_Provider();
+      final rows = await db.getdata(
+        WaybillTrip.table,
+        WaybillTrip.columns,
+        '${WaybillTrip.col_Weign_Bridge_id} = ?',
+        [waybillId],
+      );
+      return rows.map((m) => WaybillTrip.fromMap_db(m)).toList();
+    } catch (_) {
+      return [];
     }
-    return null;
+  }
+
+  /// Save trip locally first (offline-first), then sync in the background.
+  Future<WaybillTrip?> saveTrip(WaybillTrip trip) async {
+    final db = db_Provider();
+
+    trip.sent = false;
+    if (trip.Key == null || trip.Key!.isEmpty) {
+      trip.Key = DateTime.now().millisecondsSinceEpoch.toString();
+    }
+    await db.insert(WaybillTrip.table, trip);
+
+    // Sync to BC in the background — the UI is not blocked.
+    _syncTripSingle(trip);
+
+    return trip;
+  }
+
+  /// True when the key is a locally-generated millisecond placeholder.
+  bool _isTempKey(String? key) {
+    if (key == null || key.length != 13) return false;
+    return int.tryParse(key) != null;
+  }
+
+  /// Background sync for a single trip.
+  Future<void> _syncTripSingle(WaybillTrip trip) async {
+    try {
+      final map = trip.toMap();
+      if (_isTempKey(map['Key'] as String?)) {
+        // Force BC Create for locally-created trips.
+        map['Key'] = null;
+      }
+      final response = await _api.postdata(
+        'addwaybilltrip',
+        _jsonWithoutNulls(map),
+      );
+      final result =
+          Results<WaybillTrip>.fromJson(response.body, WaybillTrip.fromMap);
+      if (result.Code == 0 &&
+          result.Contents != null &&
+          result.Contents!.isNotEmpty) {
+        final serverTrip = result.Contents!.first;
+        final db = db_Provider();
+        final oldKey = trip.Key;
+        if (serverTrip.Key != null &&
+            serverTrip.Key!.isNotEmpty &&
+            serverTrip.Key != oldKey) {
+          if (oldKey != null) {
+            await db.deletedata(
+                WaybillTrip.table, '${WaybillTrip.col_Key} = ?', [oldKey]);
+          }
+          trip.Key = serverTrip.Key;
+        }
+        trip.sent = true;
+        await db.insert(WaybillTrip.table, trip);
+      }
+    } catch (_) {
+      // Will be picked up by syncPendingWaybillTrips
+    }
+  }
+
+  /// Sync all pending (unsent) trips to the server.
+  Future<int> syncPendingWaybillTrips() async {
+    final db = db_Provider();
+    int synced = 0;
+
+    try {
+      final rows = await db.getdata(
+        WaybillTrip.table,
+        WaybillTrip.columns,
+        '${WaybillTrip.col_sent} = 0',
+      );
+      final pending = rows.map((m) => WaybillTrip.fromMap_db(m)).toList();
+
+      for (final t in pending) {
+        try {
+          await _syncTripSingle(t);
+          synced++;
+        } catch (_) {
+          // Skip failed entries; will retry next sync cycle
+        }
+      }
+    } catch (_) {
+      // DB read failed
+    }
+
+    return synced;
   }
 }

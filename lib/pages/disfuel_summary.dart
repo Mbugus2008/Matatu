@@ -632,6 +632,7 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                                 'Fuel: ${NumberFormat('#,##0.0').format(s.Total_Fuel_ltrs ?? 0)} L\n'
                                 'Amount: ${NumberFormat('#,##0.00').format(s.Total_Fuels_Amount ?? 0)}\n'
                                 'Paid: ${NumberFormat('#,##0.00').format(s.Total_Paid ?? 0)}\n'
+                                'Unpaid Fuel: ${NumberFormat('#,##0.00').format((s.Total_Fuels_Amount ?? 0) - (s.Total_Paid ?? 0))}\n'
                                 'Mileage: ${NumberFormat('#,##0').format(s.Total_Mileage ?? 0)}\n'
                                 'Arrears: ${NumberFormat('#,##0.00').format(s.Total_Fuel_Arrears ?? 0)}\n'
                                 'Net Offload: ${NumberFormat('#,##0.00').format(s.Net_Offload ?? 0)}\n'

@@ -151,34 +151,116 @@ class _CrewAssignmentState extends State<CrewAssignment> {
     );
   }
 
-  void _assignCrew() {
+  Future<void> _assignCrew() async {
     final v = widget.vehicle;
     if (v == null) return;
 
     final memberController = Get.find<MemberController>();
 
-    memberController.clearcrew(v.Vehicle_Number.toString());
+    // Resolve the selected member from the typed text. The typeahead only
+    // stores a selection when a suggestion is tapped, so fall back to
+    // matching No / Phone / Name (exact or partial) when typed manually.
+    Member? resolveMember(
+        TextEditingController ctrl, Member? selected, Crew_type type) {
+      final typed = ctrl.text.trim();
+      if (typed.isEmpty) return null;
+      if (selected != null && selected.No == typed) return selected;
 
-    if (memberController.currentdriver.value != null) {
-      memberController.currentdriver.value!.Vehicle = v.Vehicle_Number;
-      memberController.setcrew(
-        v.Vehicle_Number.toString(),
-        memberController.currentdriver.value!.No.toString(),
-        Crew_type.Driver,
-      );
-      v.Driver = memberController.currentdriver.value;
+      final all = memberController.allMembers;
+      final exact = all.firstWhereOrNull((m) =>
+          m.No == typed ||
+          m.Phone_No == typed ||
+          (m.Name != null && m.Name!.toLowerCase() == typed.toLowerCase()));
+      if (exact != null) return exact;
+
+      // Lenient: name contains the typed text, prefer the right crew type.
+      final contains = all
+          .where((m) =>
+              m.Crew_Type == type &&
+              m.Name != null &&
+              m.Name!.toLowerCase().contains(typed.toLowerCase()))
+          .toList();
+      if (contains.length == 1) return contains.first;
+      return null;
     }
 
-    if (memberController.currentcunductor.value != null) {
-      memberController.currentcunductor.value!.Vehicle = v.Vehicle_Number;
-      memberController.setcrew(
-        v.Vehicle_Number.toString(),
-        memberController.currentcunductor.value!.No.toString(),
-        Crew_type.Conductor,
-      );
-      v.Conductor = memberController.currentcunductor.value;
+    final driver = resolveMember(driverController,
+        memberController.currentdriver.value, Crew_type.Driver);
+    final conductor = resolveMember(conductorController,
+        memberController.currentcunductor.value, Crew_type.Conductor);
+
+    // Validate before changing anything.
+    if (driverController.text.trim().isNotEmpty && driver == null) {
+      _showError('Driver not found. Pick a member from the suggestions list.');
+      return;
     }
-    memberController.getcurrentcrew(v.Vehicle_Number.toString());
-    Get.back(result: v);
+    if (conductorController.text.trim().isNotEmpty && conductor == null) {
+      _showError(
+          'Conductor not found. Pick a member from the suggestions list.');
+      return;
+    }
+
+    try {
+      await memberController.clearcrew(v.Vehicle_Number.toString());
+
+      if (driver != null && driver.No != null && driver.No!.isNotEmpty) {
+        driver.Vehicle = v.Vehicle_Number;
+        await memberController.setcrew(
+          v.Vehicle_Number.toString(),
+          driver.No!,
+          Crew_type.Driver,
+        );
+        v.Driver = driver;
+      }
+
+      if (conductor != null &&
+          conductor.No != null &&
+          conductor.No!.isNotEmpty) {
+        conductor.Vehicle = v.Vehicle_Number;
+        await memberController.setcrew(
+          v.Vehicle_Number.toString(),
+          conductor.No!,
+          Crew_type.Conductor,
+        );
+        v.Conductor = conductor;
+      }
+
+      memberController.getcurrentcrew(v.Vehicle_Number.toString());
+    } catch (e) {
+      _showError('Assign failed: $e');
+      return;
+    }
+
+    _closePage(v);
+  }
+
+  /// Closes this page. GetX's Get.back() crashes with a
+  /// LateInitializationError if the snackbar queue holds an unshown snackbar,
+  /// so fall back to a raw navigator pop.
+  void _closePage(Vehicles? v) {
+    if (!mounted) return;
+    try {
+      Get.back(result: v);
+    } catch (_) {
+      if (mounted) Navigator.of(context).pop(v);
+    }
+  }
+
+  void _showError(String message) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Assign Crew'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              if (mounted) Navigator.of(context).pop();
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
   }
 }

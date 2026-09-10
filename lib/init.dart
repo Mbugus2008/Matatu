@@ -75,6 +75,7 @@ Future<void> upload() async {
   sendtransdetails();
   sendtrans();
   WaybillService().syncPendingWaybills();
+  WaybillService().syncPendingWaybillTrips();
 }
 
 Future<void> sendtrans() async {

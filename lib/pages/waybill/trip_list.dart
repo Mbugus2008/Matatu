@@ -1,9 +1,11 @@
 // ignore_for_file: public_member_api_docs
 
 import 'package:flutter/material.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
+import 'package:t_matatu/models/route.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/pages/waybill/trip_form.dart';
 
@@ -259,7 +261,7 @@ class _TripListPageState extends State<TripListPage> {
   void _showStartTripSheet() {
     final wb = _controller.selectedWaybill.value;
     if (wb == null) {
-      Get.snackbar('Waybill', 'Select a waybill entry first');
+      _showInfoDialog('Waybill', 'Select a waybill entry first');
       return;
     }
 
@@ -280,9 +282,25 @@ class _TripListPageState extends State<TripListPage> {
         if (entryNo != null) {
           _controller.fetchTrips(entryNo);
         }
-        Get.snackbar('Start Trip', 'Trip started successfully');
+        _showInfoDialog('Start Trip', 'Trip started successfully');
       }
     });
+  }
+
+  void _showInfoDialog(String title, String message) {
+    Get.dialog(
+      AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
   }
 }
 
@@ -300,6 +318,9 @@ class _StartTripSheet extends StatefulWidget {
 class _StartTripSheetState extends State<_StartTripSheet> {
   static const _primaryGreen = Color(0xFF006B3F);
 
+  final RouteService _routeService = RouteService();
+  List<RouteModel> _routes = [];
+
   final _fromCtrl = TextEditingController();
   final _toCtrl = TextEditingController();
   final _paxCtrl = TextEditingController(text: '1');
@@ -307,6 +328,62 @@ class _StartTripSheetState extends State<_StartTripSheet> {
   final _commentsCtrl = TextEditingController();
   TimeOfDay _departure = TimeOfDay.now();
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoutes();
+  }
+
+  /// Load routes from local DB, syncing from BC when empty.
+  Future<void> _loadRoutes() async {
+    final routes = await _routeService.loadFromLocalDB();
+    if (routes.isEmpty) {
+      await _routeService.syncRoutes();
+      final refreshed = await _routeService.loadFromLocalDB();
+      if (mounted) setState(() => _routes = refreshed);
+    } else {
+      if (mounted) setState(() => _routes = routes);
+    }
+  }
+
+  Widget _buildRouteAutocomplete(TextEditingController ctrl, String label) {
+    return TypeAheadField<RouteModel>(
+      suggestionsCallback: (pattern) {
+        if (pattern.isEmpty) return _routes;
+        final query = pattern.toLowerCase();
+        return _routes
+            .where((r) =>
+                (r.Code ?? '').toLowerCase().contains(query) ||
+                (r.Description ?? '').toLowerCase().contains(query))
+            .toList();
+      },
+      itemBuilder: (context, route) => ListTile(
+        leading: const Icon(Icons.route_outlined, size: 20),
+        title: Text(route.Description ?? route.Code ?? ''),
+        subtitle: route.Code != null
+            ? Text(route.Code!, style: const TextStyle(fontSize: 12))
+            : null,
+        dense: true,
+      ),
+      onSelected: (route) {
+        ctrl.text = route.Description ?? route.Code ?? '';
+      },
+      builder: (context, controller, focusNode) {
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: 'Search route...',
+            prefixIcon: Icon(
+                label == 'From' ? Icons.trip_origin : Icons.location_on),
+            border: const OutlineInputBorder(),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -333,16 +410,16 @@ class _StartTripSheetState extends State<_StartTripSheet> {
   Future<void> _start() async {
     final entryNo = widget.entryNo;
     if (entryNo == null) {
-      Get.snackbar('Start Trip',
+      _showDialog('Start Trip',
           'This waybill is not synced yet. Tap Sync on the waybill page and try again.');
       return;
     }
     if (_fromCtrl.text.trim().isEmpty || _toCtrl.text.trim().isEmpty) {
-      Get.snackbar('Start Trip', 'Enter From and To routes');
+      _showDialog('Start Trip', 'Enter From and To routes');
       return;
     }
     if (_pax <= 0) {
-      Get.snackbar('Start Trip', 'Passengers must be at least 1');
+      _showDialog('Start Trip', 'Passengers must be at least 1');
       return;
     }
 
@@ -375,7 +452,7 @@ class _StartTripSheetState extends State<_StartTripSheet> {
     if (saved != null) {
       Navigator.pop(context, true);
     } else {
-      Get.snackbar('Start Trip', 'Failed to start trip');
+      _showDialog('Start Trip', 'Failed to start trip');
     }
   }
 
@@ -385,6 +462,24 @@ class _StartTripSheetState extends State<_StartTripSheet> {
     } catch (_) {
       return null;
     }
+  }
+
+  void _showDialog(String title, String message) {
+    Get.dialog(
+      AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              if (mounted) Navigator.of(context).pop();
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
   }
 
   @override
@@ -406,23 +501,9 @@ class _StartTripSheetState extends State<_StartTripSheet> {
                   fontWeight: FontWeight.w600,
                   color: _primaryGreen)),
           const SizedBox(height: 12),
-          TextField(
-            controller: _fromCtrl,
-            decoration: const InputDecoration(
-              labelText: 'From',
-              prefixIcon: Icon(Icons.trip_origin),
-              border: OutlineInputBorder(),
-            ),
-          ),
+          _buildRouteAutocomplete(_fromCtrl, 'From'),
           const SizedBox(height: 10),
-          TextField(
-            controller: _toCtrl,
-            decoration: const InputDecoration(
-              labelText: 'To',
-              prefixIcon: Icon(Icons.location_on),
-              border: OutlineInputBorder(),
-            ),
-          ),
+          _buildRouteAutocomplete(_toCtrl, 'To'),
           const SizedBox(height: 10),
           InkWell(
             onTap: _pickDeparture,

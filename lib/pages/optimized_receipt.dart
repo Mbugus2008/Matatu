@@ -121,23 +121,13 @@ class _ReceiptState extends State<Receipt> {
       _vehicleNoController.clear();
       upload();
       Get.back();
-      Get.snackbar(
-        "Success",
-        "Receipt printed successfully",
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
+      _showSnackbarDeferred('Success', 'Receipt printed successfully',
+          backgroundColor: Colors.green, colorText: Colors.white);
     } catch (e) {
       if (Get.isDialogOpen!) Get.back();
 
-      Get.snackbar(
-        "Print Error",
-        e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 3),
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      _showSnackbarDeferred('Print Error', e.toString(),
+          backgroundColor: Colors.red, colorText: Colors.white);
 
       debugPrint("Print error: $e");
     }
@@ -731,6 +721,24 @@ class _ReceiptState extends State<Receipt> {
       duration: const Duration(seconds: 3),
       snackPosition: SnackPosition.BOTTOM,
     );
+  }
+
+  /// Shows a snackbar after navigation settles. Calling Get.snackbar in the
+  /// same frame as Get.back() can leave an unshown snackbar in GetX's queue,
+  /// which later crashes with a LateInitializationError.
+  void _showSnackbarDeferred(String title, String message,
+      {Color? backgroundColor, Color? colorText}) {
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (Get.isSnackbarOpen) return;
+      Get.snackbar(
+        title,
+        message,
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 2),
+        backgroundColor: backgroundColor,
+        colorText: colorText,
+      );
+    });
   }
 
   void _createTransactionLine() {

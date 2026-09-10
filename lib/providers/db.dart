@@ -88,6 +88,7 @@ class db_Provider extends GetxController {
       await db.execute(Reversal.createtable);
       await db.execute(Hires.createtable);
       await db.execute(Waybill.createtable);
+      await db.execute(WaybillTrip.createtable);
       await db.execute(RouteModel.createtable);
       await db.execute(DisFuelSummary.createtable);
     }, onUpgrade: _onUpgrade);
@@ -107,6 +108,7 @@ class db_Provider extends GetxController {
   /// Ensure recent tables exist even for existing databases.
   Future<void> _ensureNewTables(Database db) async {
     await db.execute(Waybill.createtable);
+    await db.execute(WaybillTrip.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
     // Migration: new fields added to disfuel_summary
@@ -124,6 +126,7 @@ class db_Provider extends GetxController {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // Ensure new tables exist on upgrade (safe with IF NOT EXISTS)
     await db.execute(Waybill.createtable);
+    await db.execute(WaybillTrip.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
     // Migration: new fields for disfuel_summary
@@ -192,6 +195,15 @@ class db_Provider extends GetxController {
     } catch (e) {
       e.printError();
     }
+  }
+
+  Future<void> deletedata(String table, String where, List<Object> args) async {
+    if (_database == null || _database!.isOpen == false) {
+      await database;
+    }
+    await _database!.transaction((txn) async {
+      await txn.delete(table, where: where, whereArgs: args);
+    });
   }
   // Future<void> transactionprocess() async {
   //   List<Dbtrans> transaction = List.from(Get.find<db_Provider>().transactions);

@@ -322,7 +322,11 @@ class CustomDrawer extends StatelessWidget {
                 }
                 Get.find<MainController>().agent.value.Password = encrypted;
                 Get.back();
-                Get.snackbar('Success', 'Password changed');
+                Future.delayed(const Duration(milliseconds: 350), () {
+                  if (!Get.isSnackbarOpen) {
+                    Get.snackbar('Success', 'Password changed');
+                  }
+                });
               } catch (e) {
                 Get.snackbar('Error', 'Failed to change password: $e');
               }

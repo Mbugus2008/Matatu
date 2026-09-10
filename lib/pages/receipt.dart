@@ -98,7 +98,11 @@ class _ReceiptState extends State<Receipts> {
       }
     });
 
-    Get.snackbar("Success", "Receipt saved and printed");
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (!Get.isSnackbarOpen) {
+        Get.snackbar("Success", "Receipt saved and printed");
+      }
+    });
   }
 
   void createline() {
