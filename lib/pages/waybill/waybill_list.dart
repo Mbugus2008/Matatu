@@ -8,6 +8,7 @@ import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/pages/setting.dart';
 import 'package:t_matatu/pages/waybill/trip_list.dart';
 import 'package:t_matatu/pages/waybill/waybill_form.dart';
+import 'package:t_matatu/utils/crew_lookup.dart';
 
 class WaybillListPage extends StatefulWidget {
   const WaybillListPage({super.key});
@@ -40,6 +41,9 @@ class _WaybillListPageState extends State<WaybillListPage> {
     _searchCtrl.addListener(() {
       setState(() => _searchQuery = _searchCtrl.text.toUpperCase());
     });
+    // The controller is created at app start, so always reload for the
+    // selected date when the screen opens.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _controller.reload());
   }
 
   @override
@@ -56,6 +60,17 @@ class _WaybillListPageState extends State<WaybillListPage> {
     }).toList();
   }
 
+  Future<void> _navigateToForm({Waybill? wb}) async {
+    // Controller.saveWaybill() already updates the list directly — no need to re-fetch.
+    // A waybill that already exists for the vehicle/day comes back as
+    // 'open-duplicate' so we can jump straight into its trips.
+    final result = await Get.to(() => WaybillFormPage(waybill: wb));
+    if (result == 'open-duplicate') {
+      await Get.to(() => const TripListPage());
+      await _controller.reload();
+    }
+  }
+
   Future<void> _selectDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -65,13 +80,8 @@ class _WaybillListPageState extends State<WaybillListPage> {
     );
     if (picked != null) {
       _controller.selectedDate.value = picked;
-      _controller.loadFromLocalDB();
+      _controller.reload();
     }
-  }
-
-  void _navigateToForm({Waybill? wb}) {
-    // Controller.saveWaybill() already updates the list directly — no need to re-fetch
-    Get.to(() => WaybillFormPage(waybill: wb));
   }
 
   @override
@@ -83,10 +93,13 @@ class _WaybillListPageState extends State<WaybillListPage> {
         foregroundColor: _onPrimary,
         elevation: 0,
         leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+          builder: (ctx) => Navigator.of(ctx).canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  tooltip: 'Back',
+                  onPressed: () => Navigator.of(ctx).pop(),
+                )
+              : const SizedBox.shrink(),
         ),
         title: const Text(
           'CityHoppa Waybill',
@@ -95,6 +108,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today),
+            tooltip: 'Pick date',
             onPressed: _selectDate,
           ),
         ],
@@ -175,15 +189,15 @@ class _WaybillListPageState extends State<WaybillListPage> {
   // ─── Summary Bento Grid ───
   Widget _buildSummaryGrid() {
     return Obx(() {
-      final bridges = _controller.waybills;
-      if (bridges.isEmpty) return const SizedBox.shrink();
+      final trips = _controller.allTrips;
+      if (trips.isEmpty) return const SizedBox.shrink();
 
-      final totalTarget =
-          bridges.fold<double>(0, (s, b) => s + (b.Target_Revenue ?? 0));
-      final totalActual =
-          bridges.fold<double>(0, (s, b) => s + (b.Actual_Revenue ?? 0));
-      final totalShortage =
-          bridges.fold<double>(0, (s, b) => s + (b.Shortage ?? 0));
+      // Target = all trip totals; Actual = received on closed trips.
+      final totalTarget = trips.fold<double>(0, (s, t) => s + (t.Total ?? 0));
+      final totalActual = trips
+          .where((t) => t.To_Time != null)
+          .fold<double>(0, (s, t) => s + _receivedValue(t.Amount_Received));
+      final totalShortage = totalTarget - totalActual;
 
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -201,6 +215,12 @@ class _WaybillListPageState extends State<WaybillListPage> {
         ),
       );
     });
+  }
+
+  /// Numeric value of Amount_Received (stored as text, may contain commas).
+  double _receivedValue(String? value) {
+    if (value == null || value.trim().isEmpty) return 0;
+    return double.tryParse(value.replaceAll(',', '').trim()) ?? 0;
   }
 
   Widget _summaryTile(
@@ -310,9 +330,11 @@ class _WaybillListPageState extends State<WaybillListPage> {
     final borderColor = hasShortage ? _errorRed : _successGreen;
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         _controller.selectedWaybill.value = wb;
-        Get.to(() => const TripListPage());
+        await Get.to(() => const TripListPage());
+        // Trips may have been started/closed — refresh the list totals.
+        await _controller.reload();
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -376,7 +398,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                  '${wb.Driver ?? '-'} / ${wb.Conductor ?? '-'}',
+                                  '${crewLabelFor(wb.Driver)} / ${crewLabelFor(wb.Conductor)}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -487,30 +509,33 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 128,
-            height: 128,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE5E9E3),
-              borderRadius: BorderRadius.circular(64),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 128,
+              height: 128,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5E9E3),
+                borderRadius: BorderRadius.circular(64),
+              ),
+              child: const Icon(Icons.list_alt,
+                  size: 64, color: Color(0xFF6F7A71)),
             ),
-            child:
-                const Icon(Icons.list_alt, size: 64, color: Color(0xFF6F7A71)),
-          ),
-          const SizedBox(height: 16),
-          const Text('No entries yet',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF181D19))),
-          const SizedBox(height: 4),
-          const Text('Start by adding a new vehicle\nweighing entry for today.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Color(0xFF6F7A71))),
-        ],
+            const SizedBox(height: 16),
+            const Text('No entries yet',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF181D19))),
+            const SizedBox(height: 4),
+            const Text('Tap New Entry to create a waybill.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Color(0xFF6F7A71))),
+          ],
+        ),
       ),
     );
   }

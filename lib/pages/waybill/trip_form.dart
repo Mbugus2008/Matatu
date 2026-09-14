@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
 import 'package:t_matatu/models/route.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
@@ -52,7 +53,12 @@ class _TripFormPageState extends State<TripFormPage> {
     _expensesCtrl = TextEditingController(text: t?.Expenses?.toString() ?? '');
     _receivedCtrl = TextEditingController(text: t?.Amount_Received ?? '');
     _commentsCtrl = TextEditingController(text: t?.Comments ?? '');
-    _startedByCtrl = TextEditingController(text: t?.Started_By ?? '');
+    // Started By defaults to the logged-in user for new trips.
+    final agent = Get.find<MainController>().agent.value;
+    final agentLabel = (agent.Name != null && agent.Name!.isNotEmpty)
+        ? agent.Name!
+        : (agent.Agent_Code ?? '');
+    _startedByCtrl = TextEditingController(text: t?.Started_By ?? agentLabel);
 
     _fromTime = t?.From_Time != null
         ? TimeOfDay.fromDateTime(t!.From_Time!)
@@ -300,6 +306,7 @@ class _TripFormPageState extends State<TripFormPage> {
 
   Widget _buildRouteAutocomplete(TextEditingController ctrl, String label) {
     return TypeAheadField<RouteModel>(
+      controller: ctrl,
       suggestionsCallback: (pattern) {
         if (pattern.isEmpty) return _routes;
         final query = pattern.toLowerCase();

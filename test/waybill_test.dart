@@ -10,6 +10,7 @@ import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/pages/waybill/trip_form.dart';
 import 'package:t_matatu/pages/waybill/trip_list.dart';
 import 'package:t_matatu/pages/waybill/waybill_form.dart';
+import 'package:t_matatu/pages/waybill/waybill_history.dart';
 import 'package:t_matatu/pages/waybill/waybill_list.dart';
 import 'package:t_matatu/providers/AppConfig.dart';
 import 'package:t_matatu/providers/logger.dart';
@@ -424,6 +425,49 @@ void main() {
   // WIDGET TESTS
   // ═══════════════════════════════════════════════════════
 
+  group('WaybillHistoryPage — widget', () {
+    setUp(() {
+      _setupGetX();
+      Get.put(WaybillController(), permanent: true);
+    });
+    tearDown(_teardownGetX);
+
+    testWidgets('renders AppBar with title', (tester) async {
+      await tester.pumpWidget(
+        const GetMaterialApp(home: WaybillHistoryPage()),
+      );
+      await tester.pump();
+      expect(find.text('Waybill History'), findsOneWidget);
+    });
+
+    testWidgets('shows entry count and grand totals header', (tester) async {
+      await tester.pumpWidget(
+        const GetMaterialApp(home: WaybillHistoryPage()),
+      );
+      await tester.pump();
+      expect(find.text('0 entries'), findsOneWidget);
+      expect(find.text('TARGET'), findsOneWidget);
+      expect(find.text('ACTUAL'), findsOneWidget);
+      expect(find.text('SHORTAGE'), findsOneWidget);
+    });
+
+    testWidgets('renders search bar', (tester) async {
+      await tester.pumpWidget(
+        const GetMaterialApp(home: WaybillHistoryPage()),
+      );
+      await tester.pump();
+      expect(find.byIcon(Icons.search), findsWidgets);
+    });
+
+    testWidgets('shows empty state when no entries', (tester) async {
+      await tester.pumpWidget(
+        const GetMaterialApp(home: WaybillHistoryPage()),
+      );
+      await tester.pump();
+      expect(find.text('No waybills yet'), findsOneWidget);
+    });
+  });
+
   group('WaybillListPage — widget', () {
     setUp(() {
       _setupGetX();
@@ -511,7 +555,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text('Vehicle'), findsOneWidget);
-      expect(find.text('Crew'), findsOneWidget);
+      expect(find.text('Crew (attached)'), findsOneWidget);
       expect(find.text('Date & Time'), findsOneWidget);
       expect(find.text('Revenue Metrics'), findsOneWidget);
       expect(find.text('Payment Collection'), findsOneWidget);

@@ -59,12 +59,43 @@ class _ReceiptState extends State<Receipt> {
 
   @override
   void dispose() {
+    // Closing the receipt discards anything that was not committed — pending
+    // transaction lines, the typed amount, the vehicle/crew selection and the
+    // type selections — so the next time it opens it starts clean.
+    _discardUnsavedReceipt();
+
     // Clean up focus nodes and controllers
     _amountFocusNode.dispose();
     _vehicleNoController.dispose();
     _commentsController.dispose(); // Added dispose for comments controller
 
     super.dispose();
+  }
+
+  /// Resets the in-progress receipt state. Never throws: the page is being torn
+  /// down, and a controller may already be unavailable.
+  void _discardUnsavedReceipt() {
+    try {
+      final headerController = Get.find<HeaderController>();
+      headerController.amountEditingController.value.text = '';
+      headerController.curTran = tMatatu.Trans().obs;
+      headerController.currTrans.clear();
+      headerController.createheader();
+
+      if (Get.isRegistered<MemberController>()) {
+        Get.find<MemberController>().clearcurrentvehicle();
+      }
+      if (Get.isRegistered<VehiclesController>()) {
+        Get.find<VehiclesController>().Currentvehicle = Vehicles().obs;
+      }
+      if (Get.isRegistered<TransTypeController>()) {
+        final types = Get.find<TransTypeController>();
+        types.tType.value = TranTypes(Code: ' ');
+        types.vehicleTrantypes.clear();
+      }
+    } catch (e) {
+      debugPrint('Receipt close cleanup skipped: $e');
+    }
   }
 
   Future<void> _loadInitialData() async {

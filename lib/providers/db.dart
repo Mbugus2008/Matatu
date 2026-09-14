@@ -31,7 +31,10 @@ class Dbtrans {
 }
 
 class db_Provider extends GetxController {
-  Database? _database;
+  /// Static so every `db_Provider()` built anywhere shares one connection to
+  /// the same SQLite file. Separate connections stall each other when two reads
+  /// run at once; with a single connection sqflite serializes them safely.
+  static Database? _database;
   // Database get database => _db;
   RxList<Dbtrans> transactions = <Dbtrans>[].obs;
   List<AbsDbUpdates> Dbupdate = [
@@ -111,6 +114,9 @@ class db_Provider extends GetxController {
     await db.execute(WaybillTrip.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
+    // Migration: trips can be saved before their waybill is synced.
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Waybill_Key, 'TEXT');
     // Migration: new fields added to disfuel_summary
     await _addColumnIfMissing(
         db, DisFuelSummary.table, 'Total_Collection', 'REAL');
@@ -129,6 +135,9 @@ class db_Provider extends GetxController {
     await db.execute(WaybillTrip.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
+    // Migration: trips can be saved before their waybill is synced.
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Waybill_Key, 'TEXT');
     // Migration: new fields for disfuel_summary
     await _addColumnIfMissing(
         db, DisFuelSummary.table, 'Total_Collection', 'REAL');
@@ -149,14 +158,11 @@ class db_Provider extends GetxController {
     if (_database == null || _database!.isOpen == false) {
       await database;
     }
-    await _database!.transaction((txn) async {
-      txn.insert(table, data.toMap_fortable(),
-          conflictAlgorithm: ConflictAlgorithm.replace);
-    });
+    // Direct insert (no transaction): single statements do not need one, and
+    // wrapping them locks the shared connection against concurrent reads.
+    await _database!.insert(table, data.toMap_fortable(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
 
-    // await Get.find<db_Provider>().database.insert(table, data.toMap_fortable(),
-    //     conflictAlgorithm: ConflictAlgorithm.replace);
-    //close();
     return data;
   }
 
@@ -170,12 +176,12 @@ class db_Provider extends GetxController {
     if (_database == null || _database!.isOpen == false) {
       await database;
     }
-    await _database!.transaction((txn) async {
-      for (T entry in data) {
-        txn.insert(table, entry.toMap_fortable(),
-            conflictAlgorithm: ConflictAlgorithm.replace);
-      }
-    });
+    final batch = _database!.batch();
+    for (T entry in data) {
+      batch.insert(table, entry.toMap_fortable(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
 
     return data;
   }
@@ -185,13 +191,7 @@ class db_Provider extends GetxController {
       if (_database == null || _database!.isOpen == false) {
         await database;
       }
-
-      await _database!.transaction((txn) async {
-        await txn.delete(
-          table,
-          where: '1=1',
-        );
-      });
+      await _database!.delete(table, where: '1=1');
     } catch (e) {
       e.printError();
     }
@@ -201,9 +201,7 @@ class db_Provider extends GetxController {
     if (_database == null || _database!.isOpen == false) {
       await database;
     }
-    await _database!.transaction((txn) async {
-      await txn.delete(table, where: where, whereArgs: args);
-    });
+    await _database!.delete(table, where: where, whereArgs: args);
   }
   // Future<void> transactionprocess() async {
   //   List<Dbtrans> transaction = List.from(Get.find<db_Provider>().transactions);
@@ -244,69 +242,43 @@ class db_Provider extends GetxController {
     if (_database == null || _database!.isOpen == false) {
       await database;
     }
-    await _database!.transaction((txn) async {
-      try {
-        await txn.update(table, updates,
-            where: w,
-            whereArgs: args,
-            conflictAlgorithm: ConflictAlgorithm.replace);
-      } catch (e) {
-        // Handle exceptions and rollback the transaction if an error occurs
-        throw Exception('Error fetching data: $e');
-      }
-    });
-
-    // final List<Map<String, dynamic>> maps =
-    //     await Get.find<db_Provider>().database.query(table, columns: columns);
-    // return maps;
+    try {
+      await _database!.update(table, updates,
+          where: w,
+          whereArgs: args,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (e) {
+      throw Exception('Error updating data: $e');
+    }
   }
 
   Future<List<Map<String, dynamic>>> getdata(
       String table, List<String>? columns,
       [String? where, List<Object>? args]) async {
-    List<Map<String, dynamic>> data = [];
-
     if (_database == null || _database!.isOpen == false) {
       await database;
     }
-    //_showErrorSnackbar('Open Db');
-    await _database!.transaction((txn) async {
-      try {
-        if (where == null) {
-          data = await txn.query(table, columns: columns);
-        } else {
-          data = await txn.query(table,
-              columns: columns, where: where, whereArgs: args);
-        }
-        //_showErrorSnackbar('Opened Db');
-      } catch (e) {
-        // Handle exceptions and rollback the transaction if an error occurs
-        throw Exception('Error fetching data: $e');
+    // Direct query (no transaction): see insert().
+    try {
+      if (where == null) {
+        return await _database!.query(table, columns: columns);
       }
-    });
-    return data;
-    // final List<Map<String, dynamic>> maps =
-    //     await Get.find<db_Provider>().database.query(table, columns: columns);
-    // return maps;
+      return await _database!
+          .query(table, columns: columns, where: where, whereArgs: args);
+    } catch (e) {
+      throw Exception('Error fetching data: $e');
+    }
   }
 
   Future<List<Map<String, dynamic>>> getrawdata(String sql) async {
-    List<Map<String, dynamic>> data = [];
     if (_database == null || _database!.isOpen == false) {
       await database;
     }
-    await _database!.transaction((txn) async {
-      try {
-        data = await txn.rawQuery(sql);
-      } catch (e) {
-        // Handle exceptions and rollback the transaction if an error occurs
-        throw Exception('Error fetching data: $e');
-      }
-    });
-    return data;
-    // final List<Map<String, dynamic>> maps =
-    //     await Get.find<db_Provider>().database.query(table, columns: columns);
-    // return maps;
+    try {
+      return await _database!.rawQuery(sql);
+    } catch (e) {
+      throw Exception('Error fetching data: $e');
+    }
   }
 
   Future<List<Map<String, dynamic>>> getalltrans(

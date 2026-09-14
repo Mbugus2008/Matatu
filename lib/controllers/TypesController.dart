@@ -23,64 +23,59 @@ class TransTypeController extends GetxController {
   }
 
   void distribute(double amount) {
-    Get.find<TransTypeController>()
-        .vehicleTrantypes
+    final controller = Get.find<TransTypeController>();
+    final types = controller.vehicleTrantypes
         .where((p0) => p0.Name != null)
-        .forEach((element) {
+        .toList();
+
+    // Start from a clean slate.
+    for (final element in types) {
       element.Amountedited = 0;
       element.Checked = false;
-    });
-
-    Get.find<TransTypeController>()
-        .vehicleTrantypes
-        .where((p0) => p0.Name != null)
-        .forEach((element) {
-      double bal = element.VehicleAmount! - element.Amounttoday!;
-      if ((bal > 0) && (amount > 0)) {
-        if (amount > bal) {
-          element.Amountedited = bal;
-          element.eAmount.text = '${element.Amountedited}';
-          element.Checked = true;
-        }
-        if (amount < bal) {
-          element.Amountedited = amount;
-          element.eAmount.text = '${element.Amountedited}';
-          element.Checked = true;
-        }
-      }
-      amount -= element.Amountedited!;
-      if (amount <= 0) return;
-    });
-    if (amount > 0) {
-      Get.find<TransTypeController>()
-          .vehicleTrantypes
-          .where((p0) => p0.Code == "OFFLOAD")
-          .forEach((element) {
-        element.Amountedited = amount;
-        element.eAmount.text = '${element.Amountedited}';
-        element.Checked = true;
-      });
+      element.eAmount.text = '0.00';
     }
+
+    // Fill in the same order the screen shows: biggest expected first.
+    // "== balance" must allocate too, otherwise the remainder rolls past a
+    // type that matches exactly.
+    final ordered = [...types]..sort(compareByExpectedDesc);
+    var left = amount;
+    for (final element in ordered) {
+      if (left <= 0) break;
+      final bal = (element.VehicleAmount ?? 0) - (element.Amounttoday ?? 0);
+      if (bal <= 0) continue;
+
+      final allocate = left >= bal ? bal : left;
+      element.Amountedited = allocate;
+      element.eAmount.text = allocate.toStringAsFixed(2);
+      element.Checked = true;
+      left -= allocate;
+    }
+
+    // Whatever is left over goes to OFFLOAD — add to any amount it already got
+    // from the loop, and only to the first matching row.
+    if (left > 0) {
+      final offload =
+          types.firstWhereOrNull((p0) => p0.Code == 'OFFLOAD');
+      if (offload != null) {
+        offload.Amountedited = (offload.Amountedited ?? 0) + left;
+        offload.eAmount.text = offload.Amountedited!.toStringAsFixed(2);
+        offload.Checked = true;
+      }
+    }
+
     update();
   }
 
   double? get_selected() {
-    double dd = 0;
-    List<TranTypes> tp = Get.find<TransTypeController>()
+    final tp = Get.find<TransTypeController>()
         .vehicleTrantypes
         .where((p0) => p0.Checked == true && p0.Code != " ")
         .toList();
-    if (tp.isNotEmpty) {
-      dd = tp.fold<double>(
-          0.0,
-          (double currentSum, TranTypes item) =>
-              currentSum +
-              num.tryParse(item.Amountedited == null
-                  ? ""
-                  : item.Amountedited.toString())!);
-    }
-    // update();
-    return dd;
+    if (tp.isEmpty) return 0;
+    // Guarded parse: legacy rows can hold empty/garbage amounts.
+    return tp.fold<double>(
+        0.0, (sum, item) => sum + (item.Amountedited ?? 0));
   }
 
   Future<void> initialize() async {
@@ -93,7 +88,6 @@ class TransTypeController extends GetxController {
         });
         Get.find<TransTypeController>().alltrantypes.clear();
 
-        print(tt.length);
         Get.find<TransTypeController>().alltrantypes.value = tt.toList();
 
         Get.find<TransTypeController>()
@@ -127,6 +121,33 @@ class TransTypeController extends GetxController {
             : true;
 
     update();
+  }
+
+  /// Toggles one specific type by identity. Safe for lists that are filtered or
+  /// re-ordered for display, unlike [toggle] which takes an index into
+  /// [vehicleTrantypes] (crew savings produce two rows with the same code, so an
+  /// index/code lookup would toggle the wrong one).
+  void toggleType(TranTypes type) {
+    final item = Get.find<TransTypeController>()
+        .vehicleTrantypes
+        .firstWhereOrNull((t) => identical(t, type));
+    if (item == null) return;
+
+    if (item.Checked == true) {
+      Get.find<HeaderController>()
+          .currTrans
+          .removeWhere((element) => element.Type == item.Code);
+    }
+    item.Checked = item.Checked != true;
+    update();
+  }
+
+  /// Order used by the distribute screen and by the allocation itself:
+  /// biggest expected amount first, ties keep the configured order.
+  static int compareByExpectedDesc(TranTypes a, TranTypes b) {
+    final cmp = (b.VehicleAmount ?? 0).compareTo(a.VehicleAmount ?? 0);
+    if (cmp != 0) return cmp;
+    return (a.Order ?? 0).compareTo(b.Order ?? 0);
   }
 
   // get alltrantypes => _alltrantypes;

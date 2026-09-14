@@ -9,6 +9,7 @@ import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
+import 'package:t_matatu/utils/crew_lookup.dart';
 
 class WaybillFormPage extends StatefulWidget {
   final Waybill? waybill;
@@ -35,6 +36,11 @@ class _WaybillFormPageState extends State<WaybillFormPage> {
   late TimeOfDay _finishTime;
   bool _isSaving = false;
 
+  /// Crew numbers taken from the crew attached to the vehicle. The user never
+  /// types crew — the waybill uses whoever is attached.
+  String? _driverNo;
+  String? _conductorNo;
+
   // Holds the TypeAhead's internal controller so we can read/set text
   TextEditingController? _typeAheadCtrl;
 
@@ -57,6 +63,10 @@ class _WaybillFormPageState extends State<WaybillFormPage> {
   bool get _cashMatchesActual =>
       (double.tryParse(_cashCtrl.text) ?? 0) == _actual && _actual > 0;
 
+  bool get _crewAttached =>
+      _driverCtrl.text.trim().isNotEmpty &&
+      _conductorCtrl.text.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -65,8 +75,9 @@ class _WaybillFormPageState extends State<WaybillFormPage> {
     final wb = widget.waybill;
     _fleetCtrl = TextEditingController(text: wb?.Fleet_No ?? '');
     _vehicleCtrl = TextEditingController(text: wb?.Vehicle_No ?? '');
-    _driverCtrl = TextEditingController(text: wb?.Driver ?? '');
-    _conductorCtrl = TextEditingController(text: wb?.Conductor ?? '');
+    _driverCtrl = TextEditingController(text: crewNameFor(wb?.Driver) ?? '');
+    _conductorCtrl =
+        TextEditingController(text: crewNameFor(wb?.Conductor) ?? '');
     _targetCtrl =
         TextEditingController(text: wb?.Target_Revenue?.toString() ?? '');
     _actualCtrl =
@@ -84,6 +95,16 @@ class _WaybillFormPageState extends State<WaybillFormPage> {
     _targetCtrl.addListener(() => setState(() {}));
     _actualCtrl.addListener(() => setState(() {}));
     _cashCtrl.addListener(() => setState(() {}));
+
+    // Pick up the crew attached to the vehicle (existing entry or new one).
+    _driverNo = wb?.Driver;
+    _conductorNo = wb?.Conductor;
+    final presetVehicle = _vehicleCtrl.text.trim();
+    if (presetVehicle.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadCrewForVehicle(presetVehicle);
+      });
+    }
   }
 
   @override
@@ -108,18 +129,29 @@ class _WaybillFormPageState extends State<WaybillFormPage> {
     });
   }
 
-  /// Load driver and conductor using MemberController (same as receipts page).
+  /// Loads the crew attached to the vehicle. Crew are never typed by the user —
+  /// the waybill picks up whoever is attached to the vehicle in the app.
   void _loadCrewForVehicle(String? vehicleNo) {
     if (vehicleNo == null || vehicleNo.isEmpty) return;
+    if (!Get.isRegistered<MemberController>()) return;
     final memberCtrl = Get.find<MemberController>();
     memberCtrl.getcurrentcrew(vehicleNo);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          _driverCtrl.text = memberCtrl.currentdriver.value?.Name ?? '';
-          _conductorCtrl.text = memberCtrl.currentcunductor.value?.Name ?? '';
-        });
-      }
+      if (!mounted) return;
+      final driver = memberCtrl.currentdriver.value;
+      final conductor = memberCtrl.currentcunductor.value;
+      setState(() {
+        // Only overwrite when the vehicle actually has someone attached, so a
+        // stored entry keeps its crew if the attachment is missing.
+        if (driver?.No != null && driver!.No!.trim().isNotEmpty) {
+          _driverNo = driver.No;
+          _driverCtrl.text = driver.Name ?? '';
+        }
+        if (conductor?.No != null && conductor!.No!.trim().isNotEmpty) {
+          _conductorNo = conductor.No;
+          _conductorCtrl.text = conductor.Name ?? '';
+        }
+      });
     });
   }
 
@@ -157,12 +189,60 @@ class _WaybillFormPageState extends State<WaybillFormPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
 
+    final vehicleNo = _vehicleCtrl.text.trim();
+    final fleetNo = _fleetCtrl.text.trim();
+
+    // BC keeps the crew as its crew number (the field is only 10 chars wide,
+    // so names are rejected). Crew always come from the vehicle's attachment.
+    final driverText = _driverCtrl.text.trim();
+    final conductorText = _conductorCtrl.text.trim();
+
+    if (driverText.isEmpty || conductorText.isEmpty) {
+      if (mounted) setState(() => _isSaving = false);
+      await _showMessageDialog(
+          'No crew attached',
+          'Attach a driver and conductor to $vehicleNo on the Crew screen '
+              'first — the waybill picks up whoever is attached.');
+      return;
+    }
+
+    final driverNo = _driverNo ??
+        await _controller.resolveCrewNo(driverText, vehicle: vehicleNo);
+    final conductorNo = _conductorNo ??
+        await _controller.resolveCrewNo(conductorText, vehicle: vehicleNo);
+
+    if (driverNo == null) {
+      if (mounted) setState(() => _isSaving = false);
+      await _showMessageDialog('Driver not found',
+          '"$driverText" is not in the crew list. Re-attach the crew for $vehicleNo.');
+      return;
+    }
+    if (conductorNo == null) {
+      if (mounted) setState(() => _isSaving = false);
+      await _showMessageDialog('Conductor not found',
+          '"$conductorText" is not in the crew list. Re-attach the crew for $vehicleNo.');
+      return;
+    }
+
+    // Business rule: one waybill per vehicle per day.
+    final duplicate = await _controller.findEntryForVehicle(
+      vehicleNo: vehicleNo,
+      fleetNo: fleetNo,
+      date: _selectedDate,
+      excludeKey: widget.waybill?.Key,
+    );
+    if (duplicate != null) {
+      if (mounted) setState(() => _isSaving = false);
+      await _showDuplicateDialog(duplicate);
+      return;
+    }
+
     final waybill = Waybill(
       Key: widget.waybill?.Key,
-      Vehicle_No: _vehicleCtrl.text.trim(),
-      Fleet_No: _fleetCtrl.text.trim(),
-      Driver: _driverCtrl.text.trim(),
-      Conductor: _conductorCtrl.text.trim(),
+      Vehicle_No: vehicleNo,
+      Fleet_No: fleetNo,
+      Driver: driverNo,
+      Conductor: conductorNo,
       Date: _selectedDate,
       Start_Time: _combineDateAndTime(_selectedDate, _startTime),
       Finish_Time: _combineDateAndTime(_selectedDate, _finishTime),
@@ -176,6 +256,58 @@ class _WaybillFormPageState extends State<WaybillFormPage> {
     if (mounted) {
       setState(() => _isSaving = false);
       if (saved != null) Get.back(result: true);
+    }
+  }
+
+  /// Small informational dialog (crew not resolvable, etc.).
+  Future<void> _showMessageDialog(String title, String message) async {
+    await Get.dialog(
+      AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+  }
+
+  /// Shown when the vehicle already has an entry for the chosen day.
+  Future<void> _showDuplicateDialog(Waybill existing) async {
+    final day = DateFormat('EEE, dd MMM yyyy').format(_selectedDate);
+    final label = [existing.Vehicle_No, existing.Fleet_No]
+        .where((v) => v != null && v.trim().isNotEmpty)
+        .join(' / ');
+
+    final action = await Get.dialog<String>(
+      AlertDialog(
+        title: const Text('Waybill already exists'),
+        content: Text('$label already has a waybill for $day.\n\n'
+            'A vehicle can only have one waybill per day. '
+            'Add the extra runs as trips on that entry.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('cancel'),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop('open'),
+            child: const Text('Open entry'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+
+    if (action == 'open' && mounted) {
+      // The list screen opens the trips page for the entry we hand back, so
+      // this form does not need to import (and cycle with) TripListPage.
+      _controller.selectedWaybill.value = existing;
+      Navigator.of(context).pop('open-duplicate');
     }
   }
 
@@ -240,19 +372,52 @@ class _WaybillFormPageState extends State<WaybillFormPage> {
               ),
               const SizedBox(height: 16),
 
-              // ── Section 2: Crew ──
+              // ── Section 2: Crew (attached to the vehicle) ──
               _buildSectionCard(
                 icon: Icons.group,
-                title: 'Crew',
-                child: Row(
+                title: 'Crew (attached)',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                        child: _buildTextField(_driverCtrl, 'Driver',
-                            hint: 'Driver Name')),
-                    const SizedBox(width: 12),
-                    Expanded(
-                        child: _buildTextField(_conductorCtrl, 'Conductor',
-                            hint: 'Conductor Name')),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(_driverCtrl, 'Driver',
+                              enabled: false,
+                              fillColor:
+                                  _surfaceVariant.withValues(alpha: 0.3)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildTextField(_conductorCtrl, 'Conductor',
+                              enabled: false,
+                              fillColor:
+                                  _surfaceVariant.withValues(alpha: 0.3)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                            _crewAttached
+                                ? Icons.check_circle_outline
+                                : Icons.info_outline,
+                            size: 16,
+                            color: _crewAttached ? _actualGreen : _outline),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            _crewAttached
+                                ? 'Taken from the crew attached to this vehicle.'
+                                : 'No crew attached to this vehicle — attach crew first.',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: _crewAttached ? _outline : _shortageRed),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

@@ -19,6 +19,7 @@ import 'package:t_matatu/pages/disfuel_summary.dart';
 import 'package:t_matatu/pages/hires/hires_list.dart';
 import 'package:t_matatu/pages/pageloader.dart';
 import 'package:t_matatu/pages/vehicles/vehdetails.dart';
+import 'package:t_matatu/pages/waybill/waybill_history.dart';
 import 'package:t_matatu/pages/waybill/waybill_list.dart';
 import 'package:t_matatu/providers/client.dart';
 
@@ -967,7 +968,9 @@ class Cityhoppa extends BaseClients {
       ListTile(
         leading: const Icon(Icons.summarize),
         onTap: () {
-          Get.to(() => PageLoader(page: HiresListScreen(), title: "Hires"));
+          // HiresListScreen has its own AppBar — wrapping it in PageLoader
+          // would show two app bars.
+          Get.to(() => HiresListScreen());
         },
         title: const Text("Hires"),
       ),
@@ -976,8 +979,17 @@ class Cityhoppa extends BaseClients {
             .scale), //Todo: Change the icon to a more appropriate one for Way Bill if available
         title: Text('Waybill'),
         onTap: () {
-          Get.to(() =>
-              const PageLoader(page: WaybillListPage(), title: "Waybill"));
+          // WaybillListPage has its own AppBar — wrap in PageLoader would
+          // show two app bars.
+          Get.to(() => const WaybillListPage());
+        },
+      ),
+      ListTile(
+        leading: const Icon(Icons.history),
+        title: Text('Waybill History'),
+        onTap: () {
+          // Self-contained screen with its own AppBar.
+          Get.to(() => const WaybillHistoryPage());
         },
       ),
       ListTile(
