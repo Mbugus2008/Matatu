@@ -34,6 +34,12 @@ Future<void> main() async {
         // apiBaseUrl: 'http://trimline.co.ke:4005/City/api/',
         // apiBaseUrl: 'http://trimline.co.ke:4010/api/Matatu/',
         apiBaseUrl: 'http://services.trimline.co.ke:8092/api/Matatu/',
+        // Folder holding update.json and the published APKs (see
+        // build_and_deploy.ps1). UpdateController appends 'update.json'.
+        // Update feed: static IIS site on main.trimline.co.ke (folder
+        // C:\Services\Matatu\Updates, Let's Encrypt cert, port 4016 = https,
+        // 4015 = plain http fallback). UpdateController appends 'update.json'.
+        updateUrl: 'https://main.trimline.co.ke:4016/',
         clientId: "CITYHOPPER",
         clientName: "CityHoppa",
         Client: client,

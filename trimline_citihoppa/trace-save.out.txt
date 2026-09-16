@@ -1,0 +1,94 @@
+===== API calls mentioning depot (last 30) =====
+  matches: 21
+  [76] [GETX] Instance "DepotController" has been created
+  [77] [GETX] Instance "DepotController" has been initialized
+  [482] I/flutter ( 8443): results: [BODY Body Works 8 MEMBER 0.0 0.0 0.0, CARWASH Carwash 11 MEMBER 0.0 0.0 0.0, COLLECTIONS Collections 20 MEMBER 0.0 0.0 0.0, CREWLOAN Crew Loan 8 CREW 0.0 0.0 0.0, DEPOT PARKING Depot Parking 14 MEMBER 
+  [2239] Obx Obx:file:///D:/Projects2/Matatu/lib/pages/Depot.dart:86:24
+  [2361] I/flutter ( 8443): [38;5;12mâ", dY'¡ http://services.trimline.co.ke:8092/api/Matatu/getdepotdata[0m
+  [2443] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: getdepotdata, status code: 200[0m
+  [2446] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: getdepotdatabody: {"Code":0,"Desc":"Successful","Contents":[{"Key":"40;asMAAAJ7/0sARABUADQAOQAzAFAAAAAALh+XFg==8;326351000;","Vehicle":"KDT493P","Fleet":"728","On_route":false,"On_routeSp
+  [2460] Obx Obx:file:///D:/Projects2/Matatu/lib/pages/Depot.dart:86:24
+  [2619] I/flutter ( 8443): [38;5;12mâ", dY'¡ http://services.trimline.co.ke:8092/api/Matatu/getdepotdata[0m
+  [2629] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: getdepotdata, status code: 200[0m
+  [2632] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: getdepotdatabody: {"Code":0,"Desc":"Successful","Contents":[{"Key":"40;asMAAAJ7/0sARABUADQAOQAzAFAAAAAALh+XFg==8;326351000;","Vehicle":"KDT493P","Fleet":"728","On_route":false,"On_routeSp
+  [3115] I/flutter ( 8443): [38;5;12mâ", dY'¡ http://services.trimline.co.ke:8092/api/Matatu/setdepotdatabatch[0m
+  [3124] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: setdepotdatabatch, status code: 200[0m
+  [3127] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: setdepotdatabatchbody: {"Code":0,"Desc":"Successful","Contents":[{"Key":"40;asMAAAJ7/0sAQwBBADgANQAyAFYAAAAALh+XFg==8;326353170;","Vehicle":"KCA852V","Fleet":"366","On_route":false,"On_ro
+  [3146] E/flutter ( 8443): #9      _DepotState.update (package:t_matatu/pages/Depot.dart:818:11)
+  [3549] I/flutter ( 8443): [38;5;12mâ", dY'¡ http://services.trimline.co.ke:8092/api/Matatu/getdepotdata[0m
+  [3568] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: getdepotdata, status code: 200[0m
+  [3571] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: getdepotdatabody: {"Code":0,"Desc":"Successful","Contents":[{"Key":"40;asMAAAJ7/0sARABUADQAOQAzAFAAAAAALgeXFg==8;321475700;","Vehicle":"KDT493P","Fleet":"728","On_route":false,"On_routeSp
+  [3615] I/flutter ( 8443): [38;5;12mâ", dY'¡ http://services.trimline.co.ke:8092/api/Matatu/getdepotdata[0m
+  [3624] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: getdepotdata, status code: 200[0m
+  [3627] I/flutter ( 8443): [38;5;12mâ", dY'¡ url: getdepotdatabody: {"Code":0,"Desc":"Successful","Contents":[{"Key":"40;asMAAAJ7/0sARABUADQAOQAzAFAAAAAALgeXFg==8;321475700;","Vehicle":"KDT493P","Fleet":"728","On_route":false,"On_routeSp
+
+===== 60 lines before the 'No Overlay' exception (line 3132) =====
+  D/ViewRootImplStubImpl( 8443): onAnimationEnd,canceled: false
+  D/ViewRootImplStubImpl( 8443): supportImeDynamicVIP: false
+  D/InsetsController( 8443): onAnimationFinish showOnFinish: true
+  D/ViewRootImplStubImpl( 8443): notifyImeAnimEvent: isForShow = true, isAnimStart = false, has context = true, has AutofillManager = true, isMiuiAnim = true
+  D/InsetsAnimationCtrlImpl( 8443): notifyFinished shown: true, currentAlpha: 1.000000, currentInsets: Insets{left=0, top=0, right=0, bottom=871}
+  D/InsetsController( 8443): cancelAnimation of types:8 animType:0 host:trimline.citihoppa/trimline.citihoppa.MainActivity invokeCallback=false
+  D/InsetsController( 8443): notifyFinished. shown: true runner=android.view.InsetsAnimationControlImpl@76180a3
+  I/ImeTracker( 8443): trimline.citihoppa:d4d1849e: onShown
+  D/InsetsAnimationCtrlImpl( 8443): Animation finished abruptly.
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  D/FlutterJNI( 8443): Sending viewport metrics to the engine.
+  D/FlutterJNI( 8443): Sending viewport metrics to the engine.
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=216837325, downTime=216837325, phoneEventTime=1789454438886 }
+  D/VRI[MainActivity]( 8443): getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+  I/PowerHalMgrImpl( 8443): hdl:121073, pid:8443
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=216837623, downTime=216837325, phoneEventTime=1789454439184 } m
+  I/ScrollIdentify( 8443): on fling
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=216837931, downTime=216837931, phoneEventTime=1789454439492 }
+  D/VRI[MainActivity]( 8443): getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+  I/PowerHalMgrImpl( 8443): hdl:121080, pid:8443
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=216838459, downTime=216837931, phoneEventTime=1789454440019 } m
+  I/ScrollIdentify( 8443): on fling
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=216838691, downTime=216838691, phoneEventTime=1789454440251 }
+  D/VRI[MainActivity]( 8443): getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=216838735, downTime=216838691, phoneEventTime=1789454440296 } m
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=216839283, downTime=216839283, phoneEventTime=1789454440844 }
+  D/VRI[MainActivity]( 8443): getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+  I/PowerHalMgrImpl( 8443): hdl:121089, pid:8443
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=216839477, downTime=216839283, phoneEventTime=1789454441038 } m
+  I/ScrollIdentify( 8443): on fling
+  I/PowerHalMgrImpl( 8443): hdl:121093, pid:8443
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=216840570, downTime=216840570, phoneEventTime=1789454442130 }
+  D/VRI[MainActivity]( 8443): getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+  I/PowerHalMgrImpl( 8443): hdl:121097, pid:8443
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=216840784, downTime=216840570, phoneEventTime=1789454442345 } m
+  I/ScrollIdentify( 8443): on fling
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=216841496, downTime=216841496, phoneEventTime=1789454443057 }
+  D/VRI[MainActivity]( 8443): getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+  I/MIUIInput( 8443): [MotionEvent] ViewRootImpl windowName 'trimline.citihoppa/trimline.citihoppa.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=216841566, downTime=216841496, phoneEventTime=1789454443126 } m
+  I/flutter ( 8443): [DISPATCH] batch sending 1 records
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ http://services.trimline.co.ke:8092/api/Matatu/setdepotdatabatch[0m
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ out: [{"Key":"40;asMAAAJ7/0sAQwBBADgANQAyAFYAAAAALh+XFg==8;326350690;","Vehicle":"KCA852V","Fleet":"366","On_route":false,"From":null,"Nro_Defects":"CLUTCH","Descrition":null,"Date":"09/15/202
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ {Content-Type: application/json, X-Client-Identifier: CITYHOPPER, X-Api-Key: gbsQcaCncEKpIIOn45tnpsynuAwW+sXvNhFl2ynk9+s=}[0m
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ url: setdepotdatabatch, status code: 200[0m
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ url: setdepotdatabatchbody: {"Code":0,"Desc":"Successful","Contents":[{"Key":"40;asMAAAJ7/0sAQwBBADgANQAyAFYAAAAALh+XFg==8;326353170;","Vehicle":"KCA852V","Fleet":"366","On_route":false,"On_ro
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?
+  I/flutter ( 8443): source: {"Code":0,"Desc":"Successful","Contents":[{"Key":"40;asMAAAJ7/0sAQwBBADgANQAyAFYAAAAALh+XFg==8;326353170;","Vehicle":"KCA852V","Fleet":"366","On_route":false,"On_routeSpecified":true,"From":"01/01/0001 0
+  I/flutter ( 8443): map: {Code: 0, Desc: Successful, Contents: [{Key: 40;asMAAAJ7/0sAQwBBADgANQAyAFYAAAAALh+XFg==8;326353170;, Vehicle: KCA852V, Fleet: 366, On_route: false, On_routeSpecified: true, From: 01/01/0001 00:00:00, FromS
+  I/flutter ( 8443): results: [KCA852V 366 HANNINGTONE MGHANA  PETER MAINA WANG'ANG'A]
+  E/flutter ( 8443): [ERROR:flutter/runtime/dart_vm_initializer.cc(40)] Unhandled Exception: No Overlay widget found.
+
+===== any 'setdepot' / 'Saved' / 'Nothing to save' lines =====
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ http://services.trimline.co.ke:8092/api/Matatu/setdepotdatabatch[0m
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ url: setdepotdatabatch, status code: 200[0m
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ url: setdepotdatabatchbody: {"Code":0,"Desc":"Successful","Contents":[{"Key":"40;asMAAAJ7/0sAQwBBADgANQAyAFYAAAAALh+XFg==8;326353170;","Vehicle":"KCA852V","Fleet":"366","On_route":false,"On_routeSpecified":true,"
+DONE
+

@@ -780,9 +780,12 @@ class _ReceiptState extends State<Receipt> {
     currentTran.OTTN = currentHeader.Receipt_No;
     currentTran.Account_No = currentHeader.Account;
 
-    if (currentTran.Type == "SAVINGSCREW" &&
+    if (currentTran.Type == TranTypes.savingsCrewCode &&
         (currentHeader.Crew != null && currentHeader.Crew!.isNotEmpty)) {
       currentTran.Account_No = currentHeader.Crew;
+    } else if (currentTran.Type == TranTypes.savingsCrew2Code &&
+        (currentHeader.Crew2 != null && currentHeader.Crew2!.isNotEmpty)) {
+      currentTran.Account_No = currentHeader.Crew2;
     }
     currentTran.Messages = _commentsController.value.text;
     currentTran.Loan_No = currentHeader.Vehicle;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/models/Transaction.dart' as tMatatu;
+import 'package:t_matatu/models/trantypes.dart';
 
 class TransactionListItem extends StatelessWidget {
   final tMatatu.Trans transaction;
@@ -25,7 +26,7 @@ class TransactionListItem extends StatelessWidget {
           onPressed: onDelete,
         ),
         title: Text(
-          transaction.Type == "SAVINGSCREW" 
+          TranTypes.isCrewSavings(transaction.Type)
               ? '${transaction.Description}(${transaction.Account_No})'
               : '${transaction.Description}',
           style: const TextStyle(fontSize: 14),

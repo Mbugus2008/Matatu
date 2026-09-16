@@ -7,6 +7,7 @@ import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/models/Header.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/Utils/util.dart';
+import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/providers/colors.dart';
 import 'package:t_matatu/reports/controller.dart';
 
@@ -381,7 +382,7 @@ class receiptReport extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        t[i].Type == "SAVINGSCREW"
+                        TranTypes.isCrewSavings(t[i].Type)
                             ? Text('${t[i].Description}(${t[i].Account_No})',
                                 style: const TextStyle(fontSize: 12))
                             : Text(t[i].Description.toString(),

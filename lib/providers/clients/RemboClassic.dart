@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/init.dart';
 import 'package:t_matatu/models/Header.dart';
+import 'package:t_matatu/pages/expenses/vehicle_expenses_screen.dart';
 
 import 'package:t_matatu/providers/client.dart';
 
@@ -81,6 +82,21 @@ class RemboClassic extends    BaseClients {
     bytes = await getHeader() + await getTicket(header);
 
     return Future.value(bytes);
+  }
+
+  @override
+  List<Widget>? clientMenu() {
+    return [
+      ListTile(
+        leading: const Icon(Icons.receipt_long),
+        title: const Text('Vehicle Expenses'),
+        onTap: () {
+          // The screen brings its own AppBar, so it is not wrapped in a
+          // PageLoader - that would stack two app bars.
+          Get.to(() => const VehicleExpensesScreen());
+        },
+      ),
+    ];
   }
 
  

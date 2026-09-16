@@ -11,6 +11,7 @@ import 'package:t_matatu/models/Tamounts.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/Utils/util.dart';
 import 'package:t_matatu/models/summary/Tsummary.dart';
+import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/pages/Depot.dart';
@@ -119,8 +120,7 @@ class Cityhoppa extends BaseClients {
                     backgroundColor: Colors.orange,
                     onPressed: () {
                       Get.find<ReportController>().selectedDate?.value = null;
-                      Get.find<DepotController>().depottrans.clear();
-                      Get.find<DepotController>().depottrans1.clear();
+                      Get.find<DepotController>().clearAll();
                       Get.to(() => const FuelScreen());
                     },
                     child: const Icon(Icons.local_gas_station,
@@ -442,10 +442,11 @@ class Cityhoppa extends BaseClients {
   }
 
   Receipttype gettype(List<tmatatu.Trans>? t) {
-    tmatatu.Trans? crew = t?.firstWhereOrNull((element) =>
-        element.Type == "SAVINGSCREW" || element.Type == "SAVINGS");
-    tmatatu.Trans? member = t?.firstWhereOrNull((element) =>
-        element.Type != "SAVINGSCREW" && element.Type != "SAVINGS");
+    bool isCrew(tmatatu.Trans e) =>
+        TranTypes.isCrewSavings(e.Type) || e.Type == "SAVINGS";
+
+    tmatatu.Trans? crew = t?.firstWhereOrNull(isCrew);
+    tmatatu.Trans? member = t?.firstWhereOrNull((element) => !isCrew(element));
     if (crew != null && member != null) return Receipttype.Both;
     if (crew != null) return Receipttype.Crew;
     return Receipttype.Member;
@@ -466,7 +467,9 @@ class Cityhoppa extends BaseClients {
         clientName_line2 = "Co-operative Society Ltd";
         for (var element in header.transtions!) {
           Header h = header.copyWith();
-          if (element.Type == "SAVINGSCREW") h.Account = element.Account_No;
+          if (TranTypes.isCrewSavings(element.Type)) {
+            h.Account = element.Account_No;
+          }
           h.transtions = [element];
           h.Total_Amount = element.Amount;
           bytes += await getHeader() + await getTicketcrew(h);
@@ -478,7 +481,8 @@ class Cityhoppa extends BaseClients {
         List<tmatatu.Trans> listcopy = header.transtions!;
         List<tmatatu.Trans> mtr = listcopy
             .where((element) =>
-                element.Type != "SAVINGSCREW" && element.Type != "SAVINGS")
+                !TranTypes.isCrewSavings(element.Type) &&
+                element.Type != "SAVINGS")
             .toList();
         if (mtr.isNotEmpty) {
           Header h = header.copyWith();
@@ -491,11 +495,14 @@ class Cityhoppa extends BaseClients {
         }
         List<tmatatu.Trans> mtrc = listcopy
             .where((element) =>
-                element.Type == "SAVINGSCREW" || element.Type == "SAVINGS")
+                TranTypes.isCrewSavings(element.Type) ||
+                element.Type == "SAVINGS")
             .toList();
         for (var element in mtrc) {
           Header h = header.copyWith();
-          if (element.Type == "SAVINGSCREW") h.Account = element.Account_No;
+          if (TranTypes.isCrewSavings(element.Type)) {
+            h.Account = element.Account_No;
+          }
           h.transtions = [element];
           h.Total_Amount = element.Amount;
           bytes += await getTicketcrew(h);

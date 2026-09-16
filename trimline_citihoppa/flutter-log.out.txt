@@ -1,0 +1,131 @@
+file: C:\tmp\debug-console-logs\flutter_debug.log
+lines: 2,545
+error markers: 4
+
+==================== line 2229 ====================
+  â?â?â?â?â?â?â?â? Exception caught by widgets library â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?
+  The following message was thrown building Obx(has builder, dirty, state: ObxState#4fa8e):
+  [Get] the improper use of a GetX has been detected. 
+        You should only use GetX or Obx for the specific widget that will be updated.
+        If you are seeing this error, you probably did not insert any observable variables into GetX/Obx 
+        or insert them outside the scope that GetX considers suitable for an update 
+        (example: GetX => HeavyWidget => variableObservable).
+        If you need to update a parent widget and a child widget, wrap each one in an Obx/GetX.
+  
+  The relevant error-causing widget was:
+      Obx Obx:file:///D:/Projects2/Matatu/lib/pages/Depot.dart:86:24
+  
+  When the exception was thrown, this was the stack:
+  [2m#0      RxInterface.notifyChildren (package:get/get_rx/src/rx_types/rx_core/rx_interface.dart:29:7)[0m
+  [2m#1      ObxState.build (package:get/get_state_manager/src/rx_flutter/rx_obx_widget.dart:56:19)[0m
+  [2m#2      StatefulElement.build (package:flutter/src/widgets/framework.dart:5931:27)[0m
+  [2m#3      ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5817:15)[0m
+  [2m#4      StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)[0m
+  [2m#5      Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)[0m
+  [2m#6      ComponentElement._firstBuild (package:flutter/src/widgets/framework.dart:5799:5)[0m
+  [2m#7      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5973:11)[0m
+  [2m#8      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)[0m
+  ...     Normal element mounting (41 frames)
+  [2m#49     Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)[0m
+  [2m#50     MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)[0m
+  [2m#51     MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)[0m
+  ...     Normal element mounting (370 frames)
+  [2m#421    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)[0m
+  [2m#422    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)[0m
+  [2m#423    Element.updateChild (package:flutter/src/widgets/framework.dart:4059:18)[0m
+  [2m#424    Element.updateChildren (package:flutter/src/widgets/framework.dart:4255:32)[0m
+
+==================== line 2230 ====================
+  The following message was thrown building Obx(has builder, dirty, state: ObxState#4fa8e):
+  [Get] the improper use of a GetX has been detected. 
+        You should only use GetX or Obx for the specific widget that will be updated.
+        If you are seeing this error, you probably did not insert any observable variables into GetX/Obx 
+        or insert them outside the scope that GetX considers suitable for an update 
+        (example: GetX => HeavyWidget => variableObservable).
+        If you need to update a parent widget and a child widget, wrap each one in an Obx/GetX.
+  
+  The relevant error-causing widget was:
+      Obx Obx:file:///D:/Projects2/Matatu/lib/pages/Depot.dart:86:24
+  
+  When the exception was thrown, this was the stack:
+  [2m#0      RxInterface.notifyChildren (package:get/get_rx/src/rx_types/rx_core/rx_interface.dart:29:7)[0m
+  [2m#1      ObxState.build (package:get/get_state_manager/src/rx_flutter/rx_obx_widget.dart:56:19)[0m
+  [2m#2      StatefulElement.build (package:flutter/src/widgets/framework.dart:5931:27)[0m
+  [2m#3      ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5817:15)[0m
+  [2m#4      StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)[0m
+  [2m#5      Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)[0m
+  [2m#6      ComponentElement._firstBuild (package:flutter/src/widgets/framework.dart:5799:5)[0m
+  [2m#7      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5973:11)[0m
+  [2m#8      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5793:5)[0m
+  ...     Normal element mounting (41 frames)
+  [2m#49     Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)[0m
+  [2m#50     MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)[0m
+  [2m#51     MultiChildRenderObjectElement.mount (package:flutter/src/widgets/framework.dart:7279:32)[0m
+  ...     Normal element mounting (370 frames)
+  [2m#421    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4587:20)[0m
+  [2m#422    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7264:36)[0m
+  [2m#423    Element.updateChild (package:flutter/src/widgets/framework.dart:4059:18)[0m
+  [2m#424    Element.updateChildren (package:flutter/src/widgets/framework.dart:4255:32)[0m
+  [2m#425    MultiChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7295:17)[0m
+
+==================== line 2452 ====================
+  â?â?â?â?â?â?â?â? Exception caught by widgets library â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?
+  [Get] the improper use of a GetX has been detected. 
+        You should only use GetX or Obx for the specific widget that will be updated.
+        If you are seeing this error, you probably did not insert any observable variables into GetX/Obx 
+        or insert them outside the scope that GetX considers suitable for an update 
+        (example: GetX => HeavyWidget => variableObservable).
+        If you need to update a parent widget and a child widget, wrap each one in an Obx/GetX.
+  The relevant error-causing widget was:
+      Obx Obx:file:///D:/Projects2/Matatu/lib/pages/Depot.dart:86:24
+  â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?â?
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ url: members, status code: 200[0m
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ url: membersbody: {"Code":0,"Desc":"Successful","Contents":[{"Key":"16;EgAAAAJ7AzYANQAy8;325921810;","No":"652","Name":"HASSAN ABDI","Phone_No":null,"ID_No":null,"E_Mail":null,"Customer_Posting_Group":"MEMBER","Bank_Name":"KCB","Bank_Account":"1329555163","Blocked":0,"BlockedSpecified":true,"Loans":0,"LoansSpecified":true,"Crew_Type":0,"Crew_TypeSpecified":true,"Vehicle":"KBY 021T"},{"Key":"16;EgAAAAJ7AzYANQAx7;60700930;","No":"651","Name":"BENARD MAINA NGUGI","Phone_No":"0722-455015","ID_No":null,"E_Mail":null,"Customer_Posting_Group":"MEMBER","Bank_Name":"KCB","Bank_Account":"1178722228","Blocked":0,"BlockedSpecified":true,"Loans":0,"LoansSpecified":true,"Crew_Type":0,"Crew_TypeSpecified":true,"Vehicle":"KAV 005Q"},{"Key":"16;EgAAAAJ7AzYANQAw8;325921470;","No":"650","Name":"MOSES TUWEI/CHERUIYOT","Phone_No":null,"ID_No":null,"E_Mail":null,"Customer_Posting_Group":"MEMBER","Bank_Name":"EQUITY","Bank_Account":"0490185329428","Blocked":0,"BlockedSpecified":true,"Loans":0,"LoansSpecified":tr
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): source: {"Code":0,"Desc":"Successful","Contents":[{"Key":"16;EgAAAAJ7AzYANQAy8;325921810;","No":"652","Name":"HASSAN ABDI","Phone_No":null,"ID_No":null,"E_Mail":null,"Customer_Posting_Group":"MEMBER","Bank_Name":"KCB","Bank_Account":"1329555163","Blocked":0,"BlockedSpecified":true,"Loans":0,"LoansSpecified":true,"Crew_Type":0,"Crew_TypeSpecified":true,"Vehicle":"KBY 021T"},{"Key":"16;EgAAAAJ7AzYANQAx7;60700930;","No":"651","Name":"BENARD MAINA NGUGI","Phone_No":"0722-455015","ID_No":null,"E_Mail":null,"Customer_Posting_Group":"MEMBER","Bank_Name":"KCB","Bank_Account":"1178722228","Blocked":0,"BlockedSpecified":true,"Loans":0,"LoansSpecified":true,"Crew_Type":0,"Crew_TypeSpecified":true,"Vehicle":"KAV 005Q"},{"Key":"16;EgAAAAJ7AzYANQAw8;325921470;","No":"650","Name":"MOSES TUWEI/CHERUIYOT","Phone_No":null,"ID_No":null,"E_Mail":null,"Customer_Posting_Group":"MEMBER","Bank_Name":"EQUITY","Bank_Account":"0490185329428","Blocked":0,"BlockedSpecified":true,"Loans":0,"LoansSpecified":true,"Crew_Type":0,"Crew_TypeSp
+  I/flutter ( 8443): map: {Code: 0, Desc: Successful, Contents: [{Key: 16;EgAAAAJ7AzYANQAy8;325921810;, No: 652, Name: HASSAN ABDI, Phone_No: null, ID_No: null, E_Mail: null, Customer_Posting_Group: MEMBER, Bank_Name: KCB, Bank_Account: 1329555163, Blocked: 0, BlockedSpecified: true, Loans: 0, LoansSpecified: true, Crew_Type: 0, Crew_TypeSpecified: true, Vehicle: KBY 021T}, {Key: 16;EgAAAAJ7AzYANQAx7;60700930;, No: 651, Name: BENARD MAINA NGUGI, Phone_No: 0722-455015, ID_No: null, E_Mail: null, Customer_Posting_Group: MEMBER, Bank_Name: KCB, Bank_Account: 1178722228, Blocked: 0, BlockedSpecified: true, Loans: 0, LoansSpecified: true, Crew_Type: 0, Crew_TypeSpecified: true, Vehicle: KAV 005Q}, {Key: 16;EgAAAAJ7AzYANQAw8;325921470;, No: 650, Name: MOSES TUWEI/CHERUIYOT, Phone_No: null, ID_No: null, E_Mail: null, Customer_Posting_Group: MEMBER, Bank_Name: EQUITY, Bank_Account: 0490185329428, Blocked: 0, BlockedSpecified: true, Loans: 0, LoansSpecified: true, Crew_Type: 0, Crew_TypeSpecified: true, Vehicle: KBY 021T}, {Key: 16;EgAAA
+  I/flutter ( 8443): results: [652 HASSAN ABDI null null KBY 021T Crew_type.Driver, 651 BENARD MAINA NGUGI 0722-455015 null KAV 005Q Crew_type.Driver, 650 MOSES TUWEI/CHERUIYOT null null KBY 021T Crew_type.Driver, 648 RUTH WANGUI null null KBY 021T Crew_type.Driver, 647 REUBEN KIRUTHI MWANGI 0724429971 null KBW 882J Crew_type.Driver, 646 JACINTO NGUGI null null KBY 021T Crew_type.Driver, 645 GRACE WAWERU null null KBY 021T Crew_type.Driver, 643 VICTOR SHIGOLI AMALEMBA 0725-097891 null KAV 005Q Crew_type.Driver, 642 ELIUD GICHUKI NDAGU null null KBY 021T Crew_type.Driver, 641 ALPHONSE KINGORI 0721-385878 null KAV 005Q Crew_type.Driver, 639 STEPHEN KIMATHI M null null KCF595U Crew_type.Driver, 638 GODFREY WANYEKI GAKURE -B 0723489447 null KBY 021T Crew_type.Driver, 637 GODFREY WANYEKI 0723489447 null KBR221S Crew_type.Driver, 636 PAUL NGURE KAMAU 0722-880208 null KAV 005Q Crew_type.Driver, 635 FELIX WEDAH 0707-732755 null KAV 005Q Crew_type.Driver, 634 ESTHER WANGUI NJUGUNA 0724-514519 null KAV 005Q Crew_type.Driver, 633 TIMOTHY N
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ http://services.trimline.co.ke:8092/api/Matatu/members[0m
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ out: {"body":null,"Agent":null,"Otp":"","phone":"","Otp_message":"","bookmark":"16;EgAAAAJ7AzMAOAAx7;11708170;","vehicle":null,"date":null,"size":50}[0m
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ {Content-Type: application/json, X-Client-Identifier: CITYHOPPER, X-Api-Key: gbsQcaCncEKpIIOn45tnpsynuAwW+sXvNhFl2ynk9+s=}[0m
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ"Oâ"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): [38;5;12mâ", dY'¡ url: members, status code: 200[0m
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+
+===== last 25 lines of the log =====
+  I/flutter ( 8443): [38;5;12mâ""â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?â"?[0m
+  I/flutter ( 8443): source: {"Code":0,"Desc":"Successful","Contents":[]}
+  I/flutter ( 8443): map: {Code: 0, Desc: Successful, Contents: []}
+  I/flutter ( 8443): results: []
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  D/VRI[MainActivity]( 8443): visibilityChanged oldVisibility=true newVisibility=false
+  D/BLASTBufferQueue( 8443): [668f1f4 SurfaceView[trimline.citihoppa/trimline.citihoppa.MainActivity]#1](f:0,a:2) destructor()
+  D/BufferQueueConsumer( 8443): [668f1f4 SurfaceView[trimline.citihoppa/trimline.citihoppa.MainActivity]#1(BLAST Consumer)1](id:20fb00000001,api:0,p:-1,c:8443) disconnect: caller 8443
+  D/ViewRootImplStubImpl( 8443): onSurfaceViewDetached:
+  D/ViewRootImplStubImpl( 8443): , vri:android.view.ViewRootImpl@f2cde19, trimline.citihoppa/trimline.citihoppa.MainActivity
+  D/ViewRootImplStubImpl( 8443): , vri size:1220x2712
+  D/ViewRootImplStubImpl( 8443): , surfaceView:io.flutter.embedding.android.FlutterSurfaceView{668f1f4 V.E...... ........ 0,0-1220,2589}, SurfaceView[trimline.citihoppa/trimline.citihoppa.MainActivity]
+  D/ViewRootImplStubImpl( 8443): , surfaceView size:1220x2589
+  D/ViewRootImplStubImpl( 8443): , surfaceControl:Surface(name=668f1f4 SurfaceView[trimline.citihoppa/trimline.citihoppa.MainActivity](BLAST)#83159)/@0x21c5ede
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/InsetsSource( 8443): Has no intersection or mTmpFrame.height(), return Insets.NONE mTmpFrame.height() =0 hasIntersection =false
+  W/mline.citihoppa( 8443): Binder 0xb400007bcc27f560 destroyed after setInheritRt before being parceled.
+  D/BLASTBufferQueue( 8443): [VRI[MainActivity]#0](f:0,a:2) destructor()
+  D/BufferQueueConsumer( 8443): [VRI[MainActivity]#0(BLAST Consumer)0](id:20fb00000000,api:0,p:-1,c:8443) disconnect: caller 8443
+DONE
+

@@ -24,9 +24,8 @@ class TransTypeController extends GetxController {
 
   void distribute(double amount) {
     final controller = Get.find<TransTypeController>();
-    final types = controller.vehicleTrantypes
-        .where((p0) => p0.Name != null)
-        .toList();
+    final types =
+        controller.vehicleTrantypes.where((p0) => p0.Name != null).toList();
 
     // Start from a clean slate.
     for (final element in types) {
@@ -55,8 +54,7 @@ class TransTypeController extends GetxController {
     // Whatever is left over goes to OFFLOAD — add to any amount it already got
     // from the loop, and only to the first matching row.
     if (left > 0) {
-      final offload =
-          types.firstWhereOrNull((p0) => p0.Code == 'OFFLOAD');
+      final offload = types.firstWhereOrNull((p0) => p0.Code == 'OFFLOAD');
       if (offload != null) {
         offload.Amountedited = (offload.Amountedited ?? 0) + left;
         offload.eAmount.text = offload.Amountedited!.toStringAsFixed(2);
@@ -74,8 +72,7 @@ class TransTypeController extends GetxController {
         .toList();
     if (tp.isEmpty) return 0;
     // Guarded parse: legacy rows can hold empty/garbage amounts.
-    return tp.fold<double>(
-        0.0, (sum, item) => sum + (item.Amountedited ?? 0));
+    return tp.fold<double>(0.0, (sum, item) => sum + (item.Amountedited ?? 0));
   }
 
   Future<void> initialize() async {
@@ -153,10 +150,10 @@ class TransTypeController extends GetxController {
   // get alltrantypes => _alltrantypes;
   Future<List<TranTypes>> vehicleTypes(vehicle_type? vehicleType) async {
     List<TranTypes> types = [...Get.find<TransTypeController>().alltrantypes];
+    final header = Get.find<HeaderController>().currHeader.value;
 
     Get.find<TransTypeController>().vehicleTrantypes.clear();
     List<TranTypes> typess = [];
-    TranTypes? type;
 
     for (var element in types) {
       final tamount = Get.find<TransTypeController>()
@@ -166,32 +163,33 @@ class TransTypeController extends GetxController {
       element.VehicleAmount = tamount == null ? 0 : tamount.Amount;
       element.Amountedited = 0;
       element.Checked = false;
-      element.Account = Get.find<HeaderController>().currHeader.value.Account;
-      if (element.Code == "SAVINGSCREW") {
-        type = element.copyWith();
-        if (Get.find<HeaderController>().currHeader.value.Crew?.isEmpty ==
-            false) {
-          element.Name =
-              '${element.Name2}(${Get.find<HeaderController>().currHeader.value.Crew})';
-          element.Account = Get.find<HeaderController>().currHeader.value.Crew;
-          typess.add(element);
-        }
-      } else {
-        typess.add(element);
+      element.Account = header.Account;
+
+      // Crew savings post to the crew member's account. BC keeps the driver and
+      // conductor savings as separate types, so there is nothing to split here.
+      final crewAccount =
+          _crewAccountFor(element.Code, header.Crew, header.Crew2);
+      if (crewAccount != null && crewAccount.isNotEmpty) {
+        element.Account = crewAccount;
       }
 
-      if (element.Code == "SAVINGSCREW") {
-        if (Get.find<HeaderController>().currHeader.value.Crew2?.isEmpty ==
-            false) {
-          type!.Name =
-              '${type.Name2}(${Get.find<HeaderController>().currHeader.value.Crew2})';
-          type.Account = Get.find<HeaderController>().currHeader.value.Crew2;
-          typess.add(type);
-        }
-      }
+      typess.add(element);
     }
 
     Get.find<TransTypeController>().vehicleTrantypes.value = typess;
     return typess;
+  }
+
+  /// Account a crew savings type posts to: the driver's for SAVINGSCREW, the
+  /// conductor's for SAVINGSCREW2.
+  String? _crewAccountFor(String? code, String? crew, String? crew2) {
+    switch (code) {
+      case TranTypes.savingsCrewCode:
+        return crew;
+      case TranTypes.savingsCrew2Code:
+        return crew2;
+      default:
+        return null;
+    }
   }
 }

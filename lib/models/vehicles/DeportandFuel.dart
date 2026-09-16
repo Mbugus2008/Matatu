@@ -3,7 +3,8 @@
 
 import 'dart:convert';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/vehicles/vehicles.dart';
@@ -25,7 +26,16 @@ class DepotFuel implements Tomaps {
   bool? get On_route => _On_route;
   set On_route(bool? value) {
     _On_route = value;
-    DepotController().updateCheckAll();
+    // Keep the "all on route" switch in sync. Callers that update many rows
+    // should use setOnRouteSilently() and refresh once afterwards.
+    if (Get.isRegistered<DepotController>()) {
+      Get.find<DepotController>().updateCheckAll();
+    }
+  }
+
+  /// Set [On_route] without refreshing the depot list (bulk updates).
+  void setOnRouteSilently(bool? value) {
+    _On_route = value;
   }
 
   bool? _Run_Back;
@@ -43,9 +53,17 @@ class DepotFuel implements Tomaps {
   String? _Descrition;
   String? get Descrition => _Descrition;
   set Descrition(String? value) {
-    print("New description: $value");
+    // Do not write back into desc_editor here: the UI owns that controller and
+    // assigning to it mid-typing resets the caret position.
     _Descrition = value;
-    desc_editor.text = value ?? '';
+  }
+
+  /// Called from the description field in the dispatch sheet.
+  ///
+  /// Only the model is updated - the editor keeps ownership of its own text.
+  void onDescriptionChanged(String? value) {
+    _Descrition = value;
+    dirty = true;
   }
 
   DateTime? Date;
@@ -272,12 +290,8 @@ class DepotFuel implements Tomaps {
       parsedDate = dateFormat.parse(map['From'] as String);
       runbacktime = dateFormat.parse(map['Run_Bak_Time'] as String);
     } catch (e) {}
-    String? driver_name =
-        map['Driver_Name'] != null ? map['Driver_Name'] as String : null;
-    String? conductor_name =
-        map['Conductor_Name'] != null ? map['Conductor_Name'] as String : null;
-    print("Driver Name: ${driver_name}");
-    print("Conductor Name: ${conductor_name}");
+    String? driver_name = map['Driver_Name']?.toString();
+    String? conductor_name = map['Conductor_Name']?.toString();
 
     DepotFuel df = DepotFuel(
       Key: map['Key'] != null ? map['Key'] as String : null,
@@ -318,7 +332,7 @@ class DepotFuel implements Tomaps {
       Fuel_Agent:
           map['Fuel_Agent'] != null ? map['Fuel_Agent'] as String : null,
       Driver_Name: driver_name,
-      Conductor_Name: map['Conductor_Name']?.toString(),
+      Conductor_Name: conductor_name,
       Run_Back: map['Run_Back'] != null ? map['Run_Back'] as bool : null,
       Run_Bak_Time: runbacktime,
       Whos_to_blame_for_Deficiet: map['Whos_to_blame_for_Deficiet'] != null
@@ -358,8 +372,6 @@ class DepotFuel implements Tomaps {
       Conductor_Badge_Expiry: _tryParseExpiry(map['Conductor_Badge_Expiry']),
     );
 
-    print('Recieved Driver Name: ${df.Driver_Name}');
-    print('Recieved Conductor Name: ${df.Conductor_Name}');
     return df;
   }
   String toJson() => json.encode(toMap());
@@ -383,56 +395,85 @@ class DepotFuel implements Tomaps {
     return DepotFuel.fromMap(map);
   }
 
+  /// Loads the NRO defect codes used by the defect type-ahead.
   Future<void> getNRODefects() async {
     try {
-      var request = Request(body: null);
-      ApiClient().postdata("NRODefects", request.toJson()).then((r) async {
-        if (r.statusCode == 200) {
-          Results<Expenses> results =
-              Results<Expenses>.fromJson(r.body, Expenses.fromMap);
-          if (results.Code == 0) {
-            if (results.Contents != null) {
-              Get.find<VehiclesController>().NRODefects.value =
-                  results.Contents as List<Expenses>;
-            }
-          }
-        }
-      });
-    } on Exception catch (e) {
-      Errors().report(e);
+      final request = Request(body: null);
+      final r = await ApiClient().postdata("NRODefects", request.toJson());
+      if (r.statusCode != 200) return;
+      final results = Results<Expenses>.fromJson(r.body, Expenses.fromMap);
+      if (results.Code == 0 && results.Contents != null) {
+        Get.find<VehiclesController>().NRODefects.value =
+            results.Contents as List<Expenses>;
+      }
+    } catch (e) {
+      _log('NRODefects load failed: $e');
+      Errors().report(e is Exception ? e : Exception(e.toString()));
     }
   }
 
-  Future<void> getdata(DateTime date) async {
-    var request = Request(body: null, date: date);
-    await ApiClient()
-        .postdata("getdepotdata", request.toJson())
-        .then((r) async {
-      if (r.statusCode == 200) {
-        Results<DepotFuel> results =
-            Results<DepotFuel>.fromJson(r.body, DepotFuel.fromMap);
-        if (results.Code == 0) {
-          if (results.Contents != null) {
-            print(results.Contents);
-            var ll = (results.Contents ?? []);
-            ll.sort((a, b) => a.Fleet!.compareTo(b.Fleet.toString()));
-            Get.find<DepotController>()
-                .updateDepotTrans(ll); // Use the new method
-            Get.find<DepotController>().depottrans1.value = ll;
-          }
-        }
+  /// Loads the dispatch/depot rows for [date].
+  /// Returns true when the list was refreshed from the server.
+  Future<bool> getdata(DateTime date) async {
+    final ctrl = Get.find<DepotController>();
+    ctrl.loading.value = true;
+    try {
+      final request = Request(body: null, date: date);
+      final r = await ApiClient().postdata("getdepotdata", request.toJson());
+      if (r.statusCode != 200) {
+        _notifyError(
+            'Server error ${r.statusCode} while loading dispatch data');
+        return false;
+      }
+      final results = Results<DepotFuel>.fromJson(r.body, DepotFuel.fromMap);
+      if (results.Code != 0) {
+        _notifyError(results.Desc ?? 'Could not load dispatch data');
+        return false;
+      }
+      final ll = results.Contents ?? <DepotFuel>[];
+      ll.sort((a, b) => (a.Fleet ?? '').compareTo(b.Fleet ?? ''));
+      ctrl.updateDepotTrans(ll);
+      return true;
+    } catch (e) {
+      _notifyError('Could not load dispatch data: $e');
+      return false;
+    } finally {
+      ctrl.loading.value = false;
+    }
+  }
+
+  static void _log(String message) {
+    if (kDebugMode) debugPrint('[DISPATCH] $message');
+  }
+
+  static void _notifyError(String message) {
+    _log(message);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        Get.snackbar(
+          'Dispatch',
+          message,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xFFC62828),
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+      } catch (_) {
+        // No overlay available (e.g. during start-up) - the log entry is enough.
       }
     });
   }
 
-  Future<void> updatedepot(List<DepotFuel> depots) async {
+  /// Saves every dirty row. Returns true when the server accepted the batch.
+  Future<bool> updatedepot(List<DepotFuel> depots) async {
     final ctrl = Get.find<DepotController>();
     ctrl.updating.value = true;
+    var saved = false;
     final dirty = depots.where((d) => d.dirty).toList();
     if (dirty.isEmpty) {
-      Get.snackbar('Info', 'No changes to save');
+      _log('nothing to save');
       ctrl.updating.value = false;
-      return;
+      return false;
     }
     ctrl.updateTotal.value = dirty.length;
     ctrl.updateProgress.value = 0;
@@ -455,54 +496,62 @@ class DepotFuel implements Tomaps {
 
     // Send all dirty records in a single batch request.
     final payload = json.encode(dirty.map((d) => d.toMap()).toList());
-    print('[SETDEPOT] batch sending ${dirty.length} records');
+    _log('batch sending ${dirty.length} records');
     try {
       final r = await ApiClient().postdata("setdepotdatabatch", payload);
       if (r.statusCode == 200) {
-        Results<DepotFuel> results =
-            Results<DepotFuel>.fromJson(r.body, DepotFuel.fromMap);
+        final results = Results<DepotFuel>.fromJson(r.body, DepotFuel.fromMap);
         if (results.Code == 0) {
           for (final d in dirty) {
             d.dirty = false;
           }
+          saved = true;
         } else {
-          Get.snackbar('Error',
-              'Failed to update depot: ${results.Desc ?? 'Unknown error'}');
+          _notifyError(
+              'Failed to update dispatch: ${results.Desc ?? 'Unknown error'}');
         }
       } else {
-        Get.snackbar('Error', 'Server error ${r.statusCode} while updating');
+        _notifyError('Server error ${r.statusCode} while updating dispatch');
       }
     } catch (e) {
-      print('[SETDEPOT] batch failed: $e');
+      _log('batch failed: $e');
       // Fall back to one-by-one saving for compatibility.
-      await _updatedepotOneByOne(dirty, ctrl);
+      saved = await _updatedepotOneByOne(dirty, ctrl);
     }
     ctrl.updateProgress.value = ctrl.updateTotal.value;
     ctrl.updating.value = false;
+    ctrl.refreshDirty();
+    return saved;
   }
 
-  Future<void> _updatedepotOneByOne(
+  Future<bool> _updatedepotOneByOne(
       List<DepotFuel> dirty, DepotController ctrl) async {
-    for (var depot in dirty) {
-      final json = depot.toJson();
-      print('[SETDEPOT] sending: ${json.substring(0, 200)}');
+    var allSaved = true;
+    for (final depot in dirty) {
       try {
-        final r = await ApiClient().postdata("setdepotdata", json);
+        final r = await ApiClient().postdata("setdepotdata", depot.toJson());
         if (r.statusCode == 200) {
-          Results2<DepotFuel> results =
+          final results =
               Results2<DepotFuel>.fromJson(r.body, DepotFuel.fromMap);
           if (results.Code == 0) {
             depot.dirty = false;
-            if (results.Contents != null) {
-              depot = results.Contents!;
-            }
+          } else {
+            allSaved = false;
+            _notifyError('Failed to update ${depot.Vehicle}: '
+                '${results.Desc ?? 'Unknown error'}');
           }
+        } else {
+          allSaved = false;
+          _notifyError(
+              'Server error ${r.statusCode} while updating ${depot.Vehicle}');
         }
       } catch (e) {
-        print('[SETDEPOT] failed: $e');
+        allSaved = false;
+        _notifyError('Failed to update ${depot.Vehicle}: $e');
       }
       ctrl.updateProgress.value++;
     }
+    return allSaved;
   }
 
   String serializeDepotList(List<DepotFuel> depots) {
@@ -515,72 +564,97 @@ class DepotFuel implements Tomaps {
 class DepotController extends GetxController {
   RxBool checkall = false.obs;
   RxBool updating = false.obs;
+  RxBool loading = false.obs;
   RxInt updateProgress = 0.obs;
   RxInt updateTotal = 0.obs;
+
+  /// Number of rows with unsaved edits (drives the save bar).
+  RxInt dirtyCount = 0.obs;
+
   final RxList<DepotFuel> depottrans = <DepotFuel>[].obs;
   final RxList<DepotFuel> depottrans1 = <DepotFuel>[].obs;
+
+  /// Unfiltered snapshot of the last loaded list, so searching never loses rows.
+  List<DepotFuel> _snapshot = <DepotFuel>[];
+
+  /// All loaded rows, regardless of the active search filter.
+  List<DepotFuel> get allDepots =>
+      _snapshot.isNotEmpty ? _snapshot : depottrans.toList();
+
+  bool get hasDirty => dirtyCount.value > 0;
 
   @override
   void onInit() {
     super.onInit();
-    // Initialize depottrans here if it's not being initialized elsewhere
     depottrans.value = [];
-    //depottrans1.value = [];
-    // Fetch initial data
-    // DepotFuel().getdata(DateTime.now());
   }
 
+  /// Recomputes the "all on route" switch state and the unsaved counter.
   void updateCheckAll() {
-    var selected = Get.find<DepotController>()
-        .depottrans
-        .any((dt) => dt.On_route == false);
-
-    checkall.value =
-        !selected; // Get.find<VehiclesController>().depottrans.any((dt)=> dt.On_route== false);
-
+    final onRoute = depottrans.where((dt) => dt.On_route == true).length;
+    checkall.value = depottrans.isNotEmpty && onRoute == depottrans.length;
+    refreshDirty();
     update();
+  }
+
+  /// Recomputes how many rows still need saving.
+  void refreshDirty() {
+    dirtyCount.value = allDepots.where((d) => d.dirty).length;
   }
 
   @override
   void onClose() {
-    // Dispose all DepotFuel instances in depottrans
-    for (var depotFuelInstance in depottrans) {
-      depotFuelInstance.dispose();
+    // depottrans and depottrans1 can hold the same instances - dispose once.
+    final disposed = <DepotFuel>{};
+    for (final instance in <DepotFuel>[...depottrans, ...depottrans1]) {
+      if (disposed.add(instance)) {
+        instance.dispose();
+      }
     }
-    depottrans.clear(); // Optional: clear the list after disposing
-
-    // Dispose all DepotFuel instances in depottrans1 if it's used similarly
-    for (var depotFuelInstance in depottrans1) {
-      depotFuelInstance.dispose();
-    }
-    depottrans1.clear(); // Optional: clear the list after disposing
-
-    print(
-        'DepotController closed and resources disposed.'); // Optional: for debugging
+    depottrans.clear();
+    depottrans1.clear();
+    _snapshot = <DepotFuel>[];
     super.onClose();
   }
 
   void checkallvehicles(bool check) {
     for (var element in Get.find<DepotController>().depottrans) {
       element.On_route = check;
-      element.From = getdatetime();
+      if (check) {
+        // Only stamp the dispatch time when the vehicle actually goes on route.
+        element.From ??= getdatetime();
+      }
       element.dirty = true;
     }
     updateCheckAll();
   }
 
   void updateDepotTrans(List<DepotFuel> newDepotTrans) {
-    Get.find<DepotController>().depottrans.value = newDepotTrans;
-    update(); // This will notify all GetBuilder widgets to rebuild
+    _snapshot = List<DepotFuel>.from(newDepotTrans);
+    depottrans.value = newDepotTrans;
+    depottrans1.value = newDepotTrans;
+    updateCheckAll();
   }
 
+  /// Drops every loaded row (used when switching to a fresh dispatch/fuel flow).
+  void clearAll() {
+    _snapshot = <DepotFuel>[];
+    depottrans.clear();
+    depottrans1.clear();
+    checkall.value = false;
+    dirtyCount.value = 0;
+    update();
+  }
+
+  /// Filters the visible rows by vehicle/fleet/crew/defect text.
   void filterDepotTrans(String value) {
-    value = value.toUpperCase();
-    print("Filtering1 ${Get.find<DepotController>().depottrans1.length}");
-    print("Filtering ${Get.find<DepotController>().depottrans.length}");
-    Get.find<DepotController>().depottrans.value =
-        Get.find<DepotController>().depottrans1.where((item) {
-      return item.toString().toUpperCase().contains(value);
-    }).toList();
+    final query = value.trim().toUpperCase();
+    final source = allDepots;
+    depottrans.value = query.isEmpty
+        ? List<DepotFuel>.from(source)
+        : source
+            .where((item) => item.toString().toUpperCase().contains(query))
+            .toList();
+    updateCheckAll();
   }
 }

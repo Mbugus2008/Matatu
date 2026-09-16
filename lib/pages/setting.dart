@@ -82,7 +82,6 @@ class CustomDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Get.find<MainController>().getPreference("printer").toString();
-    final primary = _primaryColor(context);
     // Hide Receipts & Z Report for Depot/Fuel operators (account_type 3)
     final isNotDepotFuel =
         Get.find<MainController>().agent.value.Account_type != 3;
@@ -91,7 +90,12 @@ class CustomDrawer extends StatelessWidget {
         Get.find<MainController>().CurrentClient?.value.clientMenu();
     return Drawer(
       child: ListView(
-        padding: EdgeInsets.zero,
+        // Keep the first row (printer) clear of the status bar and notch, and
+        // the last row clear of the gesture bar.
+        padding: EdgeInsets.only(
+          top: MediaQuery.of(context).padding.top,
+          bottom: MediaQuery.of(context).padding.bottom,
+        ),
         children: <Widget>[
           // --- Printer Section ---
           Padding(
@@ -106,11 +110,17 @@ class CustomDrawer extends StatelessWidget {
                 ),
                 Expanded(
                   flex: 3,
-                  child: Obx(() => Text(Get.find<BluetoothManager>()
-                          .selectedPrinter
-                          .value
-                          ?.deviceName ??
-                      '')),
+                  child: Obx(() {
+                    final name = Get.find<BluetoothManager>()
+                        .selectedPrinter
+                        .value
+                        ?.deviceName;
+                    return Text(
+                      (name == null || name.isEmpty) ? 'Not set' : name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13),
+                    );
+                  }),
                 ),
                 Expanded(
                   flex: 2,
@@ -223,7 +233,12 @@ class CustomDrawer extends StatelessWidget {
             icon: Icons.system_update,
             title: 'Check for Updates',
             context: context,
-            onTap: () => Get.find<UpdateController>().checkForUpdate(),
+            onTap: () {
+              // Close the drawer first: otherwise the snackbar/dialog lands
+              // behind it and the menu item looks dead.
+              Navigator.of(context).pop();
+              Get.find<UpdateController>().checkForUpdate();
+            },
           ),
           const Divider(height: 1, indent: 16, endIndent: 16),
 

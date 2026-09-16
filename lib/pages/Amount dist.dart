@@ -69,16 +69,15 @@ class _DistributeState extends State<Distribute> {
             children: [
               Text(
                 vehicle?.Vehicle_Number ?? 'Distribute',
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w700),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
               Text(
                 vehicle == null
                     ? 'Spread the amount received'
                     : 'Fleet ${vehicle.Fleet_No ?? '-'}',
                 style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.white.withValues(alpha: 0.85)),
+                    fontSize: 11, color: Colors.white.withValues(alpha: 0.85)),
               ),
             ],
           );
@@ -114,7 +113,8 @@ class _DistributeState extends State<Distribute> {
           ),
         ],
       ),
-      resizeToAvoidBottomInset: true, // Allow resizing when the keyboard appears
+      resizeToAvoidBottomInset:
+          true, // Allow resizing when the keyboard appears
     );
   }
 
@@ -154,7 +154,8 @@ class _DistributeState extends State<Distribute> {
                         fontWeight: FontWeight.w600,
                         color: _muted),
                     hintText: 'Amount received',
-                    hintStyle: TextStyle(fontSize: 15, color: Color(0xFFB6BEC9)),
+                    hintStyle:
+                        TextStyle(fontSize: 15, color: Color(0xFFB6BEC9)),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
@@ -175,8 +176,8 @@ class _DistributeState extends State<Distribute> {
                 disabledBackgroundColor: Colors.white24,
                 disabledForegroundColor: Colors.white70,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                textStyle: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700),
+                textStyle:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
@@ -224,9 +225,8 @@ class _DistributeState extends State<Distribute> {
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: _received <= 0
-                      ? _muted
-                      : (warn ? _warning : _success)),
+                  color:
+                      _received <= 0 ? _muted : (warn ? _warning : _success)),
             ),
           ),
           Text('$selectedCount / ${types.length}',
@@ -392,7 +392,7 @@ class _DistributeState extends State<Distribute> {
       TranTypes transactionType, bool selected) {
     final editable = transactionType.VehicleAmount == 0 ||
         transactionType.Code == 'SAVINGS' ||
-        transactionType.Code == 'SAVINGSCREW';
+        TranTypes.isCrewSavings(transactionType.Code);
 
     if (!editable) {
       return SizedBox(
@@ -493,8 +493,7 @@ class _DistributeState extends State<Distribute> {
                       Expanded(
                         child: Text(
                           '${_money(unallocated)} not allocated yet',
-                          style: const TextStyle(
-                              fontSize: 11, color: _warning),
+                          style: const TextStyle(fontSize: 11, color: _warning),
                         ),
                       ),
                     ],
@@ -518,8 +517,7 @@ class _DistributeState extends State<Distribute> {
                   ),
                   const Spacer(),
                   FilledButton.icon(
-                    onPressed:
-                        _confirming || selected <= 0 ? null : _confirm,
+                    onPressed: _confirming || selected <= 0 ? null : _confirm,
                     icon: const Icon(Icons.check_circle, size: 18),
                     label: const Text('Confirm'),
                     style: FilledButton.styleFrom(

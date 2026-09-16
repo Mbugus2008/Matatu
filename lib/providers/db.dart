@@ -114,6 +114,10 @@ class db_Provider extends GetxController {
     await db.execute(WaybillTrip.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
+    // Migration: vehicle expenses captured offline carry their own sync flag.
+    await db.execute(Vehicle_Expenses.createtable);
+    await _addColumnIfMissing(db, Vehicle_Expenses.table,
+        Vehicle_Expenses.col_sent, 'INTEGER DEFAULT 0');
     // Migration: trips can be saved before their waybill is synced.
     await _addColumnIfMissing(
         db, WaybillTrip.table, WaybillTrip.col_Waybill_Key, 'TEXT');
@@ -135,6 +139,10 @@ class db_Provider extends GetxController {
     await db.execute(WaybillTrip.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
+    // Migration: vehicle expenses captured offline carry their own sync flag.
+    await db.execute(Vehicle_Expenses.createtable);
+    await _addColumnIfMissing(db, Vehicle_Expenses.table,
+        Vehicle_Expenses.col_sent, 'INTEGER DEFAULT 0');
     // Migration: trips can be saved before their waybill is synced.
     await _addColumnIfMissing(
         db, WaybillTrip.table, WaybillTrip.col_Waybill_Key, 'TEXT');

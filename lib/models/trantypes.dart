@@ -14,6 +14,15 @@ import '../network/results/results.dart';
 
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 class TranTypes implements mapping, Tomaps, AbsDbUpdates {
+  /// Crew savings are separate types in Business Central: the driver's savings
+  /// and the conductor's savings.
+  static const String savingsCrewCode = 'SAVINGSCREW';
+  static const String savingsCrew2Code = 'SAVINGSCREW2';
+
+  /// True for any crew savings type (driver or conductor).
+  static bool isCrewSavings(String? code) =>
+      code == savingsCrewCode || code == savingsCrew2Code;
+
   String? Key;
   String? Code;
   String? Name;

@@ -499,8 +499,8 @@ class WaybillService {
       final byName = members.where((m) => _norm(m.Name) == target).toList();
       if (byName.isEmpty) return null;
 
-      final sameVehicle =
-          byName.where((m) => vehicle != null && _norm(m.Vehicle) == _norm(vehicle));
+      final sameVehicle = byName
+          .where((m) => vehicle != null && _norm(m.Vehicle) == _norm(vehicle));
       return (sameVehicle.isNotEmpty ? sameVehicle.first : byName.first).No;
     } catch (_) {
       return null;
@@ -526,7 +526,8 @@ class WaybillService {
         final driverChanged = driverNo != null && driverNo != wb.Driver;
         final conductorChanged =
             conductorNo != null && conductorNo != wb.Conductor;
-        final wronglySent = wb.sent && (wb.Entry_No == null || wb.Entry_No == 0);
+        final wronglySent =
+            wb.sent && (wb.Entry_No == null || wb.Entry_No == 0);
 
         if (!driverChanged && !conductorChanged && !wronglySent) continue;
 
@@ -579,7 +580,8 @@ class WaybillService {
     try {
       final originalKey = waybill.Key;
 
-      final driverNo = await resolveCrewNo(waybill.Driver, vehicle: waybill.Vehicle_No);
+      final driverNo =
+          await resolveCrewNo(waybill.Driver, vehicle: waybill.Vehicle_No);
       final conductorNo =
           await resolveCrewNo(waybill.Conductor, vehicle: waybill.Vehicle_No);
       if (driverNo != null) waybill.Driver = driverNo;

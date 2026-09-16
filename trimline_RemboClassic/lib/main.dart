@@ -27,7 +27,8 @@ Future<void> main() async {
       Permission.bluetoothScan
     ].request().then((status) async {}).then((value) async {
       AppConfig config = AppConfig(
-        apiBaseUrl: 'http://nav.trimline.co.ke:4010/Test/api/Matatu/',
+        apiBaseUrl: 'http://main.trimline.co.ke:4010/Test/api/Matatu/',
+        // apiBaseUrl: 'http://nav.trimline.co.ke:4010/Test/api/Matatu/',
         // apiBaseUrl: 'http://nav.trimline.co.ke:4010/api/Matatu/',
         updateUrl: 'https://trimline.co.ke/apps/RemboClassic/',
         clientId: "REMBOCLASIC",

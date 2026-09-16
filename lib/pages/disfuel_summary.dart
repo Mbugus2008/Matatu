@@ -254,8 +254,7 @@ class _SummaryFABs extends StatelessWidget {
           backgroundColor: Colors.orange,
           onPressed: () {
             Get.find<ReportController>().selectedDate?.value = null;
-            Get.find<DepotController>().depottrans.clear();
-            Get.find<DepotController>().depottrans1.clear();
+            Get.find<DepotController>().clearAll();
             Get.to(() => const FuelScreen());
           },
           child: const Icon(Icons.local_gas_station, color: Colors.white),

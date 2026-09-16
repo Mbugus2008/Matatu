@@ -199,6 +199,8 @@ void main() {
         'Total_Paid',
         'Total_Mileage',
         'Total_Fuel_Arrears',
+        'Total_Collection',
+        'Net_Offload',
         'sent',
       ]);
     });

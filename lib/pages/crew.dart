@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/Members.dart';
@@ -10,7 +12,18 @@ import 'package:t_matatu/providers/client.dart';
 class CrewAssignment extends StatefulWidget {
   final Vehicles? vehicle;
 
-  const CrewAssignment({Key? key, required this.vehicle}) : super(key: key);
+  /// Crew currently carried by the vehicle (e.g. the dispatch row's driver and
+  /// conductor). Used to prefill the form; when omitted the crew stored locally
+  /// for the vehicle is used instead.
+  final String? driverNo;
+  final String? conductorNo;
+
+  const CrewAssignment({
+    Key? key,
+    required this.vehicle,
+    this.driverNo,
+    this.conductorNo,
+  }) : super(key: key);
 
   @override
   State<CrewAssignment> createState() => _CrewAssignmentState();
@@ -19,6 +32,14 @@ class CrewAssignment extends StatefulWidget {
 class _CrewAssignmentState extends State<CrewAssignment> {
   final TextEditingController driverController = TextEditingController();
   final TextEditingController conductorController = TextEditingController();
+
+  /// Crew the vehicle carries right now. Several crew rows can share a vehicle,
+  /// so these are tracked explicitly and only they get detached on replace.
+  String? _previousDriverNo;
+  String? _previousConductorNo;
+
+  bool _saving = false;
+  String? _error;
 
   @override
   void initState() {
@@ -29,13 +50,29 @@ class _CrewAssignmentState extends State<CrewAssignment> {
   void _loadCurrentCrew() {
     final v = widget.vehicle;
     if (v == null) return;
-    final memberController = Get.find<MemberController>();
-    memberController.getcurrentcrew(v.Vehicle_Number.toString());
 
-    final driver = memberController.currentcrew
-        .firstWhereOrNull((m) => m.Crew_Type == Crew_type.Driver);
-    final conductor = memberController.currentcrew
-        .firstWhereOrNull((m) => m.Crew_Type == Crew_type.Conductor);
+    final memberController = Get.find<MemberController>();
+    final members = memberController.allMembers;
+
+    Member? byNo(String? no) => (no == null || no.isEmpty)
+        ? null
+        : members.firstWhereOrNull((m) => m.No == no);
+
+    // The caller's crew is the source of truth; fall back to what is stored
+    // locally for the vehicle.
+    Member? driver = byNo(widget.driverNo);
+    Member? conductor = byNo(widget.conductorNo);
+
+    if (driver == null || conductor == null) {
+      memberController.getcurrentcrew(v.Vehicle_Number.toString());
+      final crew = memberController.currentcrew;
+      driver ??= crew.firstWhereOrNull((m) => m.Crew_Type == Crew_type.Driver);
+      conductor ??=
+          crew.firstWhereOrNull((m) => m.Crew_Type == Crew_type.Conductor);
+    }
+
+    _previousDriverNo = widget.driverNo ?? driver?.No;
+    _previousConductorNo = widget.conductorNo ?? conductor?.No;
 
     if (driver != null) {
       driverController.text = driver.No.toString();
@@ -78,6 +115,10 @@ class _CrewAssignmentState extends State<CrewAssignment> {
               _buildVehicleInfo(),
               const SizedBox(height: 24),
               _buildCrewForm(),
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                _buildErrorBanner(),
+              ],
               const SizedBox(height: 24),
               _buildSubmitButton(),
             ],
@@ -138,20 +179,53 @@ class _CrewAssignmentState extends State<CrewAssignment> {
     );
   }
 
+  Widget _buildErrorBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDECEC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE7B5B5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline, size: 18, color: Color(0xFFC62828)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _error!,
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFF8E2424)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSubmitButton() {
     return ElevatedButton(
-      onPressed: _assignCrew,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
-        child: Text('Assign Crew', style: TextStyle(fontSize: 18)),
-      ),
+      onPressed: _saving ? null : _assignCrew,
       style: ElevatedButton.styleFrom(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        child: _saving
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.4, color: Colors.white),
+              )
+            : const Text('Assign Crew', style: TextStyle(fontSize: 18)),
       ),
     );
   }
 
   Future<void> _assignCrew() async {
+    if (_saving) return;
     final v = widget.vehicle;
     if (v == null) return;
 
@@ -191,76 +265,92 @@ class _CrewAssignmentState extends State<CrewAssignment> {
 
     // Validate before changing anything.
     if (driverController.text.trim().isNotEmpty && driver == null) {
-      _showError('Driver not found. Pick a member from the suggestions list.');
+      _fail('Driver not found. Pick a member from the suggestions list.');
       return;
     }
     if (conductorController.text.trim().isNotEmpty && conductor == null) {
-      _showError(
-          'Conductor not found. Pick a member from the suggestions list.');
+      _fail('Conductor not found. Pick a member from the suggestions list.');
       return;
     }
 
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    const saveTimeout = Duration(seconds: 15);
+    final vehicleNo = v.Vehicle_Number.toString();
+
     try {
-      await memberController.clearcrew(v.Vehicle_Number.toString());
+      // Only the crew being replaced is detached. Clearing the whole vehicle
+      // would wipe the other crew rows attached to it.
+      if (_previousDriverNo != null && _previousDriverNo != driver?.No) {
+        await memberController
+            .detachcrew(vehicleNo, _previousDriverNo)
+            .timeout(saveTimeout);
+      }
+      if (_previousConductorNo != null &&
+          _previousConductorNo != conductor?.No) {
+        await memberController
+            .detachcrew(vehicleNo, _previousConductorNo)
+            .timeout(saveTimeout);
+      }
 
       if (driver != null && driver.No != null && driver.No!.isNotEmpty) {
         driver.Vehicle = v.Vehicle_Number;
-        await memberController.setcrew(
-          v.Vehicle_Number.toString(),
-          driver.No!,
-          Crew_type.Driver,
-        );
-        v.Driver = driver;
+        await memberController
+            .setcrew(vehicleNo, driver.No!, Crew_type.Driver)
+            .timeout(saveTimeout);
       }
 
       if (conductor != null &&
           conductor.No != null &&
           conductor.No!.isNotEmpty) {
         conductor.Vehicle = v.Vehicle_Number;
-        await memberController.setcrew(
-          v.Vehicle_Number.toString(),
-          conductor.No!,
-          Crew_type.Conductor,
-        );
-        v.Conductor = conductor;
+        await memberController
+            .setcrew(vehicleNo, conductor.No!, Crew_type.Conductor)
+            .timeout(saveTimeout);
       }
-
-      memberController.getcurrentcrew(v.Vehicle_Number.toString());
-    } catch (e) {
-      _showError('Assign failed: $e');
+    } on TimeoutException {
+      _fail('Saving crew timed out. Check the connection and try again.');
       return;
+    } catch (e) {
+      _fail('Assign failed: $e');
+      return;
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
 
+    // Hand the result back, including a cleared driver/conductor.
+    v.Driver = driver;
+    v.Conductor = conductor;
     _closePage(v);
   }
 
-  /// Closes this page. GetX's Get.back() crashes with a
-  /// LateInitializationError if the snackbar queue holds an unshown snackbar,
-  /// so fall back to a raw navigator pop.
+  /// Closes this page and hands [v] back to the caller.
+  ///
+  /// The raw navigator is used on purpose: Get.back() can pop an overlay
+  /// (snackbar/dialog) instead of this page, which leaves the screen stuck
+  /// open on top of the dispatch list.
   void _closePage(Vehicles? v) {
     if (!mounted) return;
-    try {
-      Get.back(result: v);
-    } catch (_) {
-      if (mounted) Navigator.of(context).pop(v);
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop(v);
+      return;
     }
+    Get.back(result: v);
   }
 
-  void _showError(String message) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Assign Crew'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () {
-              if (mounted) Navigator.of(context).pop();
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-      barrierDismissible: false,
-    );
+  /// Shows [message] on the page itself.
+  ///
+  /// An inline banner is used instead of a dialog because a dialog can fail to
+  /// appear (and then the button looks like it did nothing).
+  void _fail(String message) {
+    if (!mounted) return;
+    setState(() {
+      _error = message;
+      _saving = false;
+    });
   }
 }
