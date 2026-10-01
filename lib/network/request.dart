@@ -14,9 +14,15 @@ class Request {
   DateTime? date;
   int? size;
   String? Agent;
+  /// Free-form date filter used by delta reads (e.g. trips modified after).
+  String? datefilter;
+  /// M-Pesa paybill number — the till a vehicle's transactions land on.
+  String? paybill;
   Request({
     this.Agent,
     this.body,
+    this.datefilter,
+    this.paybill,
     this.Otp = '',
     this.phone = '',
     this.Otp_message = '',
@@ -30,6 +36,8 @@ class Request {
     return <String, dynamic>{
       'body': body,
       'Agent': Agent,
+      'datefilter': datefilter,
+      'paybill': paybill,
       'Otp': Otp,
       'phone': phone,
       'Otp_message': Otp_message,
@@ -50,6 +58,9 @@ class Request {
           map['Otp_message'] != null ? map['Otp_message'] as String : null,
       bookmark: map['bookmark'] != null ? map['bookmark'] as String : null,
       vehicle: map['vehicle'] != null ? map['vehicle'] as String : null,
+      datefilter:
+          map['datefilter'] != null ? map['datefilter'] as String : null,
+      paybill: map['paybill'] != null ? map['paybill'] as String : null,
       date: map['date'] != null
           ? DateFormat("dd/MM/yyyy").parse((map['date'] ?? 0))
           : null,

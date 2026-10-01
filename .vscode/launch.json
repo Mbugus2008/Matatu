@@ -45,6 +45,13 @@
       "type": "dart",
       "program": "D:\\Projects2\\Matatu\\trimline_citihoppa\\lib\\main.dart"
     },
+
+    {
+      "name": "MetroTrans",
+      "request": "launch",
+      "type": "dart",
+      "program": "D:\\Projects2\\Matatu\\trimline_MetroTrans\\lib\\main.dart"
+    },
     {
       "name": "t_matatu/trimline_kmos (profile mode)",
       "request": "launch",

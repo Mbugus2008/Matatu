@@ -20,13 +20,21 @@ import '../controllers/expenses/expense_controller.dart';
 import '../models/Header.dart';
 import '../models/Transaction.dart' as tMatatu;
 import '../models/expenses/expenses.dart';
+import '../models/mpesa_transaction.dart';
 import '../models/vehicles/vehicle.dart';
+import '../models/waybill/waybill.dart';
 import '../providers/db.dart';
 import 'widgets/total_amount_display.dart';
 import 'widgets/transaction_list_item.dart';
 
 class Receipt extends StatefulWidget {
   const Receipt({super.key});
+
+  /// Amount the vehicle still has to bring in cash: target minus what was
+  /// already paid through M-Pesa (never negative).
+  static double expectedCashAmount(double target, double paidMpesa) =>
+      target - paidMpesa > 0 ? target - paidMpesa : 0;
+
   @override
   State<Receipt> createState() => _ReceiptState();
 }
@@ -39,6 +47,10 @@ class _ReceiptState extends State<Receipt> {
   late final FocusNode _amountFocusNode;
   late final TextEditingController _vehicleNoController;
   late final TextEditingController _commentsController;
+
+  // CityHoppa metrics: open-trip stats + M-Pesa sum, fetched per vehicle.
+  Future<(int, double, double?)>? _metricsFuture;
+  String? _metricsVehicle;
 
   @override
   void initState() {
@@ -150,6 +162,9 @@ class _ReceiptState extends State<Receipt> {
       }
       headerController.clearAllTransactions();
       _vehicleNoController.clear();
+      // CityHoppa: the printed receipt settles the vehicle — close whatever is
+      // still open and update the M-Pesa transactions it covers.
+      _settleVehicleAfterPrint(header);
       upload();
       Get.back();
       _showSnackbarDeferred('Success', 'Receipt printed successfully',
@@ -170,6 +185,51 @@ class _ReceiptState extends State<Receipt> {
     Get.find<HeaderController>().currTrans.clear();
     Get.find<HeaderController>().createheader();
     Get.find<MemberController>().clearcurrentvehicle();
+  }
+
+  /// Fire-and-forget settlement run right after a CityHoppa receipt prints:
+  ///
+  /// 1. Every un-receipted M-Pesa transaction for the vehicle since the
+  ///    *previous* receipt is stamped with this receipt's number
+  ///    (Receipt_No / Receipted_At / Receipted_By) in BC, so it is never
+  ///    counted by the next receipt.
+  /// 2. Every open trip of the vehicle is closed — what was on the road was
+  ///    handed in with this receipt. Closes go through the normal dirty/push
+  ///    lifecycle, so they sync even while offline.
+  /// 3. The entries whose trips were closed are stamped with the receipt
+  ///    number too, keeping trip → entry → receipt traceable.
+  void _settleVehicleAfterPrint(Header header) {
+    if (!_isCityHoppa) return;
+    final vehicleNo = (header.Vehicle ?? '').trim();
+    if (vehicleNo.isEmpty) return;
+
+    Future<void>(() async {
+      try {
+        final service = MpesaTransactionService();
+        final receiptNo = (header.Receipt_No ?? '').trim();
+        final since = await service.lastReceiptTime(vehicleNo,
+                excludeReceiptNo: receiptNo) ??
+            MpesaTransactionService.startOfToday();
+        final vehicle = _findVehicle(vehicleNo);
+        final transactions = await service.fetchSince(
+          vehicleNo: vehicleNo,
+          paybill: vehicle?.Till_No,
+          since: since,
+        );
+        final pending = transactions.where((t) => !t.isReceipted).toList();
+        final updated = await service.markReceipted(
+          pending,
+          receiptNo: receiptNo,
+          agent: header.Agent,
+        );
+        final closed = await WaybillService()
+            .closeOpenTrips(vehicleNo: vehicleNo, receiptNo: receiptNo);
+        debugPrint('[CITYHOPPA] receipt $receiptNo: '
+            '$updated mpesa transaction(s) updated, $closed trip(s) closed');
+      } catch (e) {
+        debugPrint('[CITYHOPPA] post-print settlement failed: $e');
+      }
+    });
   }
 
   @override
@@ -218,6 +278,7 @@ class _ReceiptState extends State<Receipt> {
             children: [
               _buildVehicleMemberSection(),
               const SizedBox(height: 1.0),
+              if (_isCityHoppa) _buildCityHoppaMetrics(),
               _buildTodayTransactionsButton(),
               const SizedBox(height: 1.0),
               _buildNewEntrySection(),
@@ -256,6 +317,128 @@ class _ReceiptState extends State<Receipt> {
         labelText: 'Comments',
         border: OutlineInputBorder(),
       ),
+    );
+  }
+
+  // ─── CityHoppa metrics ───────────────────────────────
+
+  /// CityHoppa officers watch the day's trip flow here: open trips, the money
+  /// still on the road (target = totals of all open trips), M-Pesa paid and
+  /// the cash still expected.
+  bool get _isCityHoppa =>
+      Get.find<MainController>().config?.value.clientId == 'CITYHOPPER';
+
+  Future<(int, double, double?)> _metricsFutureFor(String vehicleNo) {
+    if (_metricsVehicle != vehicleNo || _metricsFuture == null) {
+      _metricsVehicle = vehicleNo;
+      _metricsFuture = _loadMetrics(vehicleNo);
+    }
+    return _metricsFuture!;
+  }
+
+  Future<(int, double, double?)> _loadMetrics(String vehicleNo) async {
+    final open = await WaybillService()
+        .openTripsSummaryForVehicle(vehicleNo: vehicleNo);
+    final vehicle = _findVehicle(vehicleNo);
+    final mpesa = await MpesaTransactionService().paidSinceLastReceipt(
+      vehicleNo: vehicleNo,
+      paybill: vehicle?.Till_No,
+    );
+    return (open.$1, open.$2, mpesa);
+  }
+
+  /// Local vehicle row — carries the M-Pesa till (paybill) its transactions
+  /// land on.
+  Vehicles? _findVehicle(String vehicleNo) {
+    final target = vehicleNo.trim().toUpperCase();
+    if (target.isEmpty) return null;
+    try {
+      for (final v in Get.find<VehiclesController>().allVehicles) {
+        if ((v.Vehicle_Number ?? '').trim().toUpperCase() == target) return v;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Widget _buildCityHoppaMetrics() {
+    final vehicleCtrl = Get.find<VehiclesController>();
+    // Reactive: the card must reload when the officer picks another vehicle.
+    return Obx(() {
+      final vehicle = vehicleCtrl.Currentvehicle.value;
+
+      var mpesa = vehicle?.Mpesa;
+      if (mpesa == null && vehicle?.Vehicle_Number != null) {
+        for (final v in vehicleCtrl.vehdailycollections) {
+          if (v.Vehicle_Number == vehicle!.Vehicle_Number) {
+            mpesa = v.Mpesa;
+            break;
+          }
+        }
+      }
+      final money = NumberFormat('#,##0');
+
+      return FutureBuilder<(int, double, double?)>(
+        future: _metricsFutureFor(vehicle?.Vehicle_Number ?? ''),
+        builder: (context, snapshot) {
+          final waiting = snapshot.connectionState == ConnectionState.waiting;
+          final openCount = snapshot.data?.$1 ?? 0;
+          // Target = the money still on the road: totals of all open trips.
+          final target = snapshot.data?.$2 ?? 0;
+          // Paid M-Pesa: live sum of the vehicle's M-Pesa transactions since
+          // its last receipt. Falls back to the daily-collection figure when
+          // the feed is unreachable, so the receipt still works offline.
+          final paidMpesa = snapshot.data?.$3 ?? mpesa ?? 0;
+          final expectedCash = Receipt.expectedCashAmount(target, paidMpesa);
+
+          return Card(
+            elevation: 4,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildMetric('Open Trips',
+                        waiting ? '—' : '$openCount', Icons.timelapse),
+                  ),
+                  Expanded(
+                    child: _buildMetric('Target',
+                        waiting ? '—' : money.format(target),
+                        Icons.flag_outlined),
+                  ),
+                  Expanded(
+                    child: _buildMetric(
+                        'Paid M-Pesa',
+                        waiting ? '—' : money.format(paidMpesa),
+                        Icons.phone_android),
+                  ),
+                  Expanded(
+                    child: _buildMetric(
+                        'Expected Cash',
+                        waiting ? '—' : money.format(expectedCash),
+                        Icons.payments_outlined),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    });
+  }
+
+  Widget _buildMetric(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF006B3F)),
+        const SizedBox(height: 4),
+        Text(value,
+            style:
+                const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF5B5F61)),
+            textAlign: TextAlign.center),
+      ],
     );
   }
 

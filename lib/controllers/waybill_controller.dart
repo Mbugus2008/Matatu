@@ -1,9 +1,11 @@
 // ignore_for_file: public_member_api_docs
 
 import 'package:get/get.dart';
+import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/providers/db.dart';
 import 'package:t_matatu/providers/logger.dart';
+import 'package:t_matatu/utils/crew_lookup.dart';
 
 /// Controller for managing Waybill data state and operations
 class WaybillController extends GetxController {
@@ -39,6 +41,7 @@ class WaybillController extends GetxController {
 
   final Rx<DateTime> selectedDate = DateTime.now().obs;
   final RxBool isLoading = false.obs;
+  bool _syncInFlight = false;
   final Rx<String?> selectedVehicle = Rx<String?>(null);
   final Rx<Waybill?> selectedWaybill = Rx<Waybill?>(null);
 
@@ -46,8 +49,8 @@ class WaybillController extends GetxController {
 
   /// Loads the waybill entries of [selectedDate] from the local DB.
   /// This is the primary data source — API is only used for sync, not reads.
-  Future<void> loadFromLocalDB() async {
-    isLoading.value = true;
+  Future<void> loadFromLocalDB({bool silent = false}) async {
+    if (!silent) isLoading.value = true;
     try {
       final startOfDay = DateTime(selectedDate.value.year,
           selectedDate.value.month, selectedDate.value.day);
@@ -70,13 +73,13 @@ class WaybillController extends GetxController {
       _logError('loadFromLocalDB failed', e);
       rethrow;
     } finally {
-      isLoading.value = false;
+      if (!silent) isLoading.value = false;
     }
   }
 
   /// Loads every waybill entry on the device, newest first (no date filter).
-  Future<void> loadAllFromLocalDB() async {
-    isLoading.value = true;
+  Future<void> loadAllFromLocalDB({bool silent = false}) async {
+    if (!silent) isLoading.value = true;
     try {
       final rows = await db_Provider().getdata(Waybill.table, Waybill.columns);
 
@@ -95,7 +98,7 @@ class WaybillController extends GetxController {
       _logError('loadAllFromLocalDB failed', e);
       rethrow;
     } finally {
-      isLoading.value = false;
+      if (!silent) isLoading.value = false;
     }
   }
 
@@ -159,11 +162,31 @@ class WaybillController extends GetxController {
     }).toList();
   }
 
+  /// Delta-sync trip changes made on other devices or in BC since the stored
+  /// sync time. Fire-and-forget; the waybill page runs it as it opens.
+  Future<void> syncTripChanges() async {
+    try {
+      final merged = await _service.pullModifiedTrips();
+      if (merged > 0) {
+        _log('merged $merged changed trip(s) from BC');
+        await loadFromLocalDB();
+        await loadTripTotals();
+      }
+    } catch (e) {
+      _logError('syncTripChanges failed', e);
+    }
+  }
+
   /// Two-way sync: pushes local entries/trips that BC has not accepted yet,
   /// then pulls the day's entries and merges them. Used by the Sync button and
-  /// by pull-to-refresh on the waybill screens.
-  Future<void> syncFromAPI() async {
-    isLoading.value = true;
+  /// by pull-to-refresh on the waybill screens. [silent] keeps the UI still:
+  /// no spinner appears and the list just refreshes when the sync lands.
+  Future<void> syncFromAPI({bool silent = false}) async {
+    // One sync at a time — the minute timer, page open and pull-to-refresh
+    // can otherwise overlap on slow networks.
+    if (_syncInFlight) return;
+    _syncInFlight = true;
+    if (!silent) isLoading.value = true;
     try {
       // 1. Push pending work first, so local entries get their BC entry number
       //    and the trips waiting on them can follow.
@@ -171,32 +194,44 @@ class WaybillController extends GetxController {
       final pushedTrips = await _service.syncPendingWaybillTrips();
       _log('pushed $pushedWaybills waybill(s), $pushedTrips trip(s)');
 
-      // 2. Pull the day's entries from BC.
+      // 2. Pull the day's entries from BC and merge them — one row per
+      //    entry survives even when BC re-keyed rows (stale local key).
       final result = await _service.getWaybills(DateTime.now());
       _log('API returned ${result.length} entries');
-      final db = db_Provider();
       for (final wb in result) {
-        wb.sent = wb.Entry_No != null;
-        await db.insert(Waybill.table, wb);
+        await _service.mergeServerWaybill(wb);
       }
+
+      // 2b. Entries created or edited elsewhere (other devices / BC) since
+      //     the last sync — whatever their date (NAV Last_modified delta).
+      final mergedWaybills = await _service.pullModifiedWaybills();
+      if (mergedWaybills > 0) {
+        _log('merged $mergedWaybills changed waybill(s)');
+      }
+
+      // 3. Pull trips changed in BC since the last sync (edits from other
+      //    devices/users) and merge them in.
+      final mergedTrips = await _service.pullModifiedTrips();
+      if (mergedTrips > 0) _log('merged $mergedTrips changed trip(s)');
     } catch (e) {
       _logError('syncFromAPI failed', e);
     } finally {
       // Always re-read local DB so the screen reflects merged + pending rows,
       // even when BC has no entries for the date.
       try {
-        await loadFromLocalDB();
+        await loadFromLocalDB(silent: silent);
       } catch (_) {
         // Already logged in loadFromLocalDB
       }
       await loadTripTotals();
       // Keep the history screen in step with the same sync.
       try {
-        await loadAllFromLocalDB();
+        await loadAllFromLocalDB(silent: silent);
       } catch (_) {
         // Already logged in loadAllFromLocalDB
       }
-      isLoading.value = false;
+      _syncInFlight = false;
+      if (!silent) isLoading.value = false;
     }
   }
 
@@ -221,6 +256,49 @@ class WaybillController extends GetxController {
   /// crew list. Used when a waybill is saved.
   Future<String?> resolveCrewNo(String? nameOrNumber, {String? vehicle}) =>
       _service.resolveCrewNo(nameOrNumber, vehicle: vehicle);
+
+  /// The day's entry for [vehicle] — found, or created silently when missing.
+  /// Start Trip calls this so the user never creates an entry by hand: the
+  /// target comes from the vehicle's daily contribution and the crew from the
+  /// team attached to the vehicle.
+  Future<Waybill?> ensureEntryForVehicle({
+    required Vehicles vehicle,
+    DateTime? date,
+  }) async {
+    final day = date ?? selectedDate.value;
+    try {
+      final existing = await _service.findEntryForVehicle(
+        vehicleNo: vehicle.Vehicle_Number,
+        fleetNo: vehicle.Fleet_No,
+        date: day,
+      );
+      if (existing != null) return existing;
+
+      final (driverNo, conductorNo) =
+          crewNumbersForVehicle(vehicle.Vehicle_Number);
+
+      final entry = Waybill(
+        Vehicle_No: vehicle.Vehicle_Number,
+        Fleet_No: vehicle.Fleet_No,
+        Driver: driverNo,
+        Conductor: conductorNo,
+        Date: DateTime(day.year, day.month, day.day),
+        Start_Time: DateTime.now(),
+        Target_Revenue: vehicle.Daily_Contribution ?? 0,
+      );
+
+      _log('entry for ${vehicle.Vehicle_Number} created silently for $day');
+      return await saveWaybill(entry);
+    } catch (e) {
+      _logError('ensureEntryForVehicle failed', e);
+      return null;
+    }
+  }
+
+  /// Next trip number for [waybill]. Start Trip uses it instead of counting
+  /// the screen's list, so an entry started from the list numbers correctly.
+  Future<int> nextTripNo(Waybill waybill) =>
+      _service.nextTripNo(waybill.Entry_No, waybillKey: waybill.Key);
 
   /// Save to local DB first, then attempt background API sync.
   /// Updates the list immediately for instant UI feedback.
@@ -283,9 +361,9 @@ class WaybillController extends GetxController {
   }
 
   /// Safe reload for the daily screen — never throws.
-  Future<void> reload() async {
+  Future<void> reload({bool silent = false}) async {
     try {
-      await loadFromLocalDB();
+      await loadFromLocalDB(silent: silent);
     } catch (_) {
       // Already logged in loadFromLocalDB
     }

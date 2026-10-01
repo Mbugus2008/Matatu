@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
+import 'package:t_matatu/models/route.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/pages/waybill/trip_form.dart';
@@ -384,6 +385,50 @@ void main() {
   // CONTROLLER TESTS
   // ═══════════════════════════════════════════════════════
 
+  group('WaybillService — BC From/To text', () {
+    final routes = [
+      RouteModel(
+          Code: 'UPDATEDROUTENAIROBA',
+          Description: 'Updated Route - Nairobi Express'),
+      RouteModel(Code: '34A', Description: 'Ambassadors -Jogoo Road - J.K.I.A'),
+    ];
+
+    test('route description resolves to its code (fits BC 20-char limit)', () {
+      expect(
+        WaybillService.bcRouteText('Updated Route - Nairobi Express', routes),
+        'UPDATEDROUTENAIROBA',
+      );
+    });
+
+    test('a code stays a code', () {
+      expect(WaybillService.bcRouteText('34A', routes), '34A');
+    });
+
+    test('matching ignores case and surrounding spaces', () {
+      expect(
+        WaybillService.bcRouteText(
+            '  updated route - nairobi express ', routes),
+        'UPDATEDROUTENAIROBA',
+      );
+    });
+
+    test('unknown long text is trimmed to 20 characters', () {
+      expect(
+        WaybillService.bcRouteText('Some very long random text here', routes),
+        'Some very long rando',
+      );
+    });
+
+    test('short unknown text is left alone', () {
+      expect(WaybillService.bcRouteText('Kencom', routes), 'Kencom');
+    });
+
+    test('empty stays empty', () {
+      expect(WaybillService.bcRouteText(null, routes), null);
+      expect(WaybillService.bcRouteText('  ', routes), '  ');
+    });
+  });
+
   group('WaybillController', () {
     setUp(() {
       _setupGetX();
@@ -505,15 +550,30 @@ void main() {
         const GetMaterialApp(home: WaybillListPage()),
       );
       await tester.pump();
-      expect(find.text('No entries yet'), findsOneWidget);
+      expect(find.text('No trips started today'), findsOneWidget);
     });
 
-    testWidgets('renders New Entry FAB', (tester) async {
+    testWidgets('renders Start Trip FAB', (tester) async {
       await tester.pumpWidget(
         const GetMaterialApp(home: WaybillListPage()),
       );
       await tester.pump();
-      expect(find.text('New Entry'), findsOneWidget);
+      expect(find.text('Start Trip'), findsOneWidget);
+    });
+
+    testWidgets('Start Trip FAB opens the silent-entry popup',
+        (tester) async {
+      await tester.pumpWidget(
+        const GetMaterialApp(home: WaybillListPage()),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Start Trip'));
+      await tester.pumpAndSettle();
+      // Fresh start: the vehicle picker comes first — the day's waybill
+      // entry is found or created silently once the vehicle is picked.
+      expect(find.text('Vehicle'), findsOneWidget);
+      expect(find.text('Departure'), findsOneWidget);
+      expect(find.text('Passengers'), findsOneWidget);
     });
 
     testWidgets('renders bottom navigation bar', (tester) async {
@@ -693,6 +753,21 @@ void main() {
       await tester.pump();
       expect(find.text('Route'), findsOneWidget);
       expect(find.text('Passenger & Fare'), findsOneWidget);
+    });
+
+    testWidgets('editing an open trip shows arrival as not closed',
+        (tester) async {
+      final trip = WaybillTrip(
+        Trip_No: 5,
+        From: '46 - KEN',
+        From_Time: DateTime(2026, 9, 29, 8, 0),
+      );
+      await tester.pumpWidget(
+        GetMaterialApp(home: TripFormPage(trip: trip)),
+      );
+      await tester.pump();
+      // Saving this edit must keep the trip open - arrival stays unset.
+      expect(find.text('Not closed'), findsOneWidget);
     });
 
     testWidgets('renders Save Trip button', (tester) async {

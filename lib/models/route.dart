@@ -105,7 +105,9 @@ class RouteService {
     }
   }
 
-  /// Sync routes: fetch from API, save to local DB
+  /// Pulls the route list from BC and merges it locally. Routes that are no
+  /// longer in BC are removed, because NAV validates trip From/To against its
+  /// own route codes — a stale local code would make the trip fail to sync.
   Future<void> syncRoutes() async {
     final apiRoutes = await fetchFromAPI();
     if (apiRoutes.isEmpty) return;
@@ -115,5 +117,97 @@ class RouteService {
       route.sent = true;
       await db.insert(RouteModel.table, route);
     }
+
+    final serverKeys =
+        apiRoutes.map((r) => r.Key).whereType<String>().toSet();
+    final local = await db.getdata(RouteModel.table, RouteModel.columns,
+        '${RouteModel.col_sent} = 1');
+    for (final row in local.map(RouteModel.fromMap_db)) {
+      final key = row.Key;
+      if (key == null || key.isEmpty) continue;
+      if (!serverKeys.contains(key)) {
+        await db.deletedata(
+            RouteModel.table, '${RouteModel.col_Key} = ?', [key]);
+      }
+    }
+  }
+
+  // ─── Creating routes ───
+
+  /// Short code for a route named on the device. BC's own codes are letters
+  /// and digits only (GPO, KENCOM, AMBASSANDER), so match that shape rather
+  /// than inventing a different convention.
+  static String codeFromDescription(String description) {
+    final code = description.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (code.isEmpty) {
+      return 'ROUTE${DateTime.now().millisecondsSinceEpoch % 100000}';
+    }
+    return code.length <= 20 ? code : code.substring(0, 20);
+  }
+
+  /// Creates a route from [description]: stored locally straight away, then
+  /// pushed to Business Central. The local row survives if the push fails, so
+  /// a route captured offline is not lost and goes up on the next sync.
+  Future<RouteModel> createRoute(String description) async {
+    final route = RouteModel(
+      Key: DateTime.now().millisecondsSinceEpoch.toString(),
+      Code: codeFromDescription(description),
+      Description: description.trim(),
+      sent: false,
+    );
+
+    await db_Provider().insert(RouteModel.table, route);
+    await postRoute(route);
+    return route;
+  }
+
+  /// Pushes one route to BC and adopts whatever Key/Code comes back.
+  Future<bool> postRoute(RouteModel route) async {
+    try {
+      final response = await _api.postdata('addroute', route.toJson());
+      final result =
+          Results<RouteModel>.fromJson(response.body, RouteModel.fromMap);
+      if (result.Code != 0 ||
+          result.Contents == null ||
+          result.Contents!.isEmpty) {
+        return false;
+      }
+
+      final server = result.Contents!.first;
+      final db = db_Provider();
+
+      // BC may hand back its own key: move the row instead of leaving a twin.
+      if (server.Key != null && server.Key != route.Key) {
+        if (route.Key != null) {
+          await db.deletedata(
+              RouteModel.table, '${RouteModel.col_Key} = ?', [route.Key!]);
+        }
+        route.Key = server.Key;
+      }
+
+      route.Code = server.Code ?? route.Code;
+      route.Description = server.Description ?? route.Description;
+      route.sent = true;
+      await db.insert(RouteModel.table, route);
+      return true;
+    } catch (_) {
+      // Left unsent - retried by syncPendingRoutes().
+      return false;
+    }
+  }
+
+  /// Pushes every route captured on the device that BC has not accepted yet.
+  Future<int> syncPendingRoutes() async {
+    var synced = 0;
+    try {
+      final rows = await db_Provider().getdata(
+          RouteModel.table, RouteModel.columns, '${RouteModel.col_sent} = 0');
+      for (final route in rows.map(RouteModel.fromMap_db)) {
+        if (await postRoute(route)) synced++;
+      }
+    } catch (_) {
+      // Offline or DB not ready: they stay pending.
+    }
+    return synced;
   }
 }

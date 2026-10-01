@@ -1,14 +1,18 @@
 // ignore_for_file: public_member_api_docs
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/pages/setting.dart';
+import 'package:t_matatu/pages/waybill/start_trip_sheet.dart';
 import 'package:t_matatu/pages/waybill/trip_list.dart';
 import 'package:t_matatu/pages/waybill/waybill_form.dart';
 import 'package:t_matatu/utils/crew_lookup.dart';
+import 'package:t_matatu/utils/snackbar_service.dart';
 
 class WaybillListPage extends StatefulWidget {
   const WaybillListPage({super.key});
@@ -21,6 +25,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
   late final WaybillController _controller;
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
+  Timer? _autoSyncTimer;
 
   static const _primaryGreen = Color(0xFF006B3F);
   static const _onPrimary = Color(0xFFFFFFFF);
@@ -43,11 +48,26 @@ class _WaybillListPageState extends State<WaybillListPage> {
     });
     // The controller is created at app start, so always reload for the
     // selected date when the screen opens.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _controller.reload());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.reload(silent: true);
+      // Full sync on open: pushes pending rows, pulls the day's entries and
+      // whatever changed elsewhere (other devices / BC) — entries appear
+      // without a manual Sync tap. Silent: no spinner, the list just
+      // refreshes when the sync lands.
+      _controller.syncFromAPI(silent: true);
+
+      // Keep the screen live: another device's entry, a trip closed or a
+      // receipt settled server-side — refresh quietly every minute.
+      _autoSyncTimer?.cancel();
+      _autoSyncTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+        _controller.syncFromAPI(silent: true);
+      });
+    });
   }
 
   @override
   void dispose() {
+    _autoSyncTimer?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -60,14 +80,30 @@ class _WaybillListPageState extends State<WaybillListPage> {
     }).toList();
   }
 
-  Future<void> _navigateToForm({Waybill? wb}) async {
-    // Controller.saveWaybill() already updates the list directly — no need to re-fetch.
-    // A waybill that already exists for the vehicle/day comes back as
-    // 'open-duplicate' so we can jump straight into its trips.
-    final result = await Get.to(() => WaybillFormPage(waybill: wb));
-    if (result == 'open-duplicate') {
-      await Get.to(() => const TripListPage());
-      await _controller.reload();
+  /// Opens the entry form to adjust details (target, crew, cash, ...).
+  /// Entries themselves are created silently by Start Trip.
+  Future<void> _editEntry(Waybill wb) async {
+    // Controller.saveWaybill() already updates the list directly — no need to
+    // re-fetch after the edit.
+    await Get.to(() => WaybillFormPage(waybill: wb));
+  }
+
+  /// Start Trip is the primary action — the day's waybill entry is found or
+  /// created silently once the vehicle is picked on the sheet.
+  Future<void> _startTrip() async {
+    final started = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => StartTripSheet(controller: _controller),
+    );
+    if (started != true || !mounted) return;
+    await _controller.reload();
+    if (mounted) {
+      SnackbarService.showSuccess('Trip started — it will sync automatically');
     }
   }
 
@@ -119,7 +155,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
           _buildDateBar(),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => _controller.syncFromAPI(),
+              onRefresh: () => _controller.syncFromAPI(silent: true),
               child: CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(child: _buildSummaryGrid()),
@@ -132,11 +168,11 @@ class _WaybillListPageState extends State<WaybillListPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _navigateToForm(),
+        onPressed: _startTrip,
         backgroundColor: _primaryGreen,
         foregroundColor: _onPrimary,
-        icon: const Icon(Icons.add),
-        label: const Text('New Entry'),
+        icon: const Icon(Icons.play_arrow),
+        label: const Text('Start Trip'),
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
@@ -166,7 +202,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
             ),
             const Spacer(),
             GestureDetector(
-              onTap: () => _controller.syncFromAPI(),
+              onTap: () => _controller.syncFromAPI(silent: true),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -411,7 +447,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.more_vert, color: _outline),
-                    onPressed: () => _navigateToForm(wb: wb),
+                    onPressed: () => _editEntry(wb),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -495,7 +531,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
           BottomNavigationBarItem(icon: Icon(Icons.sync), label: 'Sync'),
         ],
         onTap: (index) {
-          if (index == 2) _controller.syncFromAPI();
+          if (index == 2) _controller.syncFromAPI(silent: true);
         },
       ),
     );
@@ -521,17 +557,18 @@ class _EmptyState extends StatelessWidget {
                 color: const Color(0xFFE5E9E3),
                 borderRadius: BorderRadius.circular(64),
               ),
-              child: const Icon(Icons.list_alt,
+              child: const Icon(Icons.play_circle_outline,
                   size: 64, color: Color(0xFF6F7A71)),
             ),
             const SizedBox(height: 16),
-            const Text('No entries yet',
+            const Text('No trips started today',
                 style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF181D19))),
             const SizedBox(height: 4),
-            const Text('Tap New Entry to create a waybill.',
+            const Text(
+                'Tap Start Trip to begin — the day\'s waybill is created automatically.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, color: Color(0xFF6F7A71))),
           ],

@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/main.dart';
-import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
-import 'package:t_matatu/models/route.dart';
-import 'package:t_matatu/models/vehicles/vehicle.dart';
+import 'package:t_matatu/models/expenses/vehicle_expenses.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
+import 'package:t_matatu/pages/waybill/start_trip_sheet.dart';
 import 'package:t_matatu/pages/waybill/trip_form.dart';
 import 'package:t_matatu/utils/crew_lookup.dart';
 
@@ -26,6 +25,24 @@ class _TripListPageState extends State<TripListPage> {
   /// other waybill screens, so watching it here made this page's Obx rebuild
   /// while another screen was mid-build.
   bool _loading = true;
+
+  /// Supervisors and admins can record expenses (fuel, police, ...) on an
+  /// open trip — see Agent.canAddTripExpenses.
+  bool get _canAddExpenses =>
+      Get.find<MainController>().agent.value.canAddTripExpenses;
+
+  /// "From — description" for the trip card, keeping "→ To" for older trips
+  /// that still carry a To route.
+  String _routeLine(WaybillTrip trip) {
+    final from = (trip.From ?? '?').trim();
+    final description = (trip.Description ?? '').trim();
+    final base =
+        (description.isEmpty || description.toUpperCase() == from.toUpperCase())
+            ? from
+            : '$from — $description';
+    final to = (trip.To ?? '').trim();
+    return to.isEmpty ? base : '$base → $to';
+  }
 
   @override
   void initState() {
@@ -205,7 +222,7 @@ class _TripListPageState extends State<TripListPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${trip.From ?? '?'} → ${trip.To ?? '?'}',
+                        _routeLine(trip),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -274,6 +291,19 @@ class _TripListPageState extends State<TripListPage> {
                 ),
               ],
             ),
+            if (_canAddExpenses && trip.isOpen)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF006B3F),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  icon: const Icon(Icons.post_add, size: 18),
+                  label: const Text('Add Expense'),
+                  onPressed: () => _addExpense(trip),
+                ),
+              ),
             if (trip.To_Time == null)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
@@ -347,6 +377,63 @@ class _TripListPageState extends State<TripListPage> {
     Get.to(() => TripFormPage(trip: trip))?.then((_) => _reload());
   }
 
+  /// Supervisor/admin action: money spent on a trip (fuel, police, ...) while
+  /// it is open. The amount adds to whatever is already on the trip; the
+  /// reason is kept in the comments and on the vehicle-expenses journal.
+  Future<void> _addExpense(WaybillTrip trip) async {
+    final result = await showDialog<_ExpenseEntry>(
+      context: context,
+      builder: (_) => _AddExpenseDialog(trip: trip),
+    );
+    if (result == null || !mounted) return;
+
+    trip.Expenses = (trip.Expenses ?? 0) + result.amount;
+    if (result.note.isNotEmpty) {
+      final line = 'Expense: ${result.note} '
+          '(KSh ${NumberFormat('#,##0').format(result.amount)})';
+      final existing = (trip.Comments ?? '').trim();
+      trip.Comments = existing.isEmpty ? line : '$existing\n$line';
+    }
+
+    final saved = await _controller.saveTrip(trip);
+    if (!mounted) return;
+    if (saved != null) {
+      await _storeVehicleExpense(trip, result);
+      await _reload();
+      _showInfoDialog(
+          'Add Expense', 'Expense added — it will sync automatically.');
+    } else {
+      _showInfoDialog('Add Expense', 'Could not save the expense. Try again.');
+    }
+  }
+
+  /// Mirrors the trip expense onto the vehicle-expenses journal so the depot
+  /// reports see it too. The trip's code goes in Vehicle_No — that is how the
+  /// office links a vehicle expense back to the trip it was spent on.
+  Future<void> _storeVehicleExpense(
+      WaybillTrip trip, _ExpenseEntry entry) async {
+    final wb = _controller.selectedWaybill.value;
+    final row = Vehicle_Expenses(
+      Code: Vehicle_Expenses.newCode(),
+      Vehicle_No: trip.Key,
+      Date: DateTime.now(),
+      DateSpecified: true,
+      Description: entry.note.isEmpty ? null : entry.note,
+      Created_By: Get.find<MainController>().agent.value.Agent_Code,
+      Amount: entry.amount,
+      AmountSpecified: true,
+      Fleet_No: wb?.Fleet_No,
+    );
+
+    try {
+      await row.saveLocal();
+      // Best effort push — a row BC does not take stays pending for Post All.
+      await Vehicle_Expenses.postRows([row]);
+    } catch (_) {
+      // Offline or page unavailable: the expense still reached the trip.
+    }
+  }
+
   /// Opens the close-trip popup (same style as Start Trip).
   void _closeTrip(WaybillTrip trip) {
     showModalBottomSheet<bool>(
@@ -384,11 +471,9 @@ class _TripListPageState extends State<TripListPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => _StartTripSheet(
+      builder: (_) => StartTripSheet(
         controller: _controller,
-        entryNo: wb.Entry_No,
-        vehicleNo: wb.Vehicle_No,
-        waybillKey: wb.Key,
+        waybill: wb,
       ),
     ).then((started) {
       if (started == true) {
@@ -418,422 +503,7 @@ class _TripListPageState extends State<TripListPage> {
   }
 }
 
-/// Popup form used to start a new trip quickly.
-class _StartTripSheet extends StatefulWidget {
-  final WaybillController controller;
-  final int? entryNo;
-  final String? vehicleNo;
-  final String? waybillKey;
 
-  const _StartTripSheet({
-    required this.controller,
-    required this.entryNo,
-    this.vehicleNo,
-    this.waybillKey,
-  });
-
-  @override
-  State<_StartTripSheet> createState() => _StartTripSheetState();
-}
-
-class _StartTripSheetState extends State<_StartTripSheet> {
-  static const _primaryGreen = Color(0xFF006B3F);
-
-  final RouteService _routeService = RouteService();
-  List<RouteModel> _routes = [];
-
-  final _fromCtrl = TextEditingController();
-  final _toCtrl = TextEditingController();
-  final _paxCtrl = TextEditingController(text: '1');
-  final _fareCtrl = TextEditingController();
-  final _commentsCtrl = TextEditingController();
-  TimeOfDay _departure = TimeOfDay.now();
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _prefillCapacity();
-    _loadRoutes();
-  }
-
-  /// Prefills passengers from the vehicle's capacity (derived from its type,
-  /// e.g. "33 Seater" -> 33).
-  void _prefillCapacity() {
-    final vehicleNo = widget.vehicleNo;
-    if (vehicleNo == null || vehicleNo.isEmpty) return;
-    if (!Get.isRegistered<VehiclesController>()) return;
-
-    try {
-      Vehicles? vehicle;
-      for (final v in Get.find<VehiclesController>().allVehicles) {
-        if (v.Vehicle_Number == vehicleNo) {
-          vehicle = v;
-          break;
-        }
-      }
-      if (vehicle == null) return;
-
-      final desc = vehicle_type_desc.desc[vehicle.Vehicle_Type] ?? '';
-      final digits = RegExp(r'\d+').firstMatch(desc)?.group(0);
-      if (digits != null && digits.isNotEmpty) {
-        _paxCtrl.text = digits;
-      }
-    } catch (_) {
-      // Capacity prefill is a convenience only.
-    }
-  }
-
-  /// Load routes from local DB, syncing from BC when empty.
-  Future<void> _loadRoutes() async {
-    final routes = await _routeService.loadFromLocalDB();
-    if (routes.isEmpty) {
-      await _routeService.syncRoutes();
-      final refreshed = await _routeService.loadFromLocalDB();
-      if (mounted) setState(() => _routes = refreshed);
-    } else {
-      if (mounted) setState(() => _routes = routes);
-    }
-  }
-
-  Widget _buildRouteField(TextEditingController ctrl, String label,
-      {TextEditingController? other}) {
-    return InkWell(
-      onTap: () => _pickRoute(ctrl, label, exclude: other?.text),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: 'Tap to select route',
-          prefixIcon:
-              Icon(label == 'From' ? Icons.trip_origin : Icons.location_on),
-          suffixIcon: const Icon(Icons.arrow_drop_down),
-          border: const OutlineInputBorder(),
-        ),
-        child: Text(
-          ctrl.text.isEmpty ? 'Select route' : ctrl.text,
-          style: TextStyle(color: ctrl.text.isEmpty ? Colors.grey : null),
-        ),
-      ),
-    );
-  }
-
-  /// Opens a searchable list of routes and stores the picked one.
-  /// Any route already chosen in the other field is hidden.
-  Future<void> _pickRoute(TextEditingController ctrl, String label,
-      {String? exclude}) async {
-    if (_routes.isEmpty) {
-      await _loadRoutes();
-    }
-    if (!mounted) return;
-    if (_routes.isEmpty) {
-      _showDialog('Route',
-          'No routes available. Check the connection, then try again.');
-      return;
-    }
-
-    var query = '';
-    final selected = await showDialog<RouteModel>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          final excluded = (exclude ?? '').trim().toLowerCase();
-          final available = excluded.isEmpty
-              ? _routes
-              : _routes
-                  .where((r) =>
-                      (r.Description ?? r.Code ?? '').trim().toLowerCase() !=
-                      excluded)
-                  .toList();
-          final filtered = query.isEmpty
-              ? available
-              : available
-                  .where((r) =>
-                      (r.Code ?? '')
-                          .toLowerCase()
-                          .contains(query.toLowerCase()) ||
-                      (r.Description ?? '')
-                          .toLowerCase()
-                          .contains(query.toLowerCase()))
-                  .toList();
-          return AlertDialog(
-            title: Text('Select $label Route'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Search route...',
-                      prefixIcon: Icon(Icons.search),
-                    ),
-                    onChanged: (value) =>
-                        setDialogState(() => query = value.trim()),
-                  ),
-                  const SizedBox(height: 8),
-                  Flexible(
-                    child: filtered.isEmpty
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: Text('No matching routes'),
-                          )
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: filtered.length,
-                            itemBuilder: (_, index) {
-                              final route = filtered[index];
-                              return ListTile(
-                                dense: true,
-                                leading:
-                                    const Icon(Icons.route_outlined, size: 20),
-                                title:
-                                    Text(route.Description ?? route.Code ?? ''),
-                                subtitle: route.Code != null
-                                    ? Text(route.Code!,
-                                        style: const TextStyle(fontSize: 12))
-                                    : null,
-                                onTap: () =>
-                                    Navigator.pop(dialogContext, route),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    if (selected != null && mounted) {
-      setState(() => ctrl.text = selected.Description ?? selected.Code ?? '');
-    }
-  }
-
-  @override
-  void dispose() {
-    _fromCtrl.dispose();
-    _toCtrl.dispose();
-    _paxCtrl.dispose();
-    _fareCtrl.dispose();
-    _commentsCtrl.dispose();
-    super.dispose();
-  }
-
-  int get _pax => int.tryParse(_paxCtrl.text.trim()) ?? 0;
-  double get _fare => double.tryParse(_fareCtrl.text.trim()) ?? 0;
-  double get _total => _pax * _fare;
-
-  Future<void> _pickDeparture() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _departure,
-    );
-    if (picked != null) setState(() => _departure = picked);
-  }
-
-  Future<void> _start() async {
-    final entryNo = widget.entryNo;
-    if (_fromCtrl.text.trim().isEmpty || _toCtrl.text.trim().isEmpty) {
-      _showDialog('Start Trip', 'Enter From and To routes');
-      return;
-    }
-    if (_pax <= 0) {
-      _showDialog('Start Trip', 'Passengers must be at least 1');
-      return;
-    }
-
-    setState(() => _saving = true);
-
-    var nextNo = 1;
-    for (final t in widget.controller.trips) {
-      if ((t.Trip_No ?? 0) >= nextNo) nextNo = (t.Trip_No ?? 0) + 1;
-    }
-
-    final now = DateTime.now();
-    final trip = WaybillTrip(
-      // Null when the waybill is not synced yet — the trip is saved locally
-      // and linked by Waybill_Key until BC assigns its entry number.
-      Weign_Bridge_id: entryNo,
-      Waybill_Key: widget.waybillKey,
-      Trip_No: nextNo,
-      From: _fromCtrl.text.trim(),
-      From_Time: DateTime(
-          now.year, now.month, now.day, _departure.hour, _departure.minute),
-      To: _toCtrl.text.trim(),
-      Pax_No: _pax,
-      Fare_Amount: _fare,
-      Total: _total,
-      Comments:
-          _commentsCtrl.text.trim().isEmpty ? null : _commentsCtrl.text.trim(),
-    );
-
-    final saved = await _saveSafely(trip);
-    if (!mounted) return;
-    setState(() => _saving = false);
-
-    if (saved != null) {
-      Navigator.pop(context, true);
-    } else {
-      _showDialog('Start Trip', 'Failed to start trip');
-    }
-  }
-
-  Future<WaybillTrip?> _saveSafely(WaybillTrip trip) async {
-    try {
-      return await widget.controller.saveTrip(trip);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  void _showDialog(String title, String message) {
-    Get.dialog(
-      AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () {
-              if (mounted) Navigator.of(context).pop();
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-      barrierDismissible: false,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('Start Trip',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: _primaryGreen)),
-          const SizedBox(height: 12),
-          _buildRouteField(_fromCtrl, 'From', other: _toCtrl),
-          const SizedBox(height: 10),
-          _buildRouteField(_toCtrl, 'To', other: _fromCtrl),
-          const SizedBox(height: 10),
-          InkWell(
-            onTap: _pickDeparture,
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Departure',
-                prefixIcon: Icon(Icons.schedule),
-                border: OutlineInputBorder(),
-              ),
-              child: Text(_departure.format(context)),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _paxCtrl,
-                  keyboardType: TextInputType.number,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Passengers',
-                    prefixIcon: Icon(Icons.people),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _fareCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Fare Amount',
-                    prefixIcon: Icon(Icons.money),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          InputDecorator(
-            decoration: const InputDecoration(
-              labelText: 'Total',
-              prefixIcon: Icon(Icons.receipt_long),
-              border: OutlineInputBorder(),
-              filled: true,
-              fillColor: Color(0xFFF6FBF4),
-            ),
-            child: Text(NumberFormat('#,##0').format(_total)),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _commentsCtrl,
-            maxLines: 2,
-            decoration: const InputDecoration(
-              labelText: 'Comments',
-              prefixIcon: Icon(Icons.comment),
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _saving ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryGreen,
-                    foregroundColor: Colors.white,
-                  ),
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.play_arrow),
-                  label: const Text('Start'),
-                  onPressed: _saving ? null : _start,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// Popup used to close an open trip (mirrors the Start Trip sheet).
 class _CloseTripSheet extends StatefulWidget {
@@ -1055,4 +725,118 @@ class _CloseTripSheetState extends State<_CloseTripSheet> {
       ),
     );
   }
+}
+
+/// Dialog that captures an expense to add to a trip. Owns its controllers so
+/// they are disposed with the dialog — disposing them right after showDialog
+/// returns crashes while the route is still animating out.
+class _AddExpenseDialog extends StatefulWidget {
+  final WaybillTrip trip;
+
+  const _AddExpenseDialog({required this.trip});
+
+  @override
+  State<_AddExpenseDialog> createState() => _AddExpenseDialogState();
+}
+
+class _AddExpenseDialogState extends State<_AddExpenseDialog> {
+  late final TextEditingController _amountCtrl;
+  late final TextEditingController _noteCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountCtrl = TextEditingController();
+    _noteCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  double get _amount => double.tryParse(_amountCtrl.text.trim()) ?? 0;
+  String get _reason => _noteCtrl.text.trim();
+
+  /// Both the amount and the reason are required — the reason is what the
+  /// office reads on the vehicle-expenses record.
+  bool get _valid => _amount > 0 && _reason.isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    final trip = widget.trip;
+    final current = trip.Expenses ?? 0;
+
+    return AlertDialog(
+      title: const Text('Add Expense'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Trip #${trip.Trip_No ?? '-'} · '
+            '${trip.From ?? '?'} → ${trip.To ?? '?'}',
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Current expenses: KSh ${NumberFormat('#,##0').format(current)}',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Amount to add',
+              prefixText: 'KSh ',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _noteCtrl,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Reason *',
+              hintText: 'e.g. fuel, police',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          if (_amount > 0) ...[
+            const SizedBox(height: 12),
+            Text(
+              'New total: KSh '
+              '${NumberFormat('#,##0').format(current + _amount)}',
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, color: Color(0xFF006B3F)),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _valid
+              ? () => Navigator.pop(context, _ExpenseEntry(_amount, _reason))
+              : null,
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Values captured by the Add Expense dialog.
+class _ExpenseEntry {
+  final double amount;
+  final String note;
+
+  const _ExpenseEntry(this.amount, this.note);
 }

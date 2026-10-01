@@ -52,7 +52,9 @@ android {
         applicationId "trimline.citihoppa"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdkVersion 29
+        // Flutter's own default is 29 (Android 10); the fleet still has phones
+        // on Android 9 (Pie) and nothing here needs API 29 features.
+        minSdkVersion 28
         targetSdkVersion 33
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

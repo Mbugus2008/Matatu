@@ -67,4 +67,32 @@ String? crewNameFor(String? numberOrName) {
 }
 
 /// Display label for a stored crew number — falls back to the raw value.
-String crewLabelFor(String? numberOrName) => crewNameFor(numberOrName) ?? '-';
+String crewLabelFor(String? numberOrName) {
+  final name = crewNameFor(numberOrName);
+  return (name == null || name.isEmpty) ? '-' : name;
+}
+
+/// Crew numbers attached to [vehicleNo], as `(driver, conductor)`.
+/// `(null, null)` when nobody is attached. Used when the day's waybill entry
+/// is created silently by Start Trip.
+(String?, String?) crewNumbersForVehicle(String? vehicleNo) {
+  final target = _norm(vehicleNo);
+  if (target.isEmpty) return (null, null);
+
+  try {
+    String? driverNo;
+    String? conductorNo;
+    for (final m in _crew()) {
+      if (_norm(m.Vehicle) != target) continue;
+      if (m.Crew_Type == Crew_type.Driver && driverNo == null) {
+        driverNo = m.No;
+      }
+      if (m.Crew_Type == Crew_type.Conductor && conductorNo == null) {
+        conductorNo = m.No;
+      }
+    }
+    return (driverNo, conductorNo);
+  } catch (_) {
+    return (null, null);
+  }
+}

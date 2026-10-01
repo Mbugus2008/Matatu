@@ -123,6 +123,14 @@ class AddHireScreen extends StatelessWidget {
   Future<void> _submitForm() async {
     _log('BUTTON PRESSED mode=${hire == null ? 'CREATE' : 'UPDATE'} '
         'Key=${hire?.Key} Code=${hire?.Code}');
+    // A hire is an edit when the row already carries an identity from BC - a
+    // code, an entry number or a key. The new-hire screen is opened with an
+    // empty Hires(), so `hire == null` alone cannot tell the two apart.
+    final String? existingCode = hire?.Code?.trim();
+    final bool isEdit = hire != null &&
+        ((existingCode ?? '').isNotEmpty ||
+            (hire?.Entry ?? 0) > 0 ||
+            (hire?.Key ?? '').isNotEmpty);
     // Validate required fields
     if (vehicleNoController.text.isEmpty) {
       _log('validation failed: vehicle is empty');
@@ -234,13 +242,17 @@ class AddHireScreen extends StatelessWidget {
         // When editing an existing hire, allow the update through so the
         // record can still reach BC.
         final bool returnInPast = returnDateTime.isBefore(now);
-        _log('return date check: past=$returnInPast creating=${hire == null}');
-        if (!returnInPast || hire != null) {
+        _log('return date check: past=$returnInPast creating=${!isEdit}');
+        if (!returnInPast || isEdit) {
           Hires newHire = Hires(
             Key: hire?.Key,
+            Entry: hire?.Entry,
             Vehicle_No: vehicleNo,
             Amount: amount,
-            Code: hire?.Code ?? await generateCustomCode(),
+            // An edit keeps the code BC knows the hire by; when the local row
+            // has lost it, the entry number above identifies the record so
+            // the server updates instead of adding a second hire.
+            Code: isEdit ? existingCode : await generateCustomCode(),
             Start_Date: startDateParsed,
             Start_Time: startTimeParsed,
             Return_Date: returnDateParsed,
@@ -267,7 +279,7 @@ class AddHireScreen extends StatelessWidget {
             if (!success) {
               Get.snackbar(
                   'Error',
-                  'Could not ${hire == null ? 'create' : 'update'} the hire. '
+                  'Could not ${isEdit ? 'update' : 'create'} the hire. '
                       'Please check your connection and try again.',
                   backgroundColor: Colors.red,
                   snackPosition: SnackPosition.BOTTOM,
@@ -275,9 +287,9 @@ class AddHireScreen extends StatelessWidget {
               return;
             }
             Get.back(); // Navigate back after saving
-            final hireMsg = hire == null
-                ? 'New hire added successfully'
-                : 'Hire updated successfully';
+            final hireMsg = isEdit
+                ? 'Hire updated successfully'
+                : 'New hire added successfully';
             Future.delayed(const Duration(milliseconds: 350), () {
               if (!Get.isSnackbarOpen) {
                 Get.snackbar('Success', hireMsg);

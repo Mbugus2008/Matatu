@@ -4,15 +4,68 @@
 import 'dart:convert';
 
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
 import 'package:t_matatu/models/mappings.dart';
 import 'package:t_matatu/models/member.dart';
+import 'package:t_matatu/models/route.dart';
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/network/request.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/providers/db.dart';
 
 /// Waybill entry model — represents a daily vehicle waybill record
+///
+/// Dates arrive in three shapes and all of them have to parse:
+/// - Business Central JSON: `MM/dd/yyyy HH:mm:ss` (e.g. `09/29/2026 00:00:00`)
+/// - what the app itself sends: ISO-8601
+/// - what the local table stores: epoch milliseconds
+DateTime? _parseServerDate(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+  if (value is double) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt());
+  }
+  if (value is! String) return null;
+
+  final text = value.trim();
+  if (text.isEmpty) return null;
+
+  // ISO first - that is what the app writes and what the table returns.
+  final iso = DateTime.tryParse(text);
+  if (iso != null) return iso;
+
+  // Business Central serialises DateTime fields as MM/dd/yyyy HH:mm:ss.
+  const patterns = [
+    'MM/dd/yyyy HH:mm:ss',
+    'MM/dd/yyyy',
+    'M/d/yyyy H:mm:ss',
+    'M/d/yyyy',
+    'MM/dd/yyyy hh:mm:ss a',
+  ];
+  DateTime? parsed;
+  for (final pattern in patterns) {
+    try {
+      parsed = DateFormat(pattern).parse(text);
+      break;
+    } on FormatException {
+      continue;
+    }
+  }
+  if (parsed == null) return null;
+
+  // NAV's "empty" date is 01/01/0001. Time-only fields (Start_Time, From_Time,
+  // Finish_Time, ...) still carry a useful clock value, so keep it on a neutral
+  // day; a midnight value means the field is simply not set.
+  if (parsed.year == 1) {
+    final hasTime =
+        parsed.hour != 0 || parsed.minute != 0 || parsed.second != 0;
+    if (!hasTime) return null;
+    return DateTime(1970, 1, 1, parsed.hour, parsed.minute, parsed.second);
+  }
+  return parsed;
+}
 class Waybill extends Tomaps implements mapping {
   String? Key;
   String? Vehicle_No;
@@ -29,6 +82,10 @@ class Waybill extends Tomaps implements mapping {
   double? Cash;
   double? Total_Expected;
   double? Total_Collected;
+
+  /// Receipt that closed this entry's trips — empty until a receipt is
+  /// printed while the entry still had open trips.
+  String? Receipt_No;
   bool sent = false;
 
   Waybill({
@@ -47,6 +104,7 @@ class Waybill extends Tomaps implements mapping {
     this.Cash,
     this.Total_Expected,
     this.Total_Collected,
+    this.Receipt_No,
     this.sent = false,
   });
 
@@ -68,6 +126,7 @@ class Waybill extends Tomaps implements mapping {
       'Cash': Cash,
       'Total_Expected': Total_Expected,
       'Total_Collected': Total_Collected,
+      'Receipt_No': Receipt_No,
     };
   }
 
@@ -88,6 +147,7 @@ class Waybill extends Tomaps implements mapping {
       Cash: (map['Cash'] as num?)?.toDouble(),
       Total_Expected: (map['Total_Expected'] as num?)?.toDouble(),
       Total_Collected: (map['Total_Collected'] as num?)?.toDouble(),
+      Receipt_No: map['Receipt_No'] as String?,
     );
   }
 
@@ -95,12 +155,7 @@ class Waybill extends Tomaps implements mapping {
   Waybill fromMap_table(Map<String, dynamic> map) => Waybill.fromMap(map);
 
   /// Parse a date field that may be a String (API) or int milliseconds (DB).
-  static DateTime? _parseDate(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
-    if (value is String) return DateTime.tryParse(value);
-    return null;
-  }
+  static DateTime? _parseDate(dynamic value) => _parseServerDate(value);
 
   @override
   Map<String, dynamic> toMap_fortable() {
@@ -120,13 +175,15 @@ class Waybill extends Tomaps implements mapping {
       'Cash': Cash,
       'Total_Expected': Total_Expected,
       'Total_Collected': Total_Collected,
+      'Receipt_No': Receipt_No,
       'sent': sent ? 1 : 0,
     };
   }
 
   // ──────── Database ────────
-  // Table name kept as 'wbridge' so existing devices keep their local data.
-  static const String table = 'wbridge';
+  // Local table for the waybill header. Older builds called it 'wbridge';
+  // db.dart moves those rows across on first open.
+  static const String table = 'wbill';
   static const String col_Key = 'Key';
   static const String col_Vehicle_No = 'Vehicle_No';
   static const String col_Fleet_No = 'Fleet_No';
@@ -142,6 +199,7 @@ class Waybill extends Tomaps implements mapping {
   static const String col_Cash = 'Cash';
   static const String col_Total_Expected = 'Total_Expected';
   static const String col_Total_Collected = 'Total_Collected';
+  static const String col_Receipt_No = 'Receipt_No';
   static const String col_sent = 'sent';
 
   static const List<String> columns = [
@@ -160,6 +218,7 @@ class Waybill extends Tomaps implements mapping {
     col_Cash,
     col_Total_Expected,
     col_Total_Collected,
+    col_Receipt_No,
     col_sent,
   ];
 
@@ -180,6 +239,7 @@ class Waybill extends Tomaps implements mapping {
       $col_Cash REAL,
       $col_Total_Expected REAL,
       $col_Total_Collected REAL,
+      $col_Receipt_No TEXT,
       $col_sent INTEGER DEFAULT 0
     )
   ''';
@@ -214,11 +274,24 @@ class WaybillTrip extends Tomaps implements mapping {
   String? Amount_Received;
   double? Expenses;
   String? Comments;
+
+  /// Route description of [From] (e.g. "Kencom - Kawangware"). NAV stores it
+  /// on the trip for reporting; filled from the local route list.
+  String? Description;
   bool sent = false;
 
   /// Local key of the parent waybill entry. Used to link a trip saved before
   /// the waybill was synced (its BC Entry_No is not known yet).
   String? Waybill_Key;
+
+  /// True while the trip holds local edits BC has not accepted yet. Set by
+  /// [WaybillService.saveTrip], cleared when BC takes the trip, and the delta
+  /// sync never overwrites a dirty trip.
+  bool dirty = false;
+
+  /// A trip is open until it is closed with an end time. Expenses may only be
+  /// recorded while the trip is open.
+  bool get isOpen => To_Time == null;
 
   WaybillTrip({
     this.Key,
@@ -236,6 +309,7 @@ class WaybillTrip extends Tomaps implements mapping {
     this.Amount_Received,
     this.Expenses,
     this.Comments,
+    this.Description,
     this.sent = false,
     this.Waybill_Key,
   });
@@ -258,6 +332,7 @@ class WaybillTrip extends Tomaps implements mapping {
       'Amount_Received': Amount_Received,
       'Expenses': Expenses,
       'Comments': Comments,
+      'Description': Description,
     };
   }
 
@@ -278,16 +353,12 @@ class WaybillTrip extends Tomaps implements mapping {
       Amount_Received: map['Amount_Received'] as String?,
       Expenses: (map['Expenses'] as num?)?.toDouble(),
       Comments: map['Comments'] as String?,
+      Description: map['Description'] as String?,
     );
   }
 
   /// Parse a date field that may be a String (API) or int milliseconds (DB).
-  static DateTime? _parseTripDate(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
-    if (value is String) return DateTime.tryParse(value);
-    return null;
-  }
+  static DateTime? _parseTripDate(dynamic value) => _parseServerDate(value);
 
   @override
   WaybillTrip fromMap_table(Map<String, dynamic> map) =>
@@ -313,7 +384,9 @@ class WaybillTrip extends Tomaps implements mapping {
       'Amount_Received': Amount_Received,
       'Expenses': Expenses,
       'Comments': Comments,
+      'Description': Description,
       'sent': sent ? 1 : 0,
+      'Dirty': dirty ? 1 : 0,
       'Waybill_Key': Waybill_Key,
     };
   }
@@ -336,6 +409,8 @@ class WaybillTrip extends Tomaps implements mapping {
   static const String col_Amount_Received = 'Amount_Received';
   static const String col_Expenses = 'Expenses';
   static const String col_Comments = 'Comments';
+  static const String col_Description = 'Description';
+  static const String col_Dirty = 'Dirty';
   static const String col_sent = 'sent';
 
   static const List<String> columns = [
@@ -355,6 +430,8 @@ class WaybillTrip extends Tomaps implements mapping {
     col_Amount_Received,
     col_Expenses,
     col_Comments,
+    col_Description,
+    col_Dirty,
     col_sent,
   ];
 
@@ -376,6 +453,8 @@ class WaybillTrip extends Tomaps implements mapping {
       $col_Amount_Received TEXT,
       $col_Expenses REAL,
       $col_Comments TEXT,
+      $col_Description TEXT,
+      $col_Dirty INTEGER DEFAULT 0,
       $col_sent INTEGER DEFAULT 0
     )
   ''';
@@ -392,6 +471,7 @@ class WaybillTrip extends Tomaps implements mapping {
       'To': map[col_To],
     });
     trip.sent = (map[col_sent] as int?) == 1;
+    trip.dirty = (map[col_Dirty] as int?) == 1;
     trip.Waybill_Key = map[col_Waybill_Key] as String?;
     return trip;
   }
@@ -413,6 +493,9 @@ class WaybillService {
       );
       final result = Results<Waybill>.fromJson(response.body, Waybill.fromMap);
       if (result.Code == 0 && result.Contents != null) {
+        // Keep what came down: the list then works offline, and
+        // findEntryForVehicle() sees entries raised on other devices.
+        await _cacheServerWaybills(result.Contents!);
         return result.Contents!;
       }
     } catch (_) {
@@ -421,6 +504,20 @@ class WaybillService {
 
     // Fallback: fetch from local DB
     return _getLocalWaybills(date);
+  }
+
+  /// Stores waybills that came from BC locally, flagged as already sent so the
+  /// sync loop never posts them back.
+  Future<void> _cacheServerWaybills(List<Waybill> waybills) async {
+    if (waybills.isEmpty) return;
+    for (final wb in waybills) {
+      wb.sent = true;
+    }
+    try {
+      await db_Provider().batchinsert(Waybill.table, waybills);
+    } catch (_) {
+      // Caching is best-effort - the caller already has the rows.
+    }
   }
 
   /// Fetch pending (unsent) waybill entries from local DB
@@ -615,6 +712,15 @@ class WaybillService {
         waybill.sent = (waybill.Entry_No ?? 0) > 0;
         await db_Provider().insert(Waybill.table, waybill);
 
+        // Trips saved while this entry was still local point at its temp
+        // key — re-point them at the BC key and entry number BEFORE the
+        // temp row disappears, or they can never resolve.
+        if (originalKey != null &&
+            originalKey.isNotEmpty &&
+            originalKey != waybill.Key) {
+          await _relinkTripsToNewKey(originalKey, waybill);
+        }
+
         // Drop the locally-created row once BC gave us its own key, so we do
         // not retry the same waybill as a duplicate create.
         if (originalKey != null &&
@@ -687,6 +793,7 @@ class WaybillService {
             if (originalKey != null &&
                 originalKey.isNotEmpty &&
                 originalKey != wb.Key) {
+              await _relinkTripsToNewKey(originalKey, wb);
               await db.deletedata(
                   Waybill.table, '${Waybill.col_Key} = ?', [originalKey]);
             }
@@ -834,27 +941,164 @@ class WaybillService {
     }
   }
 
-  /// Links trips that were saved without a waybill link (older builds / the
-  /// snackbar "Start" path) to the only waybill of their day. Without this they
-  /// can never be found by the trips list.
+  /// Next trip number for an entry (1 when it has no trips yet). Used by
+  /// Start Trip so a silently-created entry numbers its trips from the start.
+  Future<int> nextTripNo(int? entryNo, {String? waybillKey}) async {
+    final trips = await _getLocalTrips(entryNo, waybillKey: waybillKey);
+    var next = 1;
+    for (final t in trips) {
+      if ((t.Trip_No ?? 0) >= next) next = (t.Trip_No ?? 0) + 1;
+    }
+    return next;
+  }
+
+  /// Open trips (no end time) for [vehicleNo]: their count and the sum of
+  /// their totals across every entry — a trip left open overnight is still on
+  /// the road. The receipt shows this so the officer can see the money the
+  /// vehicle still has before it is closed out.
+  Future<(int, double)> openTripsSummaryForVehicle({
+    required String vehicleNo,
+  }) async {
+    final vehicle = vehicleNo.trim().toUpperCase();
+    if (vehicle.isEmpty) return (0, 0.0);
+    try {
+      final db = db_Provider();
+      final wbRows = await db.getdata(Waybill.table, Waybill.columns);
+      final entries = wbRows.map(Waybill.fromMap_db).where((w) {
+        return (w.Vehicle_No ?? '').trim().toUpperCase() == vehicle;
+      }).toList();
+      if (entries.isEmpty) return (0, 0.0);
+
+      final tripRows = await db.getdata(
+        WaybillTrip.table,
+        WaybillTrip.columns,
+        '${WaybillTrip.col_To_Time} IS NULL',
+      );
+      final trips = <WaybillTrip>[];
+      for (final t in tripRows.map(WaybillTrip.fromMap_db)) {
+        for (final e in entries) {
+          final sameEntry =
+              (e.Entry_No != null &&
+                  e.Entry_No! > 0 &&
+                  t.Weign_Bridge_id == e.Entry_No) ||
+              (e.Key != null &&
+                  e.Key!.isNotEmpty &&
+                  t.Waybill_Key == e.Key);
+          if (sameEntry) {
+            trips.add(t);
+            break;
+          }
+        }
+      }
+      return openTripsSummary(trips);
+    } catch (_) {
+      return (0, 0.0);
+    }
+  }
+
+  /// (count, total) across the open trips in [trips]. Null totals count as 0.
+  static (int, double) openTripsSummary(Iterable<WaybillTrip> trips) {
+    var count = 0;
+    var total = 0.0;
+    for (final trip in trips) {
+      if (!trip.isOpen) continue;
+      count++;
+      total += trip.Total ?? 0;
+    }
+    return (count, total);
+  }
+
+  /// Closes every open trip of [vehicleNo] (all entries). Run after a receipt
+  /// is printed: whatever was on the road is handed in with that receipt.
+  /// Each close goes through saveTrip, so it is marked dirty locally and
+  /// pushed to BC in the background until accepted. When [receiptNo] is
+  /// given, every entry whose trips were closed is stamped with it so the
+  /// chain trip -> entry -> receipt stays traceable.
+  Future<int> closeOpenTrips(
+      {required String vehicleNo, String? receiptNo}) async {
+    final vehicle = vehicleNo.trim().toUpperCase();
+    if (vehicle.isEmpty) return 0;
+    try {
+      final db = db_Provider();
+      final wbRows = await db.getdata(Waybill.table, Waybill.columns);
+      final entries = wbRows.map(Waybill.fromMap_db).where((w) {
+        return (w.Vehicle_No ?? '').trim().toUpperCase() == vehicle;
+      }).toList();
+      if (entries.isEmpty) return 0;
+
+      final tripRows = await db.getdata(
+        WaybillTrip.table,
+        WaybillTrip.columns,
+        '${WaybillTrip.col_To_Time} IS NULL',
+      );
+      final now = DateTime.now();
+      var closed = 0;
+      final touched = <Waybill>{};
+      for (final t in tripRows.map(WaybillTrip.fromMap_db)) {
+        Waybill? entry;
+        for (final e in entries) {
+          final belongs = (e.Entry_No != null &&
+                  e.Entry_No! > 0 &&
+                  t.Weign_Bridge_id == e.Entry_No) ||
+              (e.Key != null && e.Key!.isNotEmpty && t.Waybill_Key == e.Key);
+          if (belongs) {
+            entry = e;
+            break;
+          }
+        }
+        if (entry == null) continue;
+
+        t.To_Time =
+            DateTime(now.year, now.month, now.day, now.hour, now.minute);
+        await saveTrip(t);
+        closed++;
+        touched.add(entry);
+      }
+
+      final trace = (receiptNo ?? '').trim();
+      if (trace.isNotEmpty) {
+        for (final entry in touched) {
+          if ((entry.Receipt_No ?? '').trim() == trace) continue;
+          entry.Receipt_No = trace;
+          await saveWaybill(entry);
+        }
+      }
+      return closed;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Links trips that lost their waybill link to the only waybill of their
+  /// day. Two kinds are healed: trips saved with no link at all (older builds
+  /// / the snackbar "Start" path), and trips pointing at a local key that no
+  /// longer exists (the entry's temp key, replaced by BC's key on sync).
+  /// Without this they can never be found by the trips list.
   Future<int> repairOrphanTrips() async {
     try {
       final db = db_Provider();
       final orphanRows = await db.getdata(
         WaybillTrip.table,
         WaybillTrip.columns,
-        '${WaybillTrip.col_Weign_Bridge_id} IS NULL AND '
-        '(${WaybillTrip.col_Waybill_Key} IS NULL OR '
-        '${WaybillTrip.col_Waybill_Key} = \'\')',
+        '${WaybillTrip.col_Weign_Bridge_id} IS NULL',
       );
       if (orphanRows.isEmpty) return 0;
 
       final waybillRows = await db.getdata(Waybill.table, Waybill.columns);
       final waybills = waybillRows.map((m) => Waybill.fromMap_db(m)).toList();
+      final waybillKeys = waybills
+          .map((w) => (w.Key ?? '').trim())
+          .where((k) => k.isNotEmpty)
+          .toSet();
 
       var repaired = 0;
       for (final row in orphanRows) {
         final trip = WaybillTrip.fromMap_db(row);
+        // A trip whose key still resolves waits for that entry's own sync —
+        // linking it elsewhere could attach the wrong waybill.
+        final tripKey = (trip.Waybill_Key ?? '').trim();
+        if (tripKey.isNotEmpty && waybillKeys.contains(tripKey)) continue;
+
         final when = trip.From_Time ?? trip.To_Time;
         if (when == null) continue;
 
@@ -893,6 +1137,7 @@ class WaybillService {
     }
 
     trip.sent = false;
+    trip.dirty = true;
     if (trip.Key == null || trip.Key!.isEmpty) {
       trip.Key = DateTime.now().millisecondsSinceEpoch.toString();
     }
@@ -939,6 +1184,84 @@ class WaybillService {
     }
   }
 
+  /// BC's waybill_trip From/To fields hold 20 characters. Route descriptions
+  /// often exceed that and NAV then rejects the whole trip with "The length of
+  /// the string is N, but it must be less than or equal to 20 characters" —
+  /// the trip never appears. Route codes always fit, so the matching local
+  /// route's code is sent; text with no matching route is trimmed to what BC
+  /// accepts so a trip can never stay stuck on format alone.
+  static String? bcRouteText(String? value, List<RouteModel> routes) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return value;
+
+    for (final route in routes) {
+      final code = (route.Code ?? '').trim();
+      if (code.isEmpty) continue;
+      if (_sameRouteText(code, text)) return code;
+      if (_sameRouteText(route.Description, text)) return code;
+    }
+
+    return text.length <= _bcRouteMaxLength
+        ? text
+        : text.substring(0, _bcRouteMaxLength);
+  }
+
+  static const int _bcRouteMaxLength = 20;
+
+  static bool _sameRouteText(String? a, String? b) =>
+      (a ?? '').trim().toUpperCase() == (b ?? '').trim().toUpperCase();
+
+  /// [bcRouteText] with the device's cached routes.
+  Future<String?> _bcRouteText(String? value) async {
+    if ((value ?? '').trim().isEmpty) return value;
+    var routes = const <RouteModel>[];
+    try {
+      final rows =
+          await db_Provider().getdata(RouteModel.table, RouteModel.columns);
+      routes = rows.map(RouteModel.fromMap).toList();
+    } catch (_) {
+      // No local routes (e.g. a fresh install) — the text still gets trimmed.
+    }
+    return bcRouteText(value, routes);
+  }
+
+  /// Route description for [code] from the device's cached routes.
+  Future<String?> _bcRouteDescription(String? code) async {
+    final target = (code ?? '').trim().toUpperCase();
+    if (target.isEmpty) return null;
+    try {
+      final rows =
+          await db_Provider().getdata(RouteModel.table, RouteModel.columns);
+      for (final r in rows.map(RouteModel.fromMap)) {
+        if ((r.Code ?? '').trim().toUpperCase() == target) return r.Description;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Re-points trips saved against [oldKey] (the entry's local key before BC
+  /// replaced it) at the waybill's BC key and entry number. Without this the
+  /// trips keep a key that no longer exists, resolve to nothing, and can
+  /// never sync (or show up under their entry).
+  Future<void> _relinkTripsToNewKey(String oldKey, Waybill waybill) async {
+    try {
+      final update = <String, Object?>{
+        WaybillTrip.col_Waybill_Key: waybill.Key,
+      };
+      if ((waybill.Entry_No ?? 0) > 0) {
+        update[WaybillTrip.col_Weign_Bridge_id] = waybill.Entry_No;
+      }
+      await db_Provider().updatedata(
+        WaybillTrip.table,
+        update,
+        '${WaybillTrip.col_Waybill_Key} = ?',
+        [oldKey],
+      );
+    } catch (_) {
+      // The repair sweep will adopt any trip left behind.
+    }
+  }
+
   /// Background sync for a single trip.
   Future<void> _syncTripSingle(WaybillTrip trip) async {
     try {
@@ -954,6 +1277,13 @@ class WaybillService {
       }
 
       final map = trip.toMap();
+      // NAV caps From/To at 20 characters — send the route code so the trip
+      // is not rejected for length.
+      map['From'] = await _bcRouteText(trip.From);
+      map['To'] = await _bcRouteText(trip.To);
+      // NAV keeps the route description on the trip for reporting.
+      map['Description'] =
+          trip.Description ?? await _bcRouteDescription(trip.From);
       if (_isTempKey(map['Key'] as String?)) {
         // Force BC Create for locally-created trips.
         map['Key'] = null;
@@ -980,10 +1310,59 @@ class WaybillService {
           trip.Key = serverTrip.Key;
         }
         trip.sent = true;
+        trip.dirty = false;
         await db.insert(WaybillTrip.table, trip);
+      } else if ((result.Desc ?? '')
+          .toLowerCase()
+          .contains('already exists')) {
+        // BC already has this trip — an earlier attempt reached NAV but the
+        // app never recorded the result. Adopt BC's copy so the trip stops
+        // retrying and later edits (close trip, expenses) update in place.
+        await _adoptExistingTrip(trip);
       }
     } catch (_) {
       // Will be picked up by syncPendingWaybillTrips
+    }
+  }
+
+  /// Finds the trip's row on BC (same entry + trip no) and adopts its key so
+  /// the local row is marked as sent.
+  Future<void> _adoptExistingTrip(WaybillTrip trip) async {
+    try {
+      final entryNo = trip.Weign_Bridge_id;
+      if (entryNo == null || entryNo <= 0) return;
+
+      final response = await _api
+          .postdata('waybilltrips', json.encode({'waybillId': entryNo}));
+      final result =
+          Results<WaybillTrip>.fromJson(response.body, WaybillTrip.fromMap);
+      if (result.Code != 0 || result.Contents == null) return;
+
+      WaybillTrip? match;
+      for (final t in result.Contents!) {
+        if (t.Trip_No == trip.Trip_No) {
+          match = t;
+          break;
+        }
+      }
+      if (match == null) return;
+
+      final db = db_Provider();
+      final oldKey = trip.Key;
+      if (match.Key != null &&
+          match.Key!.isNotEmpty &&
+          match.Key != oldKey) {
+        if (oldKey != null) {
+          await db.deletedata(
+              WaybillTrip.table, '${WaybillTrip.col_Key} = ?', [oldKey]);
+        }
+        trip.Key = match.Key;
+      }
+      trip.sent = true;
+      trip.dirty = false;
+      await db.insert(WaybillTrip.table, trip);
+    } catch (_) {
+      // Left pending — the next sync will try to adopt it again.
     }
   }
 
@@ -996,7 +1375,7 @@ class WaybillService {
       final rows = await db.getdata(
         WaybillTrip.table,
         WaybillTrip.columns,
-        '${WaybillTrip.col_sent} = 0',
+        '${WaybillTrip.col_sent} = 0 OR ${WaybillTrip.col_Dirty} = 1',
       );
       final pending = rows.map((m) => WaybillTrip.fromMap_db(m)).toList();
 
@@ -1013,5 +1392,249 @@ class WaybillService {
     }
 
     return synced;
+  }
+
+  /// Preference key holding the last successful trip sync time (UTC stamp).
+  static const String _lastTripSyncKey = 'waybill_trip_last_sync';
+
+  /// Pulls trips changed in BC after the stored sync time and merges them
+  /// locally — this is how edits made on other devices (or in BC itself)
+  /// arrive here. Local trips still waiting to push (sent = 0) are never
+  /// overwritten. Advances the stored time on success.
+  Future<int> pullModifiedTrips() async {
+    try {
+      if (!Get.isRegistered<MainController>()) return 0;
+      final main = Get.find<MainController>();
+
+      final nowUtc = DateTime.now().toUtc();
+      var since = nowUtc.subtract(const Duration(hours: 24));
+      final stored = await main.getPreference(_lastTripSyncKey);
+      if (stored != null && stored.isNotEmpty) {
+        // The stamp is written as UTC wall time with no zone suffix; parsing
+        // it as local would shift the window by the device's offset (3h in
+        // EAT) and re-fetch everything modified in that span each round.
+        final parsed = DateTime.tryParse(
+            stored.endsWith('Z') ? stored : '${stored}Z');
+        if (parsed != null) since = parsed.toUtc();
+      }
+
+      String two(int v) => v.toString().padLeft(2, '0');
+      String stamp(DateTime d) =>
+          '${d.year}-${two(d.month)}-${two(d.day)}T${two(d.hour)}:${two(d.minute)}:${two(d.second)}';
+
+      final request = Request(datefilter: stamp(since), size: 10000);
+      final response =
+          await _api.postdata('waybilltripsmodified', request.toJson());
+      final result =
+          Results<WaybillTrip>.fromJson(response.body, WaybillTrip.fromMap);
+      if (result.Code != 0 || result.Contents == null) return 0;
+
+      final db = db_Provider();
+      var merged = 0;
+      for (final server in result.Contents!) {
+        final local = await _findLocalTrip(server, db);
+        if (local == null) {
+          server.sent = true;
+          await db.insert(WaybillTrip.table, server);
+          merged++;
+          continue;
+        }
+        // Never overwrite local edits that are still waiting to push: dirty
+        // trips or rows BC has not accepted yet.
+        if (local.dirty || !local.sent) continue;
+
+        server.sent = true;
+        server.Waybill_Key = local.Waybill_Key;
+        if (local.Key != null && local.Key != server.Key) {
+          await db.deletedata(
+              WaybillTrip.table, '${WaybillTrip.col_Key} = ?', [local.Key!]);
+        }
+        await db.insert(WaybillTrip.table, server);
+        merged++;
+
+        // Collapse duplicates: the same entry + trip number under another
+        // (typically older) key. Only rows BC has accepted are removed —
+        // never a local edit that is still waiting to push.
+        if (server.Weign_Bridge_id != null && server.Trip_No != null) {
+          final dupes = await db.getdata(
+              WaybillTrip.table,
+              WaybillTrip.columns,
+              '${WaybillTrip.col_Weign_Bridge_id} = ? AND '
+                  '${WaybillTrip.col_Trip_No} = ? AND '
+                  '${WaybillTrip.col_Key} != ? AND '
+                  '${WaybillTrip.col_sent} = 1 AND '
+                  '(${WaybillTrip.col_Dirty} = 0 OR '
+                  '${WaybillTrip.col_Dirty} IS NULL)',
+              [
+                server.Weign_Bridge_id!,
+                server.Trip_No!,
+                server.Key ?? '',
+              ]);
+          for (final dupe in dupes) {
+            final dupeKey = dupe[WaybillTrip.col_Key];
+            if (dupeKey is String && dupeKey.isNotEmpty) {
+              await db.deletedata(
+                  WaybillTrip.table, '${WaybillTrip.col_Key} = ?', [dupeKey]);
+            }
+          }
+        }
+      }
+
+      // Two minutes of overlap so rows changed mid-sync are never missed;
+      // merging is idempotent.
+      await main.savePreference(_lastTripSyncKey,
+          stamp(nowUtc.subtract(const Duration(minutes: 2))));
+      return merged;
+    } catch (_) {
+      // Offline or BC rejected the read — the next sync tries again.
+      return 0;
+    }
+  }
+
+  /// Preference key holding the last successful waybill sync time (UTC stamp).
+  static const String _lastWaybillSyncKey = 'waybill_last_sync';
+
+  /// Pulls waybills changed in BC after the stored sync time and merges them
+  /// locally — entries created or edited on other devices (or in BC itself)
+  /// arrive here, whatever their date. Local rows still waiting to push are
+  /// never overwritten. Advances the stored time on success.
+  Future<int> pullModifiedWaybills() async {
+    try {
+      if (!Get.isRegistered<MainController>()) return 0;
+      final main = Get.find<MainController>();
+
+      final nowUtc = DateTime.now().toUtc();
+      var since = nowUtc.subtract(const Duration(hours: 24));
+      final stored = await main.getPreference(_lastWaybillSyncKey);
+      if (stored != null && stored.isNotEmpty) {
+        // Written as UTC wall time with no zone suffix — parse it as UTC so
+        // the window is not shifted by the device's offset.
+        final parsed = DateTime.tryParse(
+            stored.endsWith('Z') ? stored : '${stored}Z');
+        if (parsed != null) since = parsed.toUtc();
+      }
+
+      String two(int v) => v.toString().padLeft(2, '0');
+      String stamp(DateTime d) =>
+          '${d.year}-${two(d.month)}-${two(d.day)}T${two(d.hour)}:${two(d.minute)}:${two(d.second)}';
+
+      final request = Request(datefilter: stamp(since), size: 10000);
+      final response =
+          await _api.postdata('waybillsmodified', request.toJson());
+      final result = Results<Waybill>.fromJson(response.body, Waybill.fromMap);
+      if (result.Code != 0 || result.Contents == null) return 0;
+
+      var merged = 0;
+      for (final server in result.Contents!) {
+        if (await mergeServerWaybill(server)) merged++;
+      }
+
+      // Two minutes of overlap so rows changed mid-sync are never missed;
+      // merging is idempotent.
+      await main.savePreference(_lastWaybillSyncKey,
+          stamp(nowUtc.subtract(const Duration(minutes: 2))));
+      return merged;
+    } catch (_) {
+      // Offline or BC rejected the read — the next sync tries again.
+      return 0;
+    }
+  }
+
+  /// Local waybill row for [server] — matched by BC key, then by the
+  /// vehicle + date business key (one entry per vehicle per day).
+  Future<Waybill?> _findLocalWaybill(Waybill server, db_Provider db) async {
+    try {
+      if (server.Key != null && server.Key!.isNotEmpty) {
+        final rows = await db.getdata(Waybill.table, Waybill.columns,
+            '${Waybill.col_Key} = ?', [server.Key!]);
+        if (rows.isNotEmpty) return Waybill.fromMap_db(rows.first);
+      }
+      if ((server.Vehicle_No ?? '').isNotEmpty && server.Date != null) {
+        final rows = await db.getdata(
+            Waybill.table,
+            Waybill.columns,
+            '${Waybill.col_Vehicle_No} = ? AND ${Waybill.col_Date} = ?',
+            [server.Vehicle_No!, server.Date!.millisecondsSinceEpoch]);
+        if (rows.isNotEmpty) return Waybill.fromMap_db(rows.first);
+      }
+    } catch (_) {
+      // Fall through — treated as a new row.
+    }
+    return null;
+  }
+
+  /// Merges one server waybill into the local store. Never overwrites a
+  /// local entry that is still waiting to push — its own push reconciles
+  /// with BC later. When BC's key differs from the local one (a row that
+  /// was re-keyed in BC), the stale-keyed duplicate is removed so only one
+  /// row per vehicle + day survives. Returns true when a row was written.
+  Future<bool> mergeServerWaybill(Waybill server) async {
+    try {
+      final db = db_Provider();
+      final local = await _findLocalWaybill(server, db);
+      if (local == null) {
+        server.sent = (server.Entry_No ?? 0) > 0;
+        await db.insert(Waybill.table, server);
+        return true;
+      }
+      if (!local.sent) return false;
+
+      server.sent = (server.Entry_No ?? 0) > 0;
+      if (local.Key != null && local.Key != server.Key) {
+        await db.deletedata(
+            Waybill.table, '${Waybill.col_Key} = ?', [local.Key!]);
+      }
+      await db.insert(Waybill.table, server);
+
+      // Collapse duplicates: another local row for the same vehicle + day
+      // under a different (typically older) BC key. Only rows BC has
+      // accepted are removed — never a local edit waiting to push.
+      if ((server.Vehicle_No ?? '').isNotEmpty &&
+          server.Date != null &&
+          (server.Key ?? '').isNotEmpty) {
+        final dupes = await db.getdata(
+            Waybill.table,
+            Waybill.columns,
+            '${Waybill.col_Vehicle_No} = ? AND ${Waybill.col_Date} = ? AND '
+                '${Waybill.col_Key} != ? AND ${Waybill.col_sent} = 1',
+            [
+              server.Vehicle_No!,
+              server.Date!.millisecondsSinceEpoch,
+              server.Key!,
+            ]);
+        for (final dupe in dupes) {
+          final dupeKey = dupe[Waybill.col_Key];
+          if (dupeKey is String && dupeKey.isNotEmpty) {
+            await db.deletedata(
+                Waybill.table, '${Waybill.col_Key} = ?', [dupeKey]);
+          }
+        }
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Local row for [server] — matched by BC key, then entry + trip number.
+  Future<WaybillTrip?> _findLocalTrip(
+      WaybillTrip server, db_Provider db) async {
+    try {
+      if (server.Key != null && server.Key!.isNotEmpty) {
+        final rows = await db.getdata(WaybillTrip.table, WaybillTrip.columns,
+            '${WaybillTrip.col_Key} = ?', [server.Key!]);
+        if (rows.isNotEmpty) return WaybillTrip.fromMap_db(rows.first);
+      }
+      if (server.Weign_Bridge_id != null && server.Trip_No != null) {
+        final rows = await db.getdata(
+            WaybillTrip.table,
+            WaybillTrip.columns,
+            '${WaybillTrip.col_Weign_Bridge_id} = ? AND '
+                '${WaybillTrip.col_Trip_No} = ?',
+            [server.Weign_Bridge_id!, server.Trip_No!]);
+        if (rows.isNotEmpty) return WaybillTrip.fromMap_db(rows.first);
+      }
+    } catch (_) {}
+    return null;
   }
 }

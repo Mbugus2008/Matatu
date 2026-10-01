@@ -194,5 +194,7 @@ Future<void> init() async {
 Future<String> generateCustomCode() async {
   var uuid = Uuid().v4();
   var bytes = utf8.encode(uuid);
-  return sha1.convert(bytes).toString().substring(0, 20);
+  // BC stores codes upper case, so generate it upper case - a row whose code
+  // only differs by case looks like a different hire to the server.
+  return sha1.convert(bytes).toString().substring(0, 20).toUpperCase();
 }

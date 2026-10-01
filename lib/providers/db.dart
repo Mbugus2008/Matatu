@@ -14,6 +14,7 @@ import 'package:t_matatu/models/member.dart';
 import 'package:t_matatu/models/trantypes.dart';
 
 import '../models/Utils/util.dart';
+import '../models/agent_route.dart';
 import '../models/expenses/vehicle_expenses.dart';
 import '../models/route.dart';
 import '../models/vehicles/Vehicle_crew.dart';
@@ -93,6 +94,7 @@ class db_Provider extends GetxController {
       await db.execute(Waybill.createtable);
       await db.execute(WaybillTrip.createtable);
       await db.execute(RouteModel.createtable);
+      await db.execute(AgentRouteModel.createtable);
       await db.execute(DisFuelSummary.createtable);
     }, onUpgrade: _onUpgrade);
   }
@@ -113,7 +115,15 @@ class db_Provider extends GetxController {
     await db.execute(Waybill.createtable);
     await db.execute(WaybillTrip.createtable);
     await db.execute(RouteModel.createtable);
+    await db.execute(AgentRouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
+    // Migration: waybill entries trace the receipt that closed their trips.
+    await _addColumnIfMissing(
+        db, Waybill.table, Waybill.col_Receipt_No, 'TEXT');
+    // Migration: vehicles carry the M-Pesa till (paybill) number.
+    await _addColumnIfMissing(db, Vehicles.table, 'Till_No', 'TEXT');
+    // Renamed table: waybills used to live in 'wbridge'.
+    await _migrateLegacyWbridgeTable(db);
     // Migration: vehicle expenses captured offline carry their own sync flag.
     await db.execute(Vehicle_Expenses.createtable);
     await _addColumnIfMissing(db, Vehicle_Expenses.table,
@@ -121,12 +131,43 @@ class db_Provider extends GetxController {
     // Migration: trips can be saved before their waybill is synced.
     await _addColumnIfMissing(
         db, WaybillTrip.table, WaybillTrip.col_Waybill_Key, 'TEXT');
+    // Migration: trips carry the From route's description.
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Description, 'TEXT');
+    // Migration: trips edited locally are dirty until BC takes them.
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Dirty, 'INTEGER DEFAULT 0');
     // Migration: new fields added to disfuel_summary
     await _addColumnIfMissing(
         db, DisFuelSummary.table, 'Total_Collection', 'REAL');
     await _addColumnIfMissing(db, DisFuelSummary.table, 'Net_Offload', 'REAL');
     await _addColumnIfMissing(
         db, DisFuelSummary.table, 'Active_Vehicles', 'INTEGER');
+  }
+
+  /// Moves waybill rows from the old 'wbridge' table into 'wbill' and drops the
+  /// legacy table. Runs once per database; if anything goes wrong the legacy
+  /// table is left untouched so no data is lost.
+  Future<void> _migrateLegacyWbridgeTable(Database db) async {
+    try {
+      final legacy = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='wbridge'");
+      if (legacy.isEmpty) return;
+
+      // The legacy table may predate Receipt_No; add it before copying so the
+      // shared column list still matches.
+      try {
+        await db.execute('ALTER TABLE wbridge ADD COLUMN Receipt_No TEXT');
+      } catch (_) {}
+
+      final cols = Waybill.columns.join(', ');
+      await db.execute(
+          'INSERT OR REPLACE INTO ${Waybill.table} ($cols) SELECT $cols FROM wbridge');
+      await db.execute('DROP TABLE wbridge');
+    } catch (e) {
+      // Keep the old table (and its rows) rather than losing them.
+      e.printError();
+    }
   }
 
   Future<void> close() async {
@@ -139,6 +180,11 @@ class db_Provider extends GetxController {
     await db.execute(WaybillTrip.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
+    // Migration: waybill entries trace the receipt that closed their trips.
+    await _addColumnIfMissing(
+        db, Waybill.table, Waybill.col_Receipt_No, 'TEXT');
+    // Migration: vehicles carry the M-Pesa till (paybill) number.
+    await _addColumnIfMissing(db, Vehicles.table, 'Till_No', 'TEXT');
     // Migration: vehicle expenses captured offline carry their own sync flag.
     await db.execute(Vehicle_Expenses.createtable);
     await _addColumnIfMissing(db, Vehicle_Expenses.table,
@@ -146,6 +192,12 @@ class db_Provider extends GetxController {
     // Migration: trips can be saved before their waybill is synced.
     await _addColumnIfMissing(
         db, WaybillTrip.table, WaybillTrip.col_Waybill_Key, 'TEXT');
+    // Migration: trips carry the From route's description.
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Description, 'TEXT');
+    // Migration: trips edited locally are dirty until BC takes them.
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Dirty, 'INTEGER DEFAULT 0');
     // Migration: new fields for disfuel_summary
     await _addColumnIfMissing(
         db, DisFuelSummary.table, 'Total_Collection', 'REAL');

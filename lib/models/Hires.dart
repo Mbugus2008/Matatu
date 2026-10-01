@@ -94,7 +94,7 @@ class Hires implements mapping, Tomaps, AbsDbUpdates {
       // means NAV assigns/keeps the real entry number.
       'Entry': Entry ?? 0,
       'Created_by': Created_by,
-      'Code': Code,
+      'Code': Code?.trim().toUpperCase(),
       'Fleet_No': Fleet_No,
       'Destination': Destination,
       'Client_Name': Client_Name,
@@ -309,6 +309,8 @@ $col_Driver  text
         return false;
       }
 
+      var storedFromServer = false;
+
       // Parse the server response, but don't fail the whole save if only
       // the response body is unexpected - the server already processed it.
       try {
@@ -320,14 +322,34 @@ $col_Driver  text
         if (results.Contents != null) {
           await Get.find<db_Provider>()
               .batchinsert(Hires.table, [results.Contents as Hires]);
+          storedFromServer = true;
         }
       } catch (e, stackTrace) {
         Errors().report(e as Exception);
       }
 
-      // Refresh the local copy with what we sent.
-      await Get.find<db_Provider>().batchinsert(Hires.table, [hire]);
-      getthires();
+      final normalized = (hire.Code ?? '').trim().toUpperCase();
+      if (!storedFromServer && normalized.isNotEmpty) {
+        // The reply carried no record, so keep the copy we sent - but never a
+        // hire without a code: it would look new on the next edit.
+        await Get.find<db_Provider>().batchinsert(Hires.table, [hire]);
+      }
+
+      if (normalized.isNotEmpty) {
+        // Same code, different casing: that stale row is what made an edit
+        // create a second hire in BC.
+        await Get.find<db_Provider>().deletedata(
+            Hires.table,
+            'UPPER(TRIM(Code)) = ? AND TRIM(Code) <> ?',
+            [normalized, normalized]);
+      } else {
+        // The row we edited had lost its code; BC has now confirmed the
+        // record, so the unusable local row can go.
+        await Get.find<db_Provider>()
+            .deletedata(Hires.table, "Code IS NULL OR TRIM(Code) = ''", []);
+      }
+
+      await getthires();
       return true;
     } catch (e, stackTrace) {
       Errors().report(e as Exception);
@@ -342,34 +364,29 @@ $col_Driver  text
         if (r.statusCode == 200) {
           Results<Hires> results =
               Results<Hires>.fromJson(r.body, Hires.fromMap);
-          if (results.Code == 0) {
-            if (results.Contents != null) {
-              Get.find<db_Provider>()
-                  .batchinsert(Hires.table, results.Contents as List<Hires>);
-              // for (TranTypes element in results.Contents as List<TranTypes>) {
-              //   db.insert(TranTypes.table, element);
-              // }
-            }
+          if (results.Code == 0 && results.Contents != null) {
+            await Get.find<db_Provider>()
+                .batchinsert(Hires.table, results.Contents as List<Hires>);
+            // The server rows are the canonical copy - show them as soon as
+            // they land instead of waiting for the next screen refresh.
+            await _loadLocalHires();
           }
         }
       });
     } on Exception catch (e, stackTrace) {
       Errors().report(e as Exception);
-      // Optionally, you can also log the stackTrace if needed
-      // print(stackTrace);
     }
 
-    Get.find<db_Provider>()
-        .getalltrans(Hires.columns, Hires.table)
-        .then((value) {
-      print("value: $value");
-      if (value.isNotEmpty) {
-        List<Hires> tt = value.map((row) {
-          return Hires.fromMap_fortable(row);
-        }).toList();
-        Get.find<HiresController>().hires.value = tt.toList();
-      }
-    });
+    await _loadLocalHires();
+  }
+
+  /// Fills the controller from the local table - what the list actually shows.
+  Future<void> _loadLocalHires() async {
+    final value =
+        await Get.find<db_Provider>().getalltrans(Hires.columns, Hires.table);
+    if (value.isEmpty) return;
+    Get.find<HiresController>().hires.value =
+        value.map((row) => Hires.fromMap_fortable(row)).toList();
   }
 
   @override
@@ -394,7 +411,7 @@ $col_Driver  text
       'Payment_Methods': Payment_Methods?.index,
       'Entry': Entry,
       'Created_by': Created_by,
-      'Code': Code,
+      'Code': Code?.trim().toUpperCase(),
       'Fleet_No': Fleet_No,
       'Destination': Destination,
       'Client_Name': Client_Name,

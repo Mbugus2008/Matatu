@@ -26,6 +26,8 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
   double? Penalty;
   double? Parking;
   String? Fleet_No;
+  /// M-Pesa till (paybill) number the vehicle's transactions land on.
+  String? Till_No;
   double? Offload = 0;
   double? Management = 0;
   double get total => (Offload ?? 0) + (Management ?? 0);
@@ -58,6 +60,7 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
     this.Mpesa,
     this.Cash,
     this.Fleet_No,
+    this.Till_No,
     this.Offload,
     this.Management,
     this.transactions,
@@ -75,6 +78,7 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
       'Penalty': Penalty,
       'Parking': Parking,
       'Fleet_No': Fleet_No,
+      'Till_No': Till_No,
       'Offload': Offload,
       'Management': Management,
       'Mpesa': Mpesa,
@@ -106,6 +110,7 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
       Parking:
           map['Parking'] != null ? (map['Parking'] as num).toDouble() : null,
       Fleet_No: map['Fleet_No'] != null ? map['Fleet_No'] as String : null,
+      Till_No: map['Till_No'] != null ? map['Till_No'] as String : null,
       Offload:
           map['Offload'] != null ? (map['Offload'] as num).toDouble() : null,
       Management: map['Management'] != null
@@ -135,6 +140,7 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
   static const String col_Penalty = 'Penalty';
   static const String col_Parking = 'Parking';
   static const String col_Fleet_No = 'Fleet_No';
+  static const String col_Till_No = 'Till_No';
   static const List<String> columns = [
     col_Vehicle_Number,
     col_vehicle_type,
@@ -142,7 +148,8 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
     col_Start_Date,
     col_Code,
     col_Id_Number,
-    col_Fleet_No
+    col_Fleet_No,
+    col_Till_No
   ];
   static const String createtable = '''create table IF NOT EXISTS $table ( 
 $col_Vehicle_Number text primary key , 
@@ -151,6 +158,7 @@ $col_Daily_Contribution	float ,
 $col_Start_Date	int ,
 $col_Code	text ,
 $col_Fleet_No	text ,
+$col_Till_No	text ,
 $col_Id_Number	text 
  )
 ''';
@@ -185,6 +193,7 @@ $col_Id_Number	text
       Code: map['Code'] != null ? map['Code'] as String : null,
       Id_Number: map['Id_Number'] != null ? map['Id_Number'] as String : null,
       Fleet_No: map['Fleet_No'] != null ? map['Fleet_No'] as String : null,
+      Till_No: map['Till_No'] != null ? map['Till_No'] as String : null,
     );
   }
 
@@ -198,6 +207,7 @@ $col_Id_Number	text
       'Code': Code,
       'Id_Number': Id_Number,
       'Fleet_No': Fleet_No,
+      'Till_No': Till_No,
     };
   }
 

@@ -13,6 +13,13 @@ class HiresListScreen extends StatelessWidget {
   final RxString searchQuery = ''.obs;
   final TextEditingController searchController = TextEditingController();
 
+  /// Group keys the user has opened; every other group renders collapsed.
+  final RxSet<String> expandedGroups = <String>{}.obs;
+
+  /// Set once a header is tapped, so the initial "first group open" default
+  /// does not creep back on the next rebuild.
+  final RxBool _headersTouched = false.obs;
+
   HiresListScreen() {
     fetchHires();
   }
@@ -110,147 +117,266 @@ class HiresListScreen extends StatelessWidget {
                 (h.Code ?? '').toLowerCase().contains(query);
           }).toList();
 
-    return filtered.isEmpty
-        ? Center(
-            child: Text(
-              query.isEmpty ? 'No hires yet' : 'No hires match "$query"',
-              style: const TextStyle(color: Color(0xFF8A9296)),
-            ),
-          )
-        : SizedBox(
-            width: MediaQuery.of(Get.context!).size.width,
-            child: ListView.builder(
-              itemCount: filtered.length,
-              itemBuilder: (context, index) {
-                final hire = filtered[index];
+    if (filtered.isEmpty) {
+      return Center(
+        child: Text(
+          query.isEmpty ? 'No hires yet' : 'No hires match "$query"',
+          style: const TextStyle(color: Color(0xFF8A9296)),
+        ),
+      );
+    }
 
-                return Card(
-                  elevation: 2,
-                  shadowColor: Colors.black26,
-                  color:
-                      hire.Key != null ? Colors.white : const Color(0xFFF2F2F2),
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () {
-                      Get.to(() => AddHireScreen(hire: hire));
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF006B3F).withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.directions_bus,
-                                color: Color(0xFF006B3F)),
+    // Group by start date, newest group first, fleet number inside a group.
+    final byDate = <DateTime, List<Hires>>{};
+    final undated = <Hires>[];
+    for (final hire in filtered) {
+      final date = hire.Start_Date;
+      if (date == null) {
+        undated.add(hire);
+        continue;
+      }
+      byDate
+          .putIfAbsent(DateTime(date.year, date.month, date.day), () => [])
+          .add(hire);
+    }
+
+    final ordered = <MapEntry<DateTime?, List<Hires>>>[];
+    for (final date in byDate.keys.toList()..sort((a, b) => b.compareTo(a))) {
+      ordered.add(MapEntry(date, byDate[date]!..sort(_byFleet)));
+    }
+    if (undated.isNotEmpty) {
+      ordered.add(MapEntry(null, undated..sort(_byFleet)));
+    }
+
+    final items = <Widget>[];
+    for (var i = 0; i < ordered.length; i++) {
+      final entry = ordered[i];
+      final key = _groupKey(entry.key);
+      // The newest group starts open, every other group starts collapsed.
+      final isExpanded =
+          expandedGroups.contains(key) || (!_headersTouched.value && i == 0);
+      items.add(_groupHeader(entry.key, entry.value, key, isExpanded));
+      if (isExpanded) {
+        items.addAll(entry.value.map(_hireCard));
+      }
+    }
+
+    return SizedBox(
+      width: MediaQuery.of(Get.context!).size.width,
+      child: ListView.builder(
+        itemCount: items.length,
+        itemBuilder: (context, index) => items[index],
+      ),
+    );
+  }
+
+  /// Fleet 99 must come before fleet 100, so numeric fleets compare as numbers.
+  int _byFleet(Hires a, Hires b) {
+    final fa = int.tryParse((a.Fleet_No ?? '').trim());
+    final fb = int.tryParse((b.Fleet_No ?? '').trim());
+    if (fa != null && fb != null && fa != fb) return fa.compareTo(fb);
+    if (fa != null && fb == null) return -1;
+    if (fa == null && fb != null) return 1;
+    return (a.Fleet_No ?? '')
+        .toLowerCase()
+        .compareTo((b.Fleet_No ?? '').toLowerCase());
+  }
+
+  /// "Today" and "Yesterday" read better than the date on a fresh group.
+  String _groupLabel(DateTime? date) {
+    if (date == null) return 'No date';
+    final now = DateTime.now();
+    final days = DateTime(now.year, now.month, now.day).difference(date).inDays;
+    if (days == 0) return 'Today';
+    if (days == 1) return 'Yesterday';
+    return DateFormat('EEE, dd MMM yyyy').format(date);
+  }
+
+  /// A stable key per group: the day, or a sentinel for hires with no date.
+  String _groupKey(DateTime? date) =>
+      date == null ? 'undated' : DateFormat('yyyy-MM-dd').format(date);
+
+  void _toggleGroup(String key, bool isExpanded) {
+    _headersTouched.value = true;
+    if (isExpanded) {
+      expandedGroups.remove(key);
+    } else {
+      expandedGroups.add(key);
+    }
+  }
+
+  Widget _groupHeader(
+      DateTime? date, List<Hires> group, String key, bool isExpanded) {
+    final total = group.fold<double>(0, (sum, h) => sum + (h.Amount ?? 0));
+    return InkWell(
+      onTap: () => _toggleGroup(key, isExpanded),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 12, 14, 6),
+        child: Row(
+          children: [
+            Icon(
+              isExpanded ? Icons.expand_more : Icons.chevron_right,
+              size: 20,
+              color: const Color(0xFF006B3F),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              _groupLabel(date),
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF161D1F)),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F1EC),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${group.length} ${group.length == 1 ? 'hire' : 'hires'}',
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF006B3F)),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              NumberFormat.simpleCurrency(name: "KES").format(total),
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF006B3F)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hireCard(Hires hire) {
+    return Card(
+      elevation: 2,
+      shadowColor: Colors.black26,
+      color: hire.Key != null ? Colors.white : const Color(0xFFF2F2F2),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Get.to(() => AddHireScreen(hire: hire));
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF006B3F).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child:
+                    const Icon(Icons.directions_bus, color: Color(0xFF006B3F)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            hire.Vehicle_No ?? '-',
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF161D1F)),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        hire.Vehicle_No ?? '-',
-                                        style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF161D1F)),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (hire.Fleet_No != null) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFE8F1EC),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          'Fleet ${hire.Fleet_No}',
-                                          style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF006B3F)),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Code: ${hire.Code ?? '-'}',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF5B5F61),
-                                      fontFamily: 'monospace'),
-                                ),
-                                const SizedBox(height: 6),
-                                _dateLine(Icons.play_circle, hire.Start_Date,
-                                    hire.Start_Time),
-                                const SizedBox(height: 2),
-                                _dateLine(Icons.stop_circle, hire.Return_Date,
-                                    hire.Return_Time),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 4,
-                                  children: [
-                                    _chip(
-                                      hire_type_desc.desc.values.elementAt(
-                                          hire.Hire_Type?.index ?? 0),
-                                      const Color(0xFF006B3F),
-                                    ),
-                                    _chip(
-                                      client_desc.desc.values
-                                          .elementAt(hire.Client?.index ?? 0),
-                                      const Color(0xFF1B6CA8),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
+                        ),
+                        if (hire.Fleet_No != null) ...[
                           const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                hire.Amount != null
-                                    ? NumberFormat.simpleCurrency(name: "KES")
-                                        .format(hire.Amount)
-                                    : 'KES 0.00',
-                                style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF006B3F)),
-                              ),
-                              const Text('Amount',
-                                  style: TextStyle(
-                                      fontSize: 10, color: Color(0xFF5B5F61))),
-                            ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F1EC),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'Fleet ${hire.Fleet_No}',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF006B3F)),
+                            ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Code: ${hire.Code ?? '-'}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF5B5F61),
+                          fontFamily: 'monospace'),
+                    ),
+                    const SizedBox(height: 6),
+                    _dateLine(
+                        Icons.play_circle, hire.Start_Date, hire.Start_Time),
+                    const SizedBox(height: 2),
+                    _dateLine(
+                        Icons.stop_circle, hire.Return_Date, hire.Return_Time),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        _chip(
+                          hire_type_desc.desc.values
+                              .elementAt(hire.Hire_Type?.index ?? 0),
+                          const Color(0xFF006B3F),
+                        ),
+                        _chip(
+                          client_desc.desc.values
+                              .elementAt(hire.Client?.index ?? 0),
+                          const Color(0xFF1B6CA8),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    hire.Amount != null
+                        ? NumberFormat.simpleCurrency(name: "KES")
+                            .format(hire.Amount)
+                        : 'KES 0.00',
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF006B3F)),
                   ),
-                );
-              },
-            ));
+                  const Text('Amount',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF5B5F61))),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _chip(String label, Color color) {
