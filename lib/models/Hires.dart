@@ -139,6 +139,9 @@ class Hires implements mapping, Tomaps, AbsDbUpdates {
       Payment_Methods: map['Payment_Methods'] != null
           ? payment_Methods.values[(map['Payment_Methods'] as int)]
           : null,
+      // Entry must survive the DB round trip - `_submitForm` uses it to
+      // recognise an existing BC record when the local row lost its code.
+      Entry: map['Entry'] != null ? int.tryParse('${map['Entry']}') : null,
       Code: map['Code'] != null ? map['Code'] as String : null,
       Created_by:
           map['Created_by'] != null ? map['Created_by'] as String : null,

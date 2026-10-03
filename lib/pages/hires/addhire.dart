@@ -96,6 +96,15 @@ class AddHireScreen extends StatelessWidget {
         .firstWhereOrNull((payment_Methods p) => p == hire?.Payment_Methods);
   }
 
+  /// True when this screen edits an existing BC hire. The + button opens a
+  /// NEW hire as `AddHireScreen(hire: Hires())`, so `hire == null` alone
+  /// cannot tell a new hire apart from an edit.
+  bool get _isEdit =>
+      hire != null &&
+      ((hire?.Code ?? '').trim().isNotEmpty ||
+          (hire?.Entry ?? 0) > 0 ||
+          (hire?.Key ?? '').isNotEmpty);
+
   DateTime parseTime(String timeString) {
     // Accept every format this screen can produce:
     // - initial value: DateFormat("h:mm:ss")  -> e.g. "10:15:00"
@@ -127,10 +136,7 @@ class AddHireScreen extends StatelessWidget {
     // code, an entry number or a key. The new-hire screen is opened with an
     // empty Hires(), so `hire == null` alone cannot tell the two apart.
     final String? existingCode = hire?.Code?.trim();
-    final bool isEdit = hire != null &&
-        ((existingCode ?? '').isNotEmpty ||
-            (hire?.Entry ?? 0) > 0 ||
-            (hire?.Key ?? '').isNotEmpty);
+    final bool isEdit = _isEdit;
     // Validate required fields
     if (vehicleNoController.text.isEmpty) {
       _log('validation failed: vehicle is empty');
@@ -234,16 +240,16 @@ class AddHireScreen extends StatelessWidget {
               backgroundColor: Colors.red, snackPosition: SnackPosition.BOTTOM);
           return;
         }
-        final DateTime now = DateTime(DateTime.now().year, DateTime.now().month,
-            DateTime.now().day); // DateTime.now();
+        final DateTime startDay = DateTime(startDateParsed.year,
+            startDateParsed.month, startDateParsed.day);
         final DateTime returnDateTime = DateTime(returnDateParsed.year,
             returnDateParsed.month, returnDateParsed.day);
-        // A return date in the past only blocks CREATING a new hire.
-        // When editing an existing hire, allow the update through so the
-        // record can still reach BC.
-        final bool returnInPast = returnDateTime.isBefore(now);
-        _log('return date check: past=$returnInPast creating=${!isEdit}');
-        if (!returnInPast || isEdit) {
+        // Back-dated hires are legitimate (recording yesterday's trip), so a
+        // past return date does not block the save any more. Only an interval
+        // that ends before it starts is rejected.
+        final bool returnBeforeStart = returnDateTime.isBefore(startDay);
+        _log('return/start check: returnBeforeStart=$returnBeforeStart');
+        if (!returnBeforeStart) {
           Hires newHire = Hires(
             Key: hire?.Key,
             Entry: hire?.Entry,
@@ -305,8 +311,9 @@ class AddHireScreen extends StatelessWidget {
             saving.value = false;
           }
         } else {
-          _log('validation failed: return date is in the past');
-          Get.snackbar('Error', 'Return date and time must be in the future');
+          _log('validation failed: return date is before the start date');
+          Get.snackbar(
+              'Error', 'Return date must be on or after the start date');
         }
       } else {
         _log('validation failed: amount is not a number');
@@ -391,7 +398,7 @@ class AddHireScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(hire == null ? 'New Hire' : 'Edit Hire',
+        title: Text(_isEdit ? 'Edit Hire' : 'New Hire',
             style: const TextStyle(
                 color: Color(0xFF161D1F), fontWeight: FontWeight.w600)),
         centerTitle: true,
@@ -487,18 +494,19 @@ class AddHireScreen extends StatelessWidget {
                               c.toString().split('.').last,
                           hintText: 'Select Client Type *',
                         ),
-                        if (selectedClient.value == null)
-                          Padding(
-                            padding:
-                                const EdgeInsets.only(left: 12.0, top: 4.0),
-                            child: Text(
-                              'Client Type is required',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
+                        Obx(() => selectedClient.value == null
+                            ? Padding(
+                                padding: const EdgeInsets.only(
+                                    left: 12.0, top: 4.0),
+                                child: Text(
+                                  'Client Type is required',
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink()),
                         const SizedBox(height: 12),
                         TextInput(
                           controller: clientNameController,
@@ -552,42 +560,49 @@ class AddHireScreen extends StatelessWidget {
                                       color: Color(0xFF3F4941))),
                             ),
                             Expanded(
-                              child: TextFormField(
-                                controller: amountController,
-                                decoration: InputDecoration(
-                                  hintText: '0.00',
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 10),
-                                  border: const OutlineInputBorder(
-                                    borderRadius: BorderRadius.horizontal(
-                                        right: Radius.circular(12)),
-                                    borderSide:
-                                        BorderSide(color: Color(0xFFE0E0E0)),
+                              child:
+                                  ValueListenableBuilder<TextEditingValue>(
+                                valueListenable: amountController,
+                                builder: (context, value, _) => TextFormField(
+                                  controller: amountController,
+                                  decoration: InputDecoration(
+                                    hintText: '0.00',
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 10),
+                                    border: const OutlineInputBorder(
+                                      borderRadius: BorderRadius.horizontal(
+                                          right: Radius.circular(12)),
+                                      borderSide: BorderSide(
+                                          color: Color(0xFFE0E0E0)),
+                                    ),
+                                    enabledBorder: const OutlineInputBorder(
+                                      borderRadius: BorderRadius.horizontal(
+                                          right: Radius.circular(12)),
+                                      borderSide: BorderSide(
+                                          color: Color(0xFFE0E0E0)),
+                                    ),
+                                    focusedBorder: const OutlineInputBorder(
+                                      borderRadius: BorderRadius.horizontal(
+                                          right: Radius.circular(12)),
+                                      borderSide: BorderSide(
+                                          color: Color(0xFF006B3F),
+                                          width: 1.5),
+                                    ),
+                                    errorText: value.text.isEmpty
+                                        ? 'Amount is required'
+                                        : null,
                                   ),
-                                  enabledBorder: const OutlineInputBorder(
-                                    borderRadius: BorderRadius.horizontal(
-                                        right: Radius.circular(12)),
-                                    borderSide:
-                                        BorderSide(color: Color(0xFFE0E0E0)),
-                                  ),
-                                  focusedBorder: const OutlineInputBorder(
-                                    borderRadius: BorderRadius.horizontal(
-                                        right: Radius.circular(12)),
-                                    borderSide: BorderSide(
-                                        color: Color(0xFF006B3F), width: 1.5),
-                                  ),
-                                  errorText: amountController.text.isEmpty
-                                      ? 'Amount is required'
-                                      : null,
+                                  keyboardType:
+                                      TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(
+                                        RegExp(r'\d+\.?\d{0,2}')),
+                                  ],
                                 ),
-                                keyboardType: TextInputType.numberWithOptions(
-                                    decimal: true),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                      RegExp(r'\d+\.?\d{0,2}')),
-                                ],
                               ),
                             ),
                           ],
@@ -610,16 +625,18 @@ class AddHireScreen extends StatelessWidget {
                                         .replaceAll('_', ' '),
                                     hintText: 'Select Hire Type *',
                                   ),
-                                  if (selectedHireType.value == null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                          left: 12.0, top: 4.0),
-                                      child: Text(
-                                        'Hire Type is required',
-                                        style: TextStyle(
-                                            color: Colors.red, fontSize: 12),
-                                      ),
-                                    ),
+                                  Obx(() => selectedHireType.value == null
+                                      ? Padding(
+                                          padding: const EdgeInsets.only(
+                                              left: 12.0, top: 4.0),
+                                          child: Text(
+                                            'Hire Type is required',
+                                            style: TextStyle(
+                                                color: Colors.red,
+                                                fontSize: 12),
+                                          ),
+                                        )
+                                      : const SizedBox.shrink()),
                                 ],
                               ),
                             ),
@@ -715,7 +732,7 @@ class AddHireScreen extends StatelessWidget {
                               ],
                             )
                           : Text(
-                              hire == null ? 'Create Hire' : 'Update Hire',
+                              _isEdit ? 'Update Hire' : 'Create Hire',
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -806,6 +823,13 @@ class VehicleNumberInput extends StatelessWidget {
         return TextField(
           controller: fieldTextEditingController,
           focusNode: fieldFocusNode,
+          onChanged: (text) {
+            // Mirror what is typed into the form's controller. Without this
+            // the outer controller only ever changed when a suggestion was
+            // tapped, so a typed-but-not-selected vehicle failed validation
+            // with "Please select a vehicle" and the save never ran.
+            controller.text = text;
+          },
           decoration: InputDecoration(
             hintText: hintText ?? 'Enter fleet number/vehicle number',
             prefixIcon: const Icon(Icons.directions_car),
