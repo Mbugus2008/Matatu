@@ -968,11 +968,12 @@ class _DepotState extends State<Depot> {
       // No result came back (a plain pop) - read what the crew screen stored.
       final members = Get.find<MemberController>().allMembers;
       if (members.isEmpty) return;
-      for (final m in members) {
-        if (m.Vehicle != vehicle) continue;
-        if (m.Crew_Type == Crew_type.Driver) driver = m;
-        if (m.Crew_Type == Crew_type.Conductor) conductor = m;
-      }
+      // Same pick as the receipt and crew screen: the row assigned last is
+      // the crew riding now; a list-order scan can pick an old pile row.
+      final attached = members.where((m) => m.Vehicle == vehicle).toList();
+      driver = MemberController.pickCurrentCrew(attached, Crew_type.Driver);
+      conductor =
+          MemberController.pickCurrentCrew(attached, Crew_type.Conductor);
     }
 
     final newDriver = driver?.No;

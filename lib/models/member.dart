@@ -43,6 +43,18 @@ class Member implements mapping, Tomaps, AbsDbUpdates {
     return '$No $Name $Phone_No $ID_No $Vehicle $Crew_Type';
   }
 
+  /// Trailing number of the NAV web-service [Key] (e.g.
+  /// "24;EgAAAAJ7...;322134510;"). NAV increases it every time the record is
+  /// modified, so of several members pointing at one vehicle the largest tail
+  /// is the row that was attached/changed last - the crew riding now.
+  int get keyTail {
+    final key = Key;
+    if (key == null || key.isEmpty) return -1;
+    final match = RegExp(r';(\d+);?$').firstMatch(key.trim());
+    if (match == null) return -1;
+    return int.tryParse(match.group(1)!) ?? -1;
+  }
+
   @override
   Map<String, dynamic> toMap_fortable() {
     // DB rows must not contain API-only fields (e.g. Crew_TypeSpecified).

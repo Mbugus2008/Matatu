@@ -109,14 +109,22 @@ class Reversal implements mapping, Tomaps, AbsDbUpdates {
       Date: map['Date'] != null
           ? DateFormat("MM/dd/yyyy").parse((map['Date'] ?? 0))
           : null,
-      Status:
-          map['Status'] != null ? STatus.values[(map['Status']) as int] : null,
+      Status: map['Status'] is int &&
+              (map['Status'] as int) >= 0 &&
+              (map['Status'] as int) < STatus.values.length
+          ? STatus.values[map['Status'] as int]
+          : null,
       Created_By:
           map['Created_By'] != null ? map['Created_By'] as String : null,
-      Total_Amount:
-          map['Total_Amount'] != null ? map['Total_Amount'] as double : null,
-      Total_Trans:
-          map['Total_Trans'] != null ? map['Total_Trans'] as int : null,
+      // num, not double: a whole-shilling amount arrives as a JSON int and
+      // the old `as double` cast crashed the whole parse — which silently
+      // blocked reversal syncs in both directions.
+      Total_Amount: map['Total_Amount'] != null
+          ? (map['Total_Amount'] as num).toDouble()
+          : null,
+      Total_Trans: map['Total_Trans'] != null
+          ? (map['Total_Trans'] as num).toInt()
+          : null,
       Transction_Date: map['Transction_Date'] != null
           ? DateFormat("MM/dd/yyyy").parse((map['Transction_Date'] ?? 0))
           : null,
@@ -138,14 +146,19 @@ class Reversal implements mapping, Tomaps, AbsDbUpdates {
       Date: map['Date'] != null
           ? DateTime.fromMillisecondsSinceEpoch((map['Date'] ?? 0))
           : null,
-      Status:
-          map['Status'] != null ? STatus.values[(map['Status']) as int] : null,
+      Status: map['Status'] is int &&
+              (map['Status'] as int) >= 0 &&
+              (map['Status'] as int) < STatus.values.length
+          ? STatus.values[map['Status'] as int]
+          : null,
       Created_By:
           map['Created_By'] != null ? map['Created_By'] as String : null,
-      Total_Amount:
-          map['Total_Amount'] != null ? map['Total_Amount'] as double : null,
-      Total_Trans:
-          map['Total_Trans'] != null ? map['Total_Trans'] as int : null,
+      Total_Amount: map['Total_Amount'] != null
+          ? (map['Total_Amount'] as num).toDouble()
+          : null,
+      Total_Trans: map['Total_Trans'] != null
+          ? (map['Total_Trans'] as num).toInt()
+          : null,
       Transction_Date: map['Transction_Date'] != null
           ? DateTime.fromMillisecondsSinceEpoch((map['Transction_Date'] ?? 0))
           : null,
@@ -371,9 +384,14 @@ class Reversal implements mapping, Tomaps, AbsDbUpdates {
     return Future.value(null);
   }
 
+  /// Pull first, push last.
+  ///
+  /// Pushing before the download would overwrite a status the office just set
+  /// with the device's stale copy, so an approved request could never be
+  /// applied. downloadreversals() uploads the local rows once the current
+  /// server state is known.
   Future<void> syncReversals() async {
     await getreversals();
-    await uploadreversal();
     await downloadreversals();
     await getreversals();
   }

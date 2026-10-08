@@ -25,6 +25,7 @@ class AddHireScreen extends StatelessWidget {
   final TextEditingController inchargeController;
   final TextEditingController departmentController;
   final TextEditingController driverController;
+  final TextEditingController kmController;
 
   final Rx<client?> selectedClient = Rx<client?>(null);
   final List<client> clients = [client.Corporate, client.Private];
@@ -34,7 +35,8 @@ class AddHireScreen extends StatelessWidget {
     hire_Type.Dropoff,
     hire_Type.Pick_and_Drop,
     hire_Type.Full_Day,
-    hire_Type.Half_Day
+    hire_Type.Half_Day,
+    hire_Type.Several_Days,
   ];
   final Rx<vat_Type?> selectedVatType = Rx<vat_Type?>(null);
   final List<vat_Type> vatTypes = [
@@ -51,6 +53,7 @@ class AddHireScreen extends StatelessWidget {
 
   final _formKey = GlobalKey<FormState>();
   final RxBool saving = false.obs;
+  final RxBool isPaid = false.obs;
 
   /// Debug helper - prints to the VS Code debug console AND the app log
   /// file (/storage/emulated/0/Documents/Mbranch/yyyy-MM-dd.log)
@@ -85,7 +88,9 @@ class AddHireScreen extends StatelessWidget {
         inchargeController = TextEditingController(text: hire?.Incharge ?? ''),
         departmentController =
             TextEditingController(text: hire?.Department ?? ''),
-        driverController = TextEditingController(text: hire?.Driver ?? '') {
+        driverController = TextEditingController(text: hire?.Driver ?? ''),
+        kmController = TextEditingController(
+            text: (hire?.Km ?? 0) == 0 ? '' : hire!.Km!.toString()) {
     selectedClient.value =
         clients.firstWhereOrNull((client c) => c == hire?.Client);
     selectedHireType.value =
@@ -94,6 +99,7 @@ class AddHireScreen extends StatelessWidget {
         vatTypes.firstWhereOrNull((vat_Type v) => v == hire?.Vat_Type);
     selectedPaymentMethod.value = paymentMethods
         .firstWhereOrNull((payment_Methods p) => p == hire?.Payment_Methods);
+    isPaid.value = hire?.Paid ?? false;
   }
 
   /// True when this screen edits an existing BC hire. The + button opens a
@@ -104,6 +110,9 @@ class AddHireScreen extends StatelessWidget {
       ((hire?.Code ?? '').trim().isNotEmpty ||
           (hire?.Entry ?? 0) > 0 ||
           (hire?.Key ?? '').isNotEmpty);
+
+  /// A hire that has been marked Paid can no longer be edited.
+  bool get _locked => hire?.Paid == true;
 
   DateTime parseTime(String timeString) {
     // Accept every format this screen can produce:
@@ -129,7 +138,39 @@ class AddHireScreen extends StatelessWidget {
     throw FormatException('Invalid time format: "$timeString"');
   }
 
+  /// Turning Paid on locks the hire from further edits - confirm first.
+  Future<void> _confirmPaidToggle(bool value) async {
+    if (!value || isPaid.value) {
+      isPaid.value = value;
+      return;
+    }
+    final confirm = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Mark as Paid?'),
+        content: const Text(
+            'Once a hire is marked as Paid it can no longer be edited.\n\n'
+            'Continue?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Mark Paid'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+    if (confirm == true) {
+      isPaid.value = true;
+      _log('paid confirmed - the hire will lock after saving');
+    }
+  }
+
   Future<void> _submitForm() async {
+    if (_locked) return;
     _log('BUTTON PRESSED mode=${hire == null ? 'CREATE' : 'UPDATE'} '
         'Key=${hire?.Key} Code=${hire?.Code}');
     // A hire is an edit when the row already carries an identity from BC - a
@@ -185,7 +226,7 @@ class AddHireScreen extends StatelessWidget {
     final String fleetNo = fleetNoController.text;
     _log('fields: vehicle=$vehicleNo amount=$amountText '
         'start=$startDate $startTime return=$returnDate $returnTime '
-        'fleet=$fleetNo');
+        'fleet=$fleetNo km=${kmController.text} paid=${isPaid.value}');
 
     if (vehicleNo.isNotEmpty &&
         amountText.isNotEmpty &&
@@ -274,6 +315,8 @@ class AddHireScreen extends StatelessWidget {
             Incharge: inchargeController.text,
             Department: departmentController.text,
             Driver: driverController.text,
+            Paid: isPaid.value,
+            Km: double.tryParse(kmController.text.trim()) ?? 0,
           );
 
           // Save the hire (button shows updating state meanwhile)
@@ -350,6 +393,32 @@ class AddHireScreen extends StatelessWidget {
     );
   }
 
+  /// Shown when the hire is locked (already marked Paid in BC).
+  Widget _buildPaidBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F5E9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFA5D6A7)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.lock_outline, size: 18, color: Color(0xFF2E7D32)),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'This hire is marked as Paid — it can no longer be edited.',
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF2E7D32)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPeriodCard({
     required IconData icon,
     required String label,
@@ -418,12 +487,14 @@ class AddHireScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_locked) _buildPaidBanner(),
                   _buildSection(
                     'Vehicle Information',
                     VehicleNumberInput(
                       controller: vehicleNoController,
                       fleetNoController: fleetNoController,
                       hintText: 'Vehicle Number *',
+                      enabled: !_locked,
                       onSelected: (Vehicles? selection) {
                         if (selection != null) {
                           vehicleNoController.text =
@@ -443,6 +514,7 @@ class AddHireScreen extends StatelessWidget {
                           date: DateInput(
                             controller: startDateController,
                             labelText: 'Start Date',
+                            enabled: !_locked,
                             onDateSelected: (selectedDate) {
                               startDateController.text =
                                   DateFormat('MM/dd/yyyy').format(selectedDate);
@@ -451,6 +523,7 @@ class AddHireScreen extends StatelessWidget {
                           time: TimeInput(
                             controller: startTimeController,
                             labelText: 'Start Time',
+                            enabled: !_locked,
                             onTimeSelected: (selectedTime) {
                               startTimeController.text =
                                   DateFormat('HH:mm').format(selectedTime);
@@ -464,6 +537,7 @@ class AddHireScreen extends StatelessWidget {
                           date: DateInput(
                             controller: returnDateController,
                             labelText: 'Return Date',
+                            enabled: !_locked,
                             onDateSelected: (selectedDate) {
                               returnDateController.text =
                                   DateFormat('MM/dd/yyyy').format(selectedDate);
@@ -472,6 +546,7 @@ class AddHireScreen extends StatelessWidget {
                           time: TimeInput(
                             controller: returnTimeController,
                             labelText: 'Return Time',
+                            enabled: !_locked,
                             onTimeSelected: (selectedTime) {
                               returnTimeController.text =
                                   DateFormat('HH:mm').format(selectedTime);
@@ -493,6 +568,7 @@ class AddHireScreen extends StatelessWidget {
                           displayText: (client c) =>
                               c.toString().split('.').last,
                           hintText: 'Select Client Type *',
+                          enabled: !_locked,
                         ),
                         Obx(() => selectedClient.value == null
                             ? Padding(
@@ -512,24 +588,28 @@ class AddHireScreen extends StatelessWidget {
                           controller: clientNameController,
                           hintText: 'Client Name',
                           prefixIcon: Icons.person,
+                          enabled: !_locked,
                         ),
                         const SizedBox(height: 12),
                         TextInput(
                           controller: inchargeController,
                           hintText: 'In Charge',
                           prefixIcon: Icons.badge,
+                          enabled: !_locked,
                         ),
                         const SizedBox(height: 12),
                         TextInput(
                           controller: departmentController,
                           hintText: 'Department',
                           prefixIcon: Icons.domain,
+                          enabled: !_locked,
                         ),
                         const SizedBox(height: 12),
                         TextInput(
                           controller: destinationController,
                           hintText: 'Destination',
                           prefixIcon: Icons.pin_drop,
+                          enabled: !_locked,
                         ),
                       ],
                     ),
@@ -565,6 +645,7 @@ class AddHireScreen extends StatelessWidget {
                                 valueListenable: amountController,
                                 builder: (context, value, _) => TextFormField(
                                   controller: amountController,
+                                  enabled: !_locked,
                                   decoration: InputDecoration(
                                     hintText: '0.00',
                                     filled: true,
@@ -608,6 +689,20 @@ class AddHireScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 12),
+                        TextInput(
+                          controller: kmController,
+                          hintText: 'Distance (Km)',
+                          prefixIcon: Icons.route,
+                          enabled: !_locked,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(
+                                  decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'\d+\.?\d{0,2}')),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -624,6 +719,7 @@ class AddHireScreen extends StatelessWidget {
                                         .last
                                         .replaceAll('_', ' '),
                                     hintText: 'Select Hire Type *',
+                                    enabled: !_locked,
                                   ),
                                   Obx(() => selectedHireType.value == null
                                       ? Padding(
@@ -651,6 +747,7 @@ class AddHireScreen extends StatelessWidget {
                                     .last
                                     .replaceAll('_', ' '),
                                 hintText: 'VAT Type',
+                                enabled: !_locked,
                               ),
                             ),
                           ],
@@ -662,7 +759,39 @@ class AddHireScreen extends StatelessWidget {
                           displayText: (payment_Methods p) =>
                               p.toString().split('.').last,
                           hintText: 'Payment Method',
+                          enabled: !_locked,
                         ),
+                        const SizedBox(height: 12),
+                        Obx(() => Container(
+                              padding: const EdgeInsets.only(left: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: const Color(0xFFE0E0E0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.payments_outlined,
+                                      size: 20, color: Color(0xFF3F4941)),
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Text('Paid',
+                                        style: TextStyle(
+                                            fontSize: 15,
+                                            color: Color(0xFF161D1F))),
+                                  ),
+                                  Switch(
+                                    value: isPaid.value,
+                                    onChanged:
+                                        _locked ? null : _confirmPaidToggle,
+                                    activeThumbColor: Colors.white,
+                                    activeTrackColor:
+                                        const Color(0xFF006B3F),
+                                  ),
+                                ],
+                              ),
+                            )),
                       ],
                     ),
                     tinted: true,
@@ -702,7 +831,9 @@ class AddHireScreen extends StatelessWidget {
                   ],
                 ),
                 child: Obx(() => ElevatedButton(
-                      onPressed: saving.value ? null : _submitForm,
+                      onPressed: _locked
+                          ? () => Get.back()
+                          : (saving.value ? null : _submitForm),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF006B3F),
                         foregroundColor: Colors.white,
@@ -712,7 +843,17 @@ class AddHireScreen extends StatelessWidget {
                         shape: const StadiumBorder(),
                         elevation: 0,
                       ),
-                      child: saving.value
+                      child: _locked
+                          ? const Text(
+                              'Close',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : saving.value
                           ? Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: const [
@@ -755,19 +896,21 @@ class CustomDropdown<T> extends StatelessWidget {
   final List<T> items;
   final String Function(T) displayText;
   final String hintText;
+  final bool enabled;
 
   const CustomDropdown({
     required this.selectedValue,
     required this.items,
     required this.displayText,
     required this.hintText,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return Obx(() => Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: enabled ? Colors.white : const Color(0xFFF2F2F2),
             border: Border.all(color: const Color(0xFFE0E0E0)),
             borderRadius: BorderRadius.circular(12),
           ),
@@ -781,11 +924,13 @@ class CustomDropdown<T> extends StatelessWidget {
               hintText,
               style: const TextStyle(color: Color(0xFF5B5F61)),
             ),
-            onChanged: (T? newValue) {
-              if (newValue != null) {
-                selectedValue.value = newValue;
-              }
-            },
+            onChanged: !enabled
+                ? null
+                : (T? newValue) {
+                    if (newValue != null) {
+                      selectedValue.value = newValue;
+                    }
+                  },
             underline: const SizedBox(),
             items: items.map((T item) {
               return DropdownMenuItem<T>(
@@ -803,12 +948,14 @@ class VehicleNumberInput extends StatelessWidget {
   final TextEditingController fleetNoController;
   final String? hintText;
   final ValueChanged<Vehicles>? onSelected;
+  final bool enabled;
 
   const VehicleNumberInput({
     required this.controller,
     required this.fleetNoController,
     this.hintText,
     this.onSelected,
+    this.enabled = true,
     Key? key,
   }) : super(key: key);
 
@@ -823,6 +970,7 @@ class VehicleNumberInput extends StatelessWidget {
         return TextField(
           controller: fieldTextEditingController,
           focusNode: fieldFocusNode,
+          enabled: enabled,
           onChanged: (text) {
             // Mirror what is typed into the form's controller. Without this
             // the outer controller only ever changed when a suggestion was
@@ -850,16 +998,18 @@ class VehicleNumberInput extends StatelessWidget {
               borderSide: BorderSide(color: Color(0xFF006B3F), width: 1.5),
             ),
           ),
-          onTap: () {
-            // Keep the existing text on focus; just select it so the user
-            // can quickly type over it to search another vehicle.
-            if (fieldTextEditingController.text.isNotEmpty) {
-              fieldTextEditingController.selection = TextSelection(
-                baseOffset: 0,
-                extentOffset: fieldTextEditingController.text.length,
-              );
-            }
-          },
+          onTap: enabled
+              ? () {
+                  // Keep the existing text on focus; just select it so the
+                  // user can quickly type over it to search another vehicle.
+                  if (fieldTextEditingController.text.isNotEmpty) {
+                    fieldTextEditingController.selection = TextSelection(
+                      baseOffset: 0,
+                      extentOffset: fieldTextEditingController.text.length,
+                    );
+                  }
+                }
+              : null,
         );
       },
       optionsViewBuilder: (context, onSelected, options) {
@@ -964,6 +1114,7 @@ class TextInput extends StatelessWidget {
   final IconData? prefixIcon;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
+  final bool enabled;
 
   const TextInput({
     required this.controller,
@@ -971,12 +1122,14 @@ class TextInput extends StatelessWidget {
     this.prefixIcon,
     this.keyboardType,
     this.inputFormatters,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      enabled: enabled,
       decoration: InputDecoration(
         hintText: hintText,
         prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
@@ -1045,17 +1198,20 @@ class DateInput extends StatelessWidget {
   final TextEditingController controller;
   final String labelText;
   final ValueChanged<DateTime>? onDateSelected;
+  final bool enabled;
 
   const DateInput({
     required this.controller,
     required this.labelText,
     this.onDateSelected,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      enabled: enabled,
       decoration: InputDecoration(
         labelText: labelText,
         filled: true,
@@ -1076,20 +1232,22 @@ class DateInput extends StatelessWidget {
           borderSide: BorderSide(color: Color(0xFF006B3F), width: 1.5),
         ),
       ),
-      onTap: () async {
-        final DateTime? picked = await showDatePicker(
-          fieldLabelText: labelText,
-          helpText: labelText,
-          context: context,
-          initialDate: DateTime.now(),
-          firstDate: DateTime(1900),
-          lastDate: DateTime(2100),
-        );
-        if (picked != null) {
-          controller.text = DateFormat("MM/dd/yyyy").format(picked);
-          onDateSelected?.call(picked);
-        }
-      },
+      onTap: enabled
+          ? () async {
+              final DateTime? picked = await showDatePicker(
+                fieldLabelText: labelText,
+                helpText: labelText,
+                context: context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime(1900),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) {
+                controller.text = DateFormat("MM/dd/yyyy").format(picked);
+                onDateSelected?.call(picked);
+              }
+            }
+          : null,
       readOnly: true,
     );
   }
@@ -1099,17 +1257,20 @@ class TimeInput extends StatelessWidget {
   final TextEditingController controller;
   final String labelText;
   final ValueChanged<DateTime>? onTimeSelected;
+  final bool enabled;
 
   const TimeInput({
     required this.controller,
     required this.labelText,
     this.onTimeSelected,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      enabled: enabled,
       decoration: InputDecoration(
         labelText: labelText,
         filled: true,
@@ -1130,24 +1291,26 @@ class TimeInput extends StatelessWidget {
           borderSide: BorderSide(color: Color(0xFF006B3F), width: 1.5),
         ),
       ),
-      onTap: () async {
-        final TimeOfDay? pickedTime = await showTimePicker(
-          helpText: labelText,
-          context: context,
-          initialEntryMode: TimePickerEntryMode.input,
-          initialTime: TimeOfDay.now(),
-        );
-        if (pickedTime != null && context.mounted) {
-          controller.text = pickedTime.format(context);
-          onTimeSelected?.call(DateTime(
-            DateTime.now().year,
-            DateTime.now().month,
-            DateTime.now().day,
-            pickedTime.hour,
-            pickedTime.minute,
-          ));
-        }
-      },
+      onTap: enabled
+          ? () async {
+              final TimeOfDay? pickedTime = await showTimePicker(
+                helpText: labelText,
+                context: context,
+                initialEntryMode: TimePickerEntryMode.input,
+                initialTime: TimeOfDay.now(),
+              );
+              if (pickedTime != null && context.mounted) {
+                controller.text = pickedTime.format(context);
+                onTimeSelected?.call(DateTime(
+                  DateTime.now().year,
+                  DateTime.now().month,
+                  DateTime.now().day,
+                  pickedTime.hour,
+                  pickedTime.minute,
+                ));
+              }
+            }
+          : null,
       readOnly: true,
     );
   }

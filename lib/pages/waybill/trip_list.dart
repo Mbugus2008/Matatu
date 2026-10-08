@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
 import 'package:t_matatu/models/expenses/vehicle_expenses.dart';
+import 'package:t_matatu/models/waybill/trip_comment.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/pages/waybill/start_trip_sheet.dart';
 import 'package:t_matatu/pages/waybill/trip_form.dart';
@@ -26,8 +27,12 @@ class _TripListPageState extends State<TripListPage> {
   /// while another screen was mid-build.
   bool _loading = true;
 
-  /// Supervisors and admins can record expenses (fuel, police, ...) on an
-  /// open trip — see Agent.canAddTripExpenses.
+  /// Comment records for the trips on screen, keyed by Trip_No — shown on
+  /// the cards and refreshed after the comments dialog closes.
+  Map<int, TripComment> _tripComments = {};
+
+  /// Supervisors, admins and controllers can record expenses (fuel,
+  /// police, ...) on an open trip — see Agent.canAddTripExpenses.
   bool get _canAddExpenses =>
       Get.find<MainController>().agent.value.canAddTripExpenses;
 
@@ -65,7 +70,22 @@ class _TripListPageState extends State<TripListPage> {
     final wb = _controller.selectedWaybill.value;
     await _controller.fetchTrips(wb?.Entry_No, waybillKey: wb?.Key);
     await _controller.loadTripTotals();
+    await _loadTripComments();
     if (mounted) setState(() => _loading = false);
+  }
+
+  /// Loads the comment records for the trips currently on screen.
+  Future<void> _loadTripComments() async {
+    try {
+      final ids = _controller.trips
+          .map((t) => t.Trip_No ?? 0)
+          .where((n) => n > 0)
+          .toList();
+      final map = await TripComment.forTrips(ids);
+      if (mounted) setState(() => _tripComments = map);
+    } catch (_) {
+      // The cards simply show no comments when the local read fails.
+    }
   }
 
   @override
@@ -193,9 +213,16 @@ class _TripListPageState extends State<TripListPage> {
   }
 
   Widget _buildTripCard(WaybillTrip trip) {
+    final wb = _controller.selectedWaybill.value;
+    final comment = _tripComments[trip.Trip_No ?? 0];
+    final commentText = (comment?.Comments ?? '').trim();
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        // Touching anywhere on the card opens the trip's full details.
+        onTap: () => _showTripDetails(trip, wb),
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,32 +263,42 @@ class _TripListPageState extends State<TripListPage> {
                             color: Colors.grey[600],
                           ),
                         ),
+                      // Closed trips name the receipt that settled them.
+                      if (trip.To_Time != null &&
+                          (wb?.Receipt_No ?? '').trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            'Closed by receipt ${wb!.Receipt_No!.trim()}',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0B5FA5),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                if (trip.To_Time == null)
-                  IconButton(
-                    tooltip: 'Edit Trip',
-                    icon: const Icon(Icons.edit, size: 18),
-                    onPressed: () => _navigateToTripForm(trip: trip),
-                  )
-                else
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(6),
+                // Comments are logged while the trip is OPEN. Closed trips
+                // show no card actions — the trip is done.
+                if (trip.To_Time == null) ...[
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF0B5FA5),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      minimumSize: const Size(0, 30),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text(
-                      'CLOSED',
+                    icon: const Icon(Icons.mode_comment_outlined, size: 16),
+                    label: const Text(
+                      'Add comments',
                       style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey,
-                      ),
+                          fontSize: 12, fontWeight: FontWeight.w600),
                     ),
+                    onPressed: () => _addComment(trip),
                   ),
+                ],
               ],
             ),
             const Divider(height: 16),
@@ -304,30 +341,6 @@ class _TripListPageState extends State<TripListPage> {
                   onPressed: () => _addExpense(trip),
                 ),
               ),
-            if (trip.To_Time == null)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF006B3F),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    icon: const Icon(Icons.flag, size: 20),
-                    label: const Text(
-                      'Close Trip',
-                      style:
-                          TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                    ),
-                    onPressed: () => _closeTrip(trip),
-                  ),
-                ),
-              ),
             if (trip.Comments != null && trip.Comments!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -348,9 +361,41 @@ class _TripListPageState extends State<TripListPage> {
                   ],
                 ),
               ),
+            // The trip's comment record (BC TripComments) — the same text the
+            // "Add comments" dialog writes. Full text shows in the popup.
+            if (commentText.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFFECB3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.mode_comment_outlined,
+                          size: 14, color: Color(0xFFB45309)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          commentText,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),
+        ),
     );
   }
 
@@ -373,6 +418,9 @@ class _TripListPageState extends State<TripListPage> {
     );
   }
 
+  // The card's edit pencil was removed (2026-10-07) — kept so the trip form
+  // can be re-entered from another spot if needed.
+  // ignore: unused_element
   void _navigateToTripForm({WaybillTrip? trip}) {
     Get.to(() => TripFormPage(trip: trip))?.then((_) => _reload());
   }
@@ -408,14 +456,18 @@ class _TripListPageState extends State<TripListPage> {
   }
 
   /// Mirrors the trip expense onto the vehicle-expenses journal so the depot
-  /// reports see it too. The trip's code goes in Vehicle_No — that is how the
-  /// office links a vehicle expense back to the trip it was spent on.
+  /// reports see it too. BC caps the journal's Vehicle No at 10 characters,
+  /// so it carries the trip's id — its auto-incrementing trip number, e.g.
+  /// "59" — which the office uses to link an expense back to its trip.
+  /// Until the number is known the trip key is stored instead and
+  /// [Vehicle_Expenses.repairLegacyTripKeys] rewrites it at sign-in.
   Future<void> _storeVehicleExpense(
       WaybillTrip trip, _ExpenseEntry entry) async {
     final wb = _controller.selectedWaybill.value;
     final row = Vehicle_Expenses(
       Code: Vehicle_Expenses.newCode(),
-      Vehicle_No: trip.Key,
+      Vehicle_No: Vehicle_Expenses.tripLabel(
+          tripNo: trip.Trip_No, fallback: trip.Key),
       Date: DateTime.now(),
       DateSpecified: true,
       Description: entry.note.isEmpty ? null : entry.note,
@@ -434,7 +486,8 @@ class _TripListPageState extends State<TripListPage> {
     }
   }
 
-  /// Opens the close-trip popup (same style as Start Trip).
+  /// Opens the close-trip popup (same style as Start Trip) — reached from
+  /// the trip details popup on an open trip.
   void _closeTrip(WaybillTrip trip) {
     showModalBottomSheet<bool>(
       context: context,
@@ -454,6 +507,39 @@ class _TripListPageState extends State<TripListPage> {
             'Close Trip', 'Trip closed. It will sync automatically.');
       }
     });
+  }
+
+  /// Comments are logged on OPEN trips: the text is kept on the device per
+  /// trip and mirrored to BC's TripComments page (one record per Trip_Id).
+  Future<void> _addComment(WaybillTrip trip) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _TripCommentsDialog(trip: trip),
+    );
+    // The cards show the comment text, so pick up whatever was added.
+    _loadTripComments();
+  }
+
+  /// Tap-a-trip popup: everything recorded for the trip in one place.
+  void _showTripDetails(WaybillTrip trip, Waybill? wb) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _TripDetailsSheet(
+        trip: trip,
+        routeLine: _routeLine(trip),
+        receivedLabel: _formatReceived(trip.Amount_Received),
+        receiptNo: (wb?.Receipt_No ?? '').trim(),
+        comment: _tripComments[trip.Trip_No ?? 0],
+        // Closing moved off the card (too easy to hit by accident) — open
+        // trips can still be closed deliberately from their details popup.
+        onCloseTrip: trip.To_Time == null ? () => _closeTrip(trip) : null,
+      ),
+    );
   }
 
   // ─── Start Trip popup ────────────────────────────────
@@ -802,7 +888,6 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'Reason *',
-              hintText: 'e.g. fuel, police',
               border: OutlineInputBorder(),
             ),
           ),
@@ -839,4 +924,402 @@ class _ExpenseEntry {
   final String note;
 
   const _ExpenseEntry(this.amount, this.note);
+}
+
+/// Dialog behind "Add comments" on a trip.
+///
+/// BC's TripComments page keeps ONE record per trip (keyed by Trip_Id), so
+/// every comment the user adds is appended to that record's text as a
+/// stamped block — who wrote it and when stays visible in the text itself.
+class _TripCommentsDialog extends StatefulWidget {
+  final WaybillTrip trip;
+
+  const _TripCommentsDialog({required this.trip});
+
+  @override
+  State<_TripCommentsDialog> createState() => _TripCommentsDialogState();
+}
+
+class _TripCommentsDialogState extends State<_TripCommentsDialog> {
+  final TextEditingController _inputCtrl = TextEditingController();
+  TripComment? _existing;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _inputCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    TripComment? row;
+    try {
+      row = await TripComment.forTrip(widget.trip.Trip_No);
+    } catch (_) {
+      row = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _existing = row;
+      _loading = false;
+    });
+  }
+
+  String get _agentCode {
+    try {
+      return Get.find<MainController>().agent.value.Agent_Code ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Future<void> _save() async {
+    final text = _inputCtrl.text.trim();
+    if (text.isEmpty || _saving) return;
+    setState(() => _saving = true);
+    try {
+      final now = DateTime.now();
+      final row = _existing ??
+          TripComment(
+            Code: TripComment.newCode(),
+            Trip_Id: widget.trip.Trip_No,
+          );
+      row.Trip_Id ??= widget.trip.Trip_No;
+      row.Comments = TripComment.appendBlock(
+        existing: _existing?.Comments,
+        text: text,
+        user: _agentCode,
+        at: now,
+      );
+      row.User = _agentCode;
+      row.Date_time = now;
+      // Edited locally — BC still needs the update.
+      row.sent = false;
+      await row.saveLocal();
+      _existing = row;
+      _inputCtrl.clear();
+      // Best effort push — a row BC does not take stays pending for the next
+      // upload/retry cycle.
+      TripComment.postPending().catchError((_) => 0);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comment saved — it will sync automatically.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tripNo = widget.trip.Trip_No;
+    final existingText = (_existing?.Comments ?? '').trim();
+
+    return AlertDialog(
+      title: Text('Trip #${tripNo ?? '-'} comments'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: _loading
+            ? const SizedBox(
+                height: 80,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (existingText.isNotEmpty) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        existingText,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ] else ...[
+                    Text(
+                      'No comments on this trip yet.',
+                      style: TextStyle(
+                          fontSize: 13, color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextField(
+                    controller: _inputCtrl,
+                    maxLines: 3,
+                    minLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'New comment',
+                      hintText: 'e.g. breakdown, accident, police...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+        FilledButton.icon(
+          onPressed: _saving ? null : _save,
+          icon: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.send, size: 18),
+          label: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Details for one trip — opened by touching a trip card. Open trips can be
+/// closed from here.
+class _TripDetailsSheet extends StatelessWidget {
+  final WaybillTrip trip;
+  final String routeLine;
+  final String receivedLabel;
+  final String receiptNo;
+  final TripComment? comment;
+
+  /// Present for open trips — closes the trip, then refreshes the list.
+  final VoidCallback? onCloseTrip;
+
+  const _TripDetailsSheet({
+    required this.trip,
+    required this.routeLine,
+    required this.receivedLabel,
+    required this.receiptNo,
+    this.comment,
+    this.onCloseTrip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final money = NumberFormat('#,##0');
+    final commentText = (comment?.Comments ?? '').trim();
+    final notes = (trip.Comments ?? '').trim();
+    final closed = trip.To_Time != null;
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Trip #${trip.Trip_No ?? '-'}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[800],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: closed
+                        ? Colors.grey.shade200
+                        : const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    closed ? 'CLOSED' : 'OPEN',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color:
+                          closed ? Colors.grey[700] : const Color(0xFF2E7D32),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(routeLine,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700)),
+            if (trip.From_Time != null || trip.To_Time != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '${trip.From_Time != null ? DateFormat('HH:mm').format(trip.From_Time!) : '?'} — ${trip.To_Time != null ? DateFormat('HH:mm').format(trip.To_Time!) : 'not closed'}',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+              ),
+            if (closed && receiptNo.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.receipt_outlined,
+                        size: 15, color: Color(0xFF0B5FA5)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Closed by receipt $receiptNo',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0B5FA5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const Divider(height: 24),
+            _detailRow('Pax', '${trip.Pax_No ?? 0}'),
+            _detailRow('Fare', money.format(trip.Fare_Amount ?? 0)),
+            _detailRow('Total', money.format(trip.Total ?? 0)),
+            _detailRow('Received', receivedLabel),
+            _detailRow('Expenses', money.format(trip.Expenses ?? 0)),
+            if (notes.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('Notes',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey[600])),
+              const SizedBox(height: 4),
+              Text(notes,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[800],
+                      fontStyle: FontStyle.italic)),
+            ],
+            if (commentText.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFFECB3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.mode_comment_outlined,
+                            size: 14, color: Color(0xFFB45309)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Comments',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFB45309)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(commentText,
+                        style: const TextStyle(fontSize: 12.5)),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            if (onCloseTrip != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF006B3F),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.flag, size: 20),
+                  label: const Text(
+                    'Close Trip',
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    onCloseTrip!();
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(onCloseTrip != null ? 'Back' : 'Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label,
+                style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+          ),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
 }

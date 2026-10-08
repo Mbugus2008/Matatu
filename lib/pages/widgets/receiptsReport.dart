@@ -41,21 +41,17 @@ class receiptReport extends StatelessWidget {
                           final bool isPendingReversal =
                               reversal == true && reversed == false;
                           final bool isReversed = reversed == true;
-                          String vehicle = Get.find<ReportController>()
-                                  .daystrans[index]
-                                  .Fleet ??
-                              '';
+                          final header =
+                              Get.find<ReportController>().daystrans[index];
+                          // Show the vehicle no AND the fleet — e.g.
+                          // "KCQ793P · 618" (account fallback when neither
+                          // is set, same as before).
+                          String vehicle = [
+                            header.Vehicle ?? '',
+                            header.Fleet ?? ''
+                          ].where((s) => s.isNotEmpty).join(' · ');
                           if (vehicle.isEmpty) {
-                            vehicle = Get.find<ReportController>()
-                                    .daystrans[index]
-                                    .Vehicle ??
-                                '';
-                          }
-                          if (vehicle.isEmpty) {
-                            vehicle = Get.find<ReportController>()
-                                    .daystrans[index]
-                                    .Account ??
-                                '';
+                            vehicle = header.Account ?? '';
                           }
 
                           return Card(
@@ -128,8 +124,12 @@ class receiptReport extends StatelessWidget {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(vehicle,
-                                        style: const TextStyle(fontSize: 12)),
+                                    Flexible(
+                                      child: Text(vehicle,
+                                          overflow: TextOverflow.ellipsis,
+                                          style:
+                                              const TextStyle(fontSize: 12)),
+                                    ),
                                     Text(
                                         Get.find<ReportController>()
                                                 .daystrans[index]
@@ -203,9 +203,9 @@ class receiptReport extends StatelessWidget {
                                                                               .transtions?[
                                                                                   i]
                                                                               .Type ==
-                                                                          "SAVINGSCREW"
+                                                                          "SAVINGSCREW" || Get.find<ReportController>().daystrans[index].transtions?[i].Type == "SAVINGSCREW1"
                                                                       ? Text(
-                                                                          '${Get.find<ReportController>().daystrans[index].transtions?[i].Description}(${Get.find<ReportController>().daystrans[index].transtions?[i].Account_No})',
+                                                                          TranTypes.crewSavingsDescription(Get.find<ReportController>().daystrans[index].transtions?[i].Description, Get.find<ReportController>().daystrans[index].transtions?[i].Account_No),
                                                                           style: const TextStyle(
                                                                               fontSize:
                                                                                   12))
@@ -383,7 +383,9 @@ class receiptReport extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         TranTypes.isCrewSavings(t[i].Type)
-                            ? Text('${t[i].Description}(${t[i].Account_No})',
+                            ? Text(
+                                TranTypes.crewSavingsDescription(
+                                    t[i].Description, t[i].Account_No),
                                 style: const TextStyle(fontSize: 12))
                             : Text(t[i].Description.toString(),
                                 style: const TextStyle(fontSize: 12)),

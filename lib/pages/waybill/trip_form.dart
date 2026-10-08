@@ -173,11 +173,14 @@ class _TripFormPageState extends State<TripFormPage> {
 
     final wb = _controller.selectedWaybill.value;
     final now = DateTime.now();
+    // New trips take the next auto-incremented trip number; edits keep theirs.
+    final tripNo = widget.trip?.Trip_No ??
+        (wb == null ? null : await _controller.nextTripNo(wb));
 
     final trip = WaybillTrip(
       Key: widget.trip?.Key,
       Weign_Bridge_id: widget.trip?.Weign_Bridge_id ?? wb?.Entry_No,
-      Trip_No: widget.trip?.Trip_No,
+      Trip_No: tripNo,
       From: _fromCtrl.text.trim(),
       Description: _routeDescription(_fromCtrl.text),
       From_Time: DateTime(

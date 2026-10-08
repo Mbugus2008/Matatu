@@ -20,6 +20,7 @@ import '../models/route.dart';
 import '../models/vehicles/Vehicle_crew.dart';
 import '../models/vehicles/vehicle.dart';
 import '../models/waybill/waybill.dart';
+import '../models/waybill/trip_comment.dart';
 import '../pages/disfuel_summary.dart';
 
 class Dbtrans {
@@ -93,6 +94,7 @@ class db_Provider extends GetxController {
       await db.execute(Hires.createtable);
       await db.execute(Waybill.createtable);
       await db.execute(WaybillTrip.createtable);
+      await db.execute(TripComment.createtable);
       await db.execute(RouteModel.createtable);
       await db.execute(AgentRouteModel.createtable);
       await db.execute(DisFuelSummary.createtable);
@@ -106,7 +108,14 @@ class db_Provider extends GetxController {
     final exists = result.any(
         (row) => (row['name'] as String).toLowerCase() == column.toLowerCase());
     if (!exists) {
-      await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+      try {
+        await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+      } catch (e) {
+        // Concurrent database opens can race the PRAGMA check: both see the
+        // column missing, the first ALTER wins and the second throws
+        // "duplicate column". The migration is done either way.
+        if (!e.toString().toLowerCase().contains('duplicate column')) rethrow;
+      }
     }
   }
 
@@ -114,6 +123,7 @@ class db_Provider extends GetxController {
   Future<void> _ensureNewTables(Database db) async {
     await db.execute(Waybill.createtable);
     await db.execute(WaybillTrip.createtable);
+    await db.execute(TripComment.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(AgentRouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
@@ -143,6 +153,9 @@ class db_Provider extends GetxController {
     await _addColumnIfMissing(db, DisFuelSummary.table, 'Net_Offload', 'REAL');
     await _addColumnIfMissing(
         db, DisFuelSummary.table, 'Active_Vehicles', 'INTEGER');
+    // Migration: hires carry the paid flag and the distance covered.
+    await _addColumnIfMissing(db, Hires.table, Hires.col_Paid, 'INTEGER');
+    await _addColumnIfMissing(db, Hires.table, Hires.col_Km, 'REAL');
   }
 
   /// Moves waybill rows from the old 'wbridge' table into 'wbill' and drops the
@@ -178,6 +191,7 @@ class db_Provider extends GetxController {
     // Ensure new tables exist on upgrade (safe with IF NOT EXISTS)
     await db.execute(Waybill.createtable);
     await db.execute(WaybillTrip.createtable);
+    await db.execute(TripComment.createtable);
     await db.execute(RouteModel.createtable);
     await db.execute(DisFuelSummary.createtable);
     // Migration: waybill entries trace the receipt that closed their trips.
@@ -204,6 +218,9 @@ class db_Provider extends GetxController {
     await _addColumnIfMissing(db, DisFuelSummary.table, 'Net_Offload', 'REAL');
     await _addColumnIfMissing(
         db, DisFuelSummary.table, 'Active_Vehicles', 'INTEGER');
+    // Migration: hires carry the paid flag and the distance covered.
+    await _addColumnIfMissing(db, Hires.table, Hires.col_Paid, 'INTEGER');
+    await _addColumnIfMissing(db, Hires.table, Hires.col_Km, 'REAL');
 
     for (var i = oldVersion; i <= newVersion; i++) {
       for (var element in get_updates(newVersion)) {

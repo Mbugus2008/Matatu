@@ -16,6 +16,7 @@ import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/pages/Depot.dart';
 import 'package:t_matatu/pages/Fuel.dart';
+import 'package:t_matatu/pages/dashboard_cues.dart';
 import 'package:t_matatu/pages/disfuel_summary.dart';
 import 'package:t_matatu/pages/hires/hires_list.dart';
 import 'package:t_matatu/pages/pageloader.dart';
@@ -144,6 +145,10 @@ class Cityhoppa extends BaseClients {
         ); // Use the TwoTabScreen for account_type 3
       case 6: // Hires
         return HiresListScreen();
+      case 7: // Controller - waybill management is their home screen.
+        return const WaybillListPage();
+      case 8: // Manager - the collections dashboard is their home screen.
+        return const DashboardCuesView();
       default:
         return GetBuilder<VehiclesController>(
           builder: (controller) {
@@ -153,7 +158,13 @@ class Cityhoppa extends BaseClients {
             return Column(
               children: [
                 _buildSearchField(controller),
-                Expanded(child: _buildVehicleList(controller)),
+                Expanded(
+                  // Pull-to-refresh re-pulls today's per-vehicle figures.
+                  child: RefreshIndicator(
+                    onRefresh: () => controller.refreshDailyCollections(),
+                    child: _buildVehicleList(controller),
+                  ),
+                ),
                 _buildSummaryCard(controller),
               ],
             );
@@ -176,6 +187,9 @@ class Cityhoppa extends BaseClients {
 
   Widget _buildVehicleList(VehiclesController controller) {
     return ListView.builder(
+      // Always scrollable so pull-to-refresh works even when the list is
+      // shorter than the screen.
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: controller.vehdailycollections.length,
       itemBuilder: (context, index) {
         final vehicle = controller.vehdailycollections[index];
@@ -491,13 +505,20 @@ class Cityhoppa extends BaseClients {
               0.0,
               (currentSum, item) =>
                   currentSum + num.tryParse(item.Amount.toString())!);
-          bytes += await getTicket(h);
+          // Mixed receipts used to print with no company header on any
+          // slip — the getHeader() call was only added to the Member and
+          // Crew cases.
+          bytes += await getHeader() + await getTicket(h);
         }
         List<tmatatu.Trans> mtrc = listcopy
             .where((element) =>
                 TranTypes.isCrewSavings(element.Type) ||
                 element.Type == "SAVINGS")
             .toList();
+        // The savings slips on a mixed receipt keep the society
+        // letterhead, exactly as in the crew-only case.
+        clientName = "Citi Travel Savings & Credit";
+        clientName_line2 = "Co-operative Society Ltd";
         for (var element in mtrc) {
           Header h = header.copyWith();
           if (TranTypes.isCrewSavings(element.Type)) {
@@ -505,7 +526,7 @@ class Cityhoppa extends BaseClients {
           }
           h.transtions = [element];
           h.Total_Amount = element.Amount;
-          bytes += await getTicketcrew(h);
+          bytes += await getHeader() + await getTicketcrew(h);
         }
         break;
     }

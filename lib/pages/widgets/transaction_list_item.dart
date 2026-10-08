@@ -27,7 +27,8 @@ class TransactionListItem extends StatelessWidget {
         ),
         title: Text(
           TranTypes.isCrewSavings(transaction.Type)
-              ? '${transaction.Description}(${transaction.Account_No})'
+              ? TranTypes.crewSavingsDescription(
+                  transaction.Description, transaction.Account_No)
               : '${transaction.Description}',
           style: const TextStyle(fontSize: 14),
         ),

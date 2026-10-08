@@ -80,18 +80,15 @@ String crewLabelFor(String? numberOrName) {
   if (target.isEmpty) return (null, null);
 
   try {
-    String? driverNo;
-    String? conductorNo;
-    for (final m in _crew()) {
-      if (_norm(m.Vehicle) != target) continue;
-      if (m.Crew_Type == Crew_type.Driver && driverNo == null) {
-        driverNo = m.No;
-      }
-      if (m.Crew_Type == Crew_type.Conductor && conductorNo == null) {
-        conductorNo = m.No;
-      }
-    }
-    return (driverNo, conductorNo);
+    // Same pick as the receipt and crew screen: the row assigned last is the
+    // crew riding now. A plain first match can return an old pile row.
+    final attached =
+        _crew().where((m) => _norm(m.Vehicle) == target).toList();
+    final driver =
+        MemberController.pickCurrentCrew(attached, Crew_type.Driver);
+    final conductor =
+        MemberController.pickCurrentCrew(attached, Crew_type.Conductor);
+    return (driver?.No, conductor?.No);
   } catch (_) {
     return (null, null);
   }

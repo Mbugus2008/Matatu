@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,12 +12,19 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:t_matatu/controllers/main.dart';
 
+import 'running_abi_stub.dart'
+    if (dart.library.ffi) 'running_abi_ffi.dart';
+
 class UpdateController extends GetxController {
   var latestVersion = "".obs;
   var apkUrl = "".obs;
   var changelog = "".obs;
   var isDownloading = false.obs;
   var progress = 0.0.obs;
+
+  /// SHA-256 published by the feed for the current release, when available.
+  /// Used to verify a downloaded file before it is offered to the installer.
+  String _apkSha256 = '';
 
   /// True when the published release must be installed before the app can be
   /// used. Releases are mandatory unless the feed publishes "mandatory": false.
@@ -75,7 +83,11 @@ class UpdateController extends GetxController {
       // Accept both the current and the older field names.
       latestVersion.value =
           (data['version'] ?? data['latest_version'] ?? '').toString().trim();
-      apkUrl.value = (data['apk_url'] ?? '').toString().trim();
+      // The feed carries one APK per ABI family; take the one for this
+      // device's family (see apkFor).
+      final apk = apkFor(data, abi: runningAbiKey);
+      apkUrl.value = apk.url;
+      _apkSha256 = apk.sha256;
       changelog.value =
           (data['release_notes'] ?? data['changelog'] ?? '').toString().trim();
       // Required by default: only a release that explicitly says
@@ -170,6 +182,99 @@ class UpdateController extends GetxController {
       .where((p) => p.isNotEmpty)
       .map((p) => int.tryParse(p) ?? 0)
       .toList();
+
+  /// Picks the APK this device should download from an update feed document.
+  ///
+  /// Releases are published once per ABI family - `apk_url`/`sha256`
+  /// (arm64), `apk_url_32`/`sha256_32` (armeabi-v7a) and
+  /// `apk_url_x64`/`sha256_x64` (x86_64) - because the families have
+  /// different version-code ranges (arm32 = 1000 + build, arm64 = 2000 +
+  /// build, x64 = 4000 + build) and Android rejects cross-family installs as
+  /// a downgrade. [abi] is the value of the platform's runningAbiKey. A feed
+  /// without a matching extra build falls back to the main APK.
+  static ({String url, String sha256}) apkFor(
+    Map<String, dynamic> data, {
+    String abi = '',
+  }) {
+    final suffix = abi == 'arm32'
+        ? '_32'
+        : abi == 'x64'
+            ? '_x64'
+            : '';
+    if (suffix.isNotEmpty) {
+      final url = (data['apk_url$suffix'] ?? '').toString().trim();
+      if (url.isNotEmpty) {
+        return (
+          url: url,
+          sha256: (data['sha256$suffix'] ?? '').toString().trim().toLowerCase(),
+        );
+      }
+    }
+    return (
+      url: (data['apk_url'] ?? '').toString().trim(),
+      sha256: (data['sha256'] ?? '').toString().trim().toLowerCase(),
+    );
+  }
+
+  /// True when a file on disk is plausibly the complete release: the feed's
+  /// SHA-256 wins when published, otherwise the server's Content-Length.
+  /// With neither known (offline, or a server that announces no size) the
+  /// file is trusted so an offline retry can still open the installer.
+  static bool looksComplete({
+    required int actualLength,
+    int? expectedLength,
+    String? expectedSha256,
+    String? actualSha256,
+  }) {
+    final wantHash = (expectedSha256 ?? '').trim().toLowerCase();
+    if (wantHash.isNotEmpty) {
+      return (actualSha256 ?? '').trim().toLowerCase() == wantHash;
+    }
+    if (expectedLength != null) return actualLength == expectedLength;
+    return true;
+  }
+
+  /// SHA-256 of a file, spelled like the feed publishes it.
+  Future<String> _sha256Of(File file) async {
+    final digest = await sha256.bind(file.openRead()).first;
+    return digest.toString();
+  }
+
+  /// The release APK's size as announced by the server, or null when the
+  /// server cannot be asked (offline) or does not report one.
+  Future<int?> _remoteApkLength() async {
+    if (apkUrl.value.isEmpty) return null;
+    try {
+      final response = await Dio().head(
+        apkUrl.value,
+        options: Options(
+          followRedirects: true,
+          validateStatus: (status) => status != null && status < 400,
+        ),
+      );
+      final header =
+          response.headers.value(Headers.contentLengthHeader);
+      return header == null ? null : int.tryParse(header);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// True when a file already on disk matches the published release: its
+  /// published SHA-256 when the feed has one, otherwise the server's
+  /// Content-Length.
+  Future<bool> _apkFileIsComplete(File apk) async {
+    final length = await apk.length();
+    if (_apkSha256.isNotEmpty) {
+      return looksComplete(
+        actualLength: length,
+        expectedSha256: _apkSha256,
+        actualSha256: await _sha256Of(apk),
+      );
+    }
+    final expected = await _remoteApkLength();
+    return looksComplete(actualLength: length, expectedLength: expected);
+  }
 
   void _log(String message) {
     if (kDebugMode) debugPrint('[UPDATE] $message');
@@ -364,8 +469,16 @@ class UpdateController extends GetxController {
       return false;
     }
     if (await apk.exists() && await apk.length() > 0) {
-      apkReady.value = true;
-      return true;
+      // A file left behind by an interrupted download shows up in the system
+      // installer as "There was a problem while parsing the package", and a
+      // retry would keep reusing it. Verify the copy before trusting it.
+      if (await _apkFileIsComplete(apk)) {
+        apkReady.value = true;
+        return true;
+      }
+      try {
+        await apk.delete();
+      } catch (_) {}
     }
 
     apkReady.value = false;
@@ -373,7 +486,7 @@ class UpdateController extends GetxController {
     isDownloading.value = true;
     progress.value = 0;
     try {
-      await Dio().download(
+      final response = await Dio().download(
         apkUrl.value,
         apk.path,
         onReceiveProgress: (received, total) {
@@ -384,6 +497,28 @@ class UpdateController extends GetxController {
 
       if (!await apk.exists() || await apk.length() == 0) {
         downloadError.value = 'The downloaded file is empty.';
+        return false;
+      }
+      // An interrupted download leaves a partial file behind — compare what
+      // landed against what the server announced (and the published hash
+      // when there is one), so a broken copy is never offered to the
+      // installer.
+      final expected = int.tryParse(
+          response.headers.value(Headers.contentLengthHeader) ?? '');
+      final actualLength = await apk.length();
+      final completed = looksComplete(
+        actualLength: actualLength,
+        expectedLength: expected,
+        expectedSha256: _apkSha256.isEmpty ? null : _apkSha256,
+        actualSha256: _apkSha256.isEmpty ? null : await _sha256Of(apk),
+      );
+      if (!completed) {
+        try {
+          await apk.delete();
+        } catch (_) {}
+        downloadError.value =
+            'The download was incomplete. Tap the button to download it '
+            'once more.';
         return false;
       }
       apkReady.value = true;
@@ -413,6 +548,10 @@ class UpdateController extends GetxController {
     final result = await OpenFilex.open(apk.path);
     if (result.type != ResultType.done) {
       downloadError.value = 'Could not open the installer: ${result.message}.';
+      // The installer refused the file — do not hand the same copy back.
+      try {
+        await apk.delete();
+      } catch (_) {}
     }
 
     await checkForUpdate(showUpToDate: false);

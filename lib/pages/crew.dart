@@ -44,7 +44,13 @@ class _CrewAssignmentState extends State<CrewAssignment> {
   @override
   void initState() {
     super.initState();
-    _loadCurrentCrew();
+    // getcurrentcrew() notifies listeners while the receipt/depot screens
+    // underneath this route still have mounted GetBuilders — doing that
+    // during the build phase trips "setState() called during build".
+    // Wait for the first frame before loading the crew.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadCurrentCrew();
+    });
   }
 
   void _loadCurrentCrew() {
@@ -65,10 +71,15 @@ class _CrewAssignmentState extends State<CrewAssignment> {
 
     if (driver == null || conductor == null) {
       memberController.getcurrentcrew(v.Vehicle_Number.toString());
-      final crew = memberController.currentcrew;
-      driver ??= crew.firstWhereOrNull((m) => m.Crew_Type == Crew_type.Driver);
-      conductor ??=
-          crew.firstWhereOrNull((m) => m.Crew_Type == Crew_type.Conductor);
+      // Use the controller's picks — the same "most recently assigned row"
+      // the receipt shows under the vehicle. Re-picking by list order here
+      // loaded DIFFERENT crew than the screen that opened this page.
+      Member? attached(Member? member) => (member == null ||
+              (member.No ?? '').trim().isEmpty)
+          ? null
+          : member;
+      driver ??= attached(memberController.currentdriver.value);
+      conductor ??= attached(memberController.currentcunductor.value);
     }
 
     _previousDriverNo = widget.driverNo ?? driver?.No;

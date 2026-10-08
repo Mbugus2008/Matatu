@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
+import 'package:t_matatu/models/expenses/vehicle_expenses.dart';
 import 'package:t_matatu/models/route.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/network/results/results.dart';
@@ -426,6 +427,91 @@ void main() {
     test('empty stays empty', () {
       expect(WaybillService.bcRouteText(null, routes), null);
       expect(WaybillService.bcRouteText('  ', routes), '  ');
+    });
+  });
+
+  group('WaybillService — trip numbers auto-increment', () {
+    test('starts at 1 on a fresh device', () {
+      expect(WaybillService.nextNumberFrom(const [], 0), 1);
+    });
+
+    test('continues past the highest number known on the device', () {
+      expect(WaybillService.nextNumberFrom([1, 7, 3], 0), 8);
+    });
+
+    test('numbers do not restart per waybill (one global sequence)', () {
+      // Trips from many entries ([1,2,3] on entry A, [1,2] on entry B):
+      // the next trip is 4, not 3 (max+1 of one entry).
+      expect(WaybillService.nextNumberFrom([1, 2, 3, 1, 2], 0), 4);
+    });
+
+    test('a deleted trip number is never re-used', () {
+      // Only row left locally is #2, but #40 was already handed out —
+      // the next number keeps going up from the persisted counter.
+      expect(WaybillService.nextNumberFrom([2], 40), 41);
+    });
+
+    test('null and zero placeholders are ignored', () {
+      expect(WaybillService.nextNumberFrom([null, 0, 5], 0), 6);
+    });
+  });
+
+  group('WaybillService — allocateReceived (receipt split across closed trips)',
+      () {
+    test('a single trip records the whole receipt total', () {
+      expect(WaybillService.allocateReceived(1100, [1530]), [1100.0]);
+    });
+
+    test('a single trip also records an over-target receipt total', () {
+      expect(WaybillService.allocateReceived(2000, [1530]), [2000.0]);
+    });
+
+    test('several trips fill in order, each capped at its target', () {
+      expect(WaybillService.allocateReceived(5000, [4000, 2000]),
+          [4000.0, 1000.0]);
+    });
+
+    test('a receipt below the first target stops there', () {
+      expect(WaybillService.allocateReceived(3000, [4000, 2000]),
+          [3000.0, 0.0]);
+    });
+
+    test('missing targets take nothing before the last trip', () {
+      expect(WaybillService.allocateReceived(500, [null, 200]), [0.0, 500.0]);
+    });
+
+    test('no trips produce no allocations', () {
+      expect(WaybillService.allocateReceived(500, const []), isEmpty);
+    });
+  });
+
+  group('Vehicle_Expenses — expense trip label', () {
+    test('Vehicle No carries the trip id', () {
+      expect(Vehicle_Expenses.tripLabel(tripNo: 59), '59');
+      expect(Vehicle_Expenses.tripLabel(tripNo: 1), '1');
+    });
+
+    test('falls back to the trip key while the number is unknown', () {
+      expect(Vehicle_Expenses.tripLabel(fallback: 'TKEY'), 'TKEY');
+      expect(
+          Vehicle_Expenses.tripLabel(tripNo: 0, fallback: 'TKEY'), 'TKEY');
+      expect(Vehicle_Expenses.tripLabel(), null);
+    });
+
+    test('recognises plain trip ids but not millisecond or BC keys', () {
+      expect(Vehicle_Expenses.isTripId('59'), true);
+      expect(Vehicle_Expenses.isTripId('9001'), true);
+      expect(Vehicle_Expenses.isTripId('1791192868220'), false);
+      expect(Vehicle_Expenses.isTripId('40;bcMAAA==8;338'), false);
+      expect(Vehicle_Expenses.isTripId('KCX 123A'), false);
+    });
+
+    test('reads the trip id out of a legacy "<waybill>-<trip>" label', () {
+      expect(Vehicle_Expenses.legacyLabelTripId('14-2'), '2');
+      expect(Vehicle_Expenses.legacyLabelTripId('9001-59'), '59');
+      expect(Vehicle_Expenses.legacyLabelTripId('59'), null);
+      expect(Vehicle_Expenses.legacyLabelTripId('1791192868220'), null);
+      expect(Vehicle_Expenses.legacyLabelTripId('KCX 123A'), null);
     });
   });
 

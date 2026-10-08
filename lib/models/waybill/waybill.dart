@@ -477,6 +477,26 @@ class WaybillTrip extends Tomaps implements mapping {
   }
 }
 
+/// How a local trip row meets BC's copy when the trip list is fetched.
+enum TripSyncDisposition {
+  /// Never-synced local row (temp key) whose trip already exists on BC — a
+  /// create whose reply was lost; the local row is redundant.
+  dropTemp,
+
+  /// Synced local row whose BC record moved on (the key's version suffix
+  /// differs). BC's copy is the newer one — drop the stale local row so one
+  /// trip never shows twice.
+  dropStale,
+
+  /// Local edit still waiting to push (a close, an expense, a comment).
+  /// BC's copy is older until the push lands — keep the edit and do not let
+  /// the server copy overwrite it.
+  keepEdit,
+
+  /// Local and server agree — keep the row; the server copy may refresh it.
+  keep,
+}
+
 /// API service for Waybill endpoints.
 /// Saves locally first (offline-first), then syncs to server.
 class WaybillService {
@@ -685,7 +705,7 @@ class WaybillService {
       if (conductorNo != null) waybill.Conductor = conductorNo;
 
       final map = waybill.toMap();
-      if (_isTempKey(map['Key'] as String?)) {
+      if (isTempKey(map['Key'] as String?)) {
         // Force BC Create for locally-created entries.
         map.remove('Key');
       }
@@ -765,7 +785,7 @@ class WaybillService {
           if (conductorNo != null) wb.Conductor = conductorNo;
 
           final map = wb.toMap();
-          if (_isTempKey(map['Key'] as String?)) {
+          if (isTempKey(map['Key'] as String?)) {
             // Force BC Create for locally-created entries.
             map.remove('Key');
           }
@@ -843,21 +863,49 @@ class WaybillService {
     }
 
     final db = db_Provider();
-    final remoteTripNos = remote.map((t) => t.Trip_No).whereType<int>().toSet();
+
+    // BC's current copy of each trip, by trip number. It anchors both sides
+    // of the merge: a local row whose BC record moved on (NAV changes the
+    // key's version suffix on every edit) is a stale copy, and a server copy
+    // must never overwrite a local edit whose push is still in flight.
+    final remoteByTripNo = <int, WaybillTrip>{};
+    for (final t in remote) {
+      final no = t.Trip_No;
+      if (no != null) remoteByTripNo[no] = t;
+    }
 
     final merged = <String, WaybillTrip>{};
+    final protectedTripNos = <int>{};
+
     for (final t in local) {
-      if (!t.sent && t.Trip_No != null && remoteTripNos.contains(t.Trip_No)) {
-        // Same trip is already on BC — drop the local temp row.
-        if (t.Key != null) {
-          await db.deletedata(
-              WaybillTrip.table, '${WaybillTrip.col_Key} = ?', [t.Key!]);
-        }
+      final remoteCopy = t.Trip_No == null ? null : remoteByTripNo[t.Trip_No!];
+      switch (tripDisposition(local: t, remote: remoteCopy)) {
+        case TripSyncDisposition.dropTemp:
+        case TripSyncDisposition.dropStale:
+          // One trip, one row: either the temp row already reached BC under
+          // another key, or BC holds a newer version of this record.
+          if (t.Key != null) {
+            await db.deletedata(
+                WaybillTrip.table, '${WaybillTrip.col_Key} = ?', [t.Key!]);
+          }
+          break;
+        case TripSyncDisposition.keepEdit:
+          // A close/expense/comment not pushed yet — BC's copy is older.
+          // Keep the edit and stop the server copy replacing it.
+          if (t.Trip_No != null) protectedTripNos.add(t.Trip_No!);
+          if (t.Key != null) merged[t.Key!] = t;
+          break;
+        case TripSyncDisposition.keep:
+          if (t.Key != null) merged[t.Key!] = t;
+          break;
+      }
+    }
+
+    for (final t in remote) {
+      if (t.Trip_No != null && protectedTripNos.contains(t.Trip_No)) {
+        // A local edit is still waiting to push — it wins until then.
         continue;
       }
-      if (t.Key != null) merged[t.Key!] = t;
-    }
-    for (final t in remote) {
       t.sent = true;
       if (t.Key != null && t.Key!.isNotEmpty) {
         await db.insert(WaybillTrip.table, t);
@@ -941,33 +989,73 @@ class WaybillService {
     }
   }
 
-  /// Next trip number for an entry (1 when it has no trips yet). Used by
-  /// Start Trip so a silently-created entry numbers its trips from the start.
-  Future<int> nextTripNo(int? entryNo, {String? waybillKey}) async {
-    final trips = await _getLocalTrips(entryNo, waybillKey: waybillKey);
-    var next = 1;
-    for (final t in trips) {
-      if ((t.Trip_No ?? 0) >= next) next = (t.Trip_No ?? 0) + 1;
+  /// Preference key holding the last trip number this device handed out.
+  static const String _lastTripNoKey = 'waybill_trip_last_no';
+
+  /// The next trip number given the numbers already known on the device and
+  /// [lastIssued], the last number this device handed out. Numbers
+  /// auto-increment across every waybill — a trip id never restarts per
+  /// entry and a deleted trip's number is never re-used.
+  static int nextNumberFrom(Iterable<int?> tripNos, int lastIssued) {
+    var highest = lastIssued;
+    for (final no in tripNos) {
+      if (no != null && no > highest) highest = no;
     }
+    return highest + 1;
+  }
+
+  /// Next trip number for a new trip. One sequence across all waybills:
+  /// trips are numbered 1, 2, 3, … on the device, never restarting under a
+  /// new entry. The issued number is persisted so the sequence keeps going up
+  /// even when older trip rows are gone locally. [entryNo]/[waybillKey] are
+  /// kept for call-site compatibility; they no longer scope the sequence.
+  Future<int> nextTripNo(int? entryNo, {String? waybillKey}) async {
+    final numbers = <int?>[];
+    try {
+      final rows = await db_Provider()
+          .getdata(WaybillTrip.table, const [WaybillTrip.col_Trip_No]);
+      numbers.addAll(rows
+          .map((row) => row[WaybillTrip.col_Trip_No])
+          .whereType<int>());
+    } catch (_) {
+      // No local rows (or no DB) — the stored counter still carries on.
+    }
+
+    var lastIssued = 0;
+    try {
+      if (Get.isRegistered<MainController>()) {
+        final stored =
+            await Get.find<MainController>().getPreference(_lastTripNoKey);
+        lastIssued = int.tryParse(stored ?? '') ?? 0;
+      }
+    } catch (_) {}
+
+    final next = nextNumberFrom(numbers, lastIssued);
+    try {
+      if (Get.isRegistered<MainController>()) {
+        await Get.find<MainController>()
+            .savePreference(_lastTripNoKey, next.toString());
+      }
+    } catch (_) {}
     return next;
   }
 
-  /// Open trips (no end time) for [vehicleNo]: their count and the sum of
-  /// their totals across every entry — a trip left open overnight is still on
-  /// the road. The receipt shows this so the officer can see the money the
-  /// vehicle still has before it is closed out.
-  Future<(int, double)> openTripsSummaryForVehicle({
+  /// Open trips (no end time) for [vehicleNo]: their count, the sum of their
+  /// totals and the sum of their expenses, across every entry — a trip left
+  /// open overnight is still on the road. The receipt shows this so the
+  /// officer can see the money the vehicle still has before it is closed out.
+  Future<(int, double, double)> openTripsSummaryForVehicle({
     required String vehicleNo,
   }) async {
     final vehicle = vehicleNo.trim().toUpperCase();
-    if (vehicle.isEmpty) return (0, 0.0);
+    if (vehicle.isEmpty) return (0, 0.0, 0.0);
     try {
       final db = db_Provider();
       final wbRows = await db.getdata(Waybill.table, Waybill.columns);
       final entries = wbRows.map(Waybill.fromMap_db).where((w) {
         return (w.Vehicle_No ?? '').trim().toUpperCase() == vehicle;
       }).toList();
-      if (entries.isEmpty) return (0, 0.0);
+      if (entries.isEmpty) return (0, 0.0, 0.0);
 
       final tripRows = await db.getdata(
         WaybillTrip.table,
@@ -992,20 +1080,60 @@ class WaybillService {
       }
       return openTripsSummary(trips);
     } catch (_) {
-      return (0, 0.0);
+      return (0, 0.0, 0.0);
     }
   }
 
-  /// (count, total) across the open trips in [trips]. Null totals count as 0.
-  static (int, double) openTripsSummary(Iterable<WaybillTrip> trips) {
+  /// Every trip recorded for [vehicleNo] across its entries — open and closed
+  /// — ordered by trip number. Drives the receipt page's trip-details popup.
+  Future<List<WaybillTrip>> tripsForVehicle({required String vehicleNo}) async {
+    final vehicle = vehicleNo.trim().toUpperCase();
+    if (vehicle.isEmpty) return const [];
+    try {
+      final db = db_Provider();
+      final wbRows = await db.getdata(Waybill.table, Waybill.columns);
+      final entries = wbRows.map(Waybill.fromMap_db).where((w) {
+        return (w.Vehicle_No ?? '').trim().toUpperCase() == vehicle;
+      }).toList();
+      if (entries.isEmpty) return const [];
+
+      final tripRows = await db.getdata(WaybillTrip.table, WaybillTrip.columns);
+      final trips = <WaybillTrip>[];
+      for (final t in tripRows.map(WaybillTrip.fromMap_db)) {
+        for (final e in entries) {
+          final sameEntry =
+              (e.Entry_No != null &&
+                  e.Entry_No! > 0 &&
+                  t.Weign_Bridge_id == e.Entry_No) ||
+              (e.Key != null &&
+                  e.Key!.isNotEmpty &&
+                  t.Waybill_Key == e.Key);
+          if (sameEntry) {
+            trips.add(t);
+            break;
+          }
+        }
+      }
+      trips.sort((a, b) => (a.Trip_No ?? 0).compareTo(b.Trip_No ?? 0));
+      return trips;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// (count, total, expenses) across the open trips in [trips]. Null values
+  /// count as 0.
+  static (int, double, double) openTripsSummary(Iterable<WaybillTrip> trips) {
     var count = 0;
     var total = 0.0;
+    var expenses = 0.0;
     for (final trip in trips) {
       if (!trip.isOpen) continue;
       count++;
       total += trip.Total ?? 0;
+      expenses += trip.Expenses ?? 0;
     }
-    return (count, total);
+    return (count, total, expenses);
   }
 
   /// Closes every open trip of [vehicleNo] (all entries). Run after a receipt
@@ -1013,9 +1141,13 @@ class WaybillService {
   /// Each close goes through saveTrip, so it is marked dirty locally and
   /// pushed to BC in the background until accepted. When [receiptNo] is
   /// given, every entry whose trips were closed is stamped with it so the
-  /// chain trip -> entry -> receipt stays traceable.
+  /// chain trip -> entry -> receipt stays traceable. When [amountReceived]
+  /// is given (the printed receipt's total) it is written onto the trips as
+  /// their Amount_Received — split across the trips via [allocateReceived].
   Future<int> closeOpenTrips(
-      {required String vehicleNo, String? receiptNo}) async {
+      {required String vehicleNo,
+      String? receiptNo,
+      double? amountReceived}) async {
     final vehicle = vehicleNo.trim().toUpperCase();
     if (vehicle.isEmpty) return 0;
     try {
@@ -1031,8 +1163,10 @@ class WaybillService {
         WaybillTrip.columns,
         '${WaybillTrip.col_To_Time} IS NULL',
       );
-      final now = DateTime.now();
-      var closed = 0;
+
+      // Collect first: the receipt amount is split across the trips (in trip
+      // order) before any of them is saved.
+      final toClose = <WaybillTrip>[];
       final touched = <Waybill>{};
       for (final t in tripRows.map(WaybillTrip.fromMap_db)) {
         Waybill? entry;
@@ -1047,12 +1181,43 @@ class WaybillService {
           }
         }
         if (entry == null) continue;
+        toClose.add(t);
+        touched.add(entry);
+      }
+      if (toClose.isEmpty) return 0;
+      toClose.sort((a, b) {
+        final af = a.From_Time;
+        final bf = b.From_Time;
+        if (af != null && bf != null) {
+          final c = af.compareTo(bf);
+          if (c != 0) return c;
+        } else if (af != null) {
+          return -1;
+        } else if (bf != null) {
+          return 1;
+        }
+        return (a.Trip_No ?? 0).compareTo(b.Trip_No ?? 0);
+      });
 
+      final received = (amountReceived != null && amountReceived > 0)
+          ? allocateReceived(
+              amountReceived, toClose.map((t) => t.Total).toList())
+          : const <double>[];
+
+      final now = DateTime.now();
+      var closed = 0;
+      for (var i = 0; i < toClose.length; i++) {
+        final t = toClose[i];
         t.To_Time =
             DateTime(now.year, now.month, now.day, now.hour, now.minute);
+        if (received.isNotEmpty) {
+          final v = received[i];
+          t.Amount_Received = v == v.roundToDouble()
+              ? v.toStringAsFixed(0)
+              : v.toStringAsFixed(2);
+        }
         await saveTrip(t);
         closed++;
-        touched.add(entry);
       }
 
       final trace = (receiptNo ?? '').trim();
@@ -1067,6 +1232,28 @@ class WaybillService {
     } catch (_) {
       return 0;
     }
+  }
+
+  /// Splits a receipt's [amount] across the trips it closes, in trip order:
+  /// every trip except the last takes at most its own target (or nothing when
+  /// the target is missing); the last trip takes whatever remains, so the
+  /// allocations always sum to [amount] exactly. A single closed trip
+  /// therefore records the whole receipt total.
+  static List<double> allocateReceived(double amount, List<double?> targets) {
+    final out = List<double>.filled(targets.length, 0);
+    if (targets.isEmpty) return out;
+    var remaining = amount;
+    for (var i = 0; i < targets.length; i++) {
+      if (i == targets.length - 1) {
+        out[i] = remaining;
+        break;
+      }
+      final cap = targets[i] ?? 0;
+      final take = remaining <= cap ? remaining : cap;
+      out[i] = take;
+      remaining -= take;
+    }
+    return out;
   }
 
   /// Links trips that lost their waybill link to the only waybill of their
@@ -1162,9 +1349,38 @@ class WaybillService {
   }
 
   /// True when the key is a locally-generated millisecond placeholder.
-  bool _isTempKey(String? key) {
+  static bool isTempKey(String? key) {
     if (key == null || key.length != 13) return false;
     return int.tryParse(key) != null;
+  }
+
+  /// Decides what happens to a local trip row when BC's copy of the same
+  /// trip (if any) is known — pure so the merge rules stay unit-testable.
+  ///
+  /// NAV bumps the key's version suffix on every edit, so a synced row whose
+  /// key no longer matches BC is an old copy of the same record. A row that
+  /// still has to push (a close, an expense, a comment) must never be
+  /// overwritten by BC's older copy, or the edit silently disappears.
+  static TripSyncDisposition tripDisposition({
+    required WaybillTrip local,
+    required WaybillTrip? remote,
+  }) {
+    if (local.dirty || !local.sent) {
+      final sameTrip = remote != null && remote.Trip_No == local.Trip_No;
+      if (sameTrip && isTempKey(local.Key)) {
+        // Never-synced local row whose trip is already on BC (the create
+        // reached NAV but the reply was lost) — the local row is redundant.
+        return TripSyncDisposition.dropTemp;
+      }
+      return TripSyncDisposition.keepEdit;
+    }
+    if (remote != null &&
+        remote.Key != null &&
+        remote.Key!.isNotEmpty &&
+        remote.Key != local.Key) {
+      return TripSyncDisposition.dropStale;
+    }
+    return TripSyncDisposition.keep;
   }
 
   /// Local waybill row by its local key (used to resolve pending trips).
@@ -1284,7 +1500,7 @@ class WaybillService {
       // NAV keeps the route description on the trip for reporting.
       map['Description'] =
           trip.Description ?? await _bcRouteDescription(trip.From);
-      if (_isTempKey(map['Key'] as String?)) {
+      if (isTempKey(map['Key'] as String?)) {
         // Force BC Create for locally-created trips.
         map['Key'] = null;
       }

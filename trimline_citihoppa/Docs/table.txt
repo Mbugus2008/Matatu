@@ -1,0 +1,100 @@
+OBJECT Table 50050 Transactions Cue
+{
+  OBJECT-PROPERTIES
+  {
+    Date=08/06/26;
+    Time=12:33:22 PM;
+    Modified=Yes;
+    Version List=;
+  }
+  PROPERTIES
+  {
+  }
+  FIELDS
+  {
+    { 1   ;   ;Members             ;Integer       ;FieldClass=FlowField;
+                                                   CalcFormula=Count(Customer WHERE (Customer Posting Group=CONST(MEMBER))) }
+    { 2   ;   ;Id                  ;Integer       ;AutoIncrement=Yes;
+                                                   DataClassification=ToBeClassified }
+    { 3   ;   ;Crew                ;Integer       ;FieldClass=FlowField;
+                                                   CalcFormula=Count(Customer WHERE (Customer Posting Group=CONST(CREW))) }
+    { 4   ;   ;Total               ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("MBranch Header"."Total Amount") }
+    { 5   ;   ;Vehicles            ;Integer       ;FieldClass=FlowField;
+                                                   CalcFormula=Count("Vehicle Details") }
+    { 6   ;   ;Offload             ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(OFFLOAD))) }
+    { 7   ;   ;Management          ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(MANAGEMENT))) }
+    { 8   ;   ;Savings             ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(SAVINGS))) }
+    { 9   ;   ;Date filter         ;Date          ;FieldClass=FlowFilter }
+    { 10  ;   ;Offload Today       ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(OFFLOAD),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 11  ;   ;Management Today    ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(MANAGEMENT),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 12  ;   ;Savings Today       ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(SAVINGS),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 13  ;   ;Today Total         ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("MBranch Header"."Total Amount" WHERE (Date=FIELD(Date filter))) }
+    { 14  ;   ;CARWASH Today       ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(CARWASH),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 15  ;   ;DEPOT PARKING Today ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(DEPOT PARKING),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 16  ;   ;EXPENSES Today      ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(EXPENSES),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 17  ;   ;BODY Today          ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(BODY),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 18  ;   ;INSURANCE Today     ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(INSURANCE),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 19  ;   ;NCC PARKING Today   ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(NCC PARKING),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 20  ;   ;KNH Today           ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(KNH),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 21  ;   ;SAVINGSCREW Today   ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(SAVINGSCREW),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 22  ;   ;SECURITY Today      ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(SECURITY),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 23  ;   ;STATUTORY SUNDRY Today;Decimal     ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(STATUTORY SUNDRY),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 24  ;   ;STONES Today        ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(STONES),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 25  ;   ;OFFLOAD PARKING Today;Decimal      ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("M-Branch Transactions".Amount WHERE (Type=CONST(OFFLOAD PARKING),
+                                                                                                         Transaction Date=FIELD(Date filter))) }
+    { 26  ;   ;Mpesa               ;Decimal       ;FieldClass=FlowField;
+                                                   CalcFormula=Sum("MPESA Transactions"."Paid In" WHERE (Transaction Date=FIELD(Date filter),
+                                                                                                         Paybil Number=FILTER(<>4790898))) }
+    { 27  ;   ;OnRoute             ;Integer       ;FieldClass=FlowField;
+                                                   CalcFormula=Count("Deport N Fuel" WHERE (Date=FIELD(Date filter),
+                                                                                            On route=FILTER(Yes))) }
+  }
+  KEYS
+  {
+    {    ;Id                                      ;Clustered=Yes }
+  }
+  FIELDGROUPS
+  {
+  }
+  CODE
+  {
+
+    BEGIN
+    END.
+  }
+}
+

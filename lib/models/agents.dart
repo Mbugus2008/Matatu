@@ -119,9 +119,10 @@ $col_Account_Balance	float )
       Agent.fromMap(json.decode(source) as Map<String, dynamic>);
 
   /// BC's users page account types: 0 User, 1 Admin, 2 Supervisor,
-  /// 3 Deport, 4 Fuel, 5 Parcel, 6 Hires.
-  /// Supervisors and admins may add expenses to open trips.
-  bool get canAddTripExpenses => Account_type == 1 || Account_type == 2;
+  /// 3 Deport, 4 Fuel, 5 Parcel, 6 Hires, 7 Controller, 8 Manager.
+  /// Supervisors, admins and controllers may add expenses to open trips.
+  bool get canAddTripExpenses =>
+      Account_type == 1 || Account_type == 2 || Account_type == 7;
 
   @override
   fromMap_table(Map<String, dynamic> map) {

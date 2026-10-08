@@ -10,12 +10,17 @@
 # Usage:
 #   pwsh -File .\build_and_deploy.ps1 -Bump -ReleaseNotes "Fixed drawer layout"
 #   pwsh -File .\build_and_deploy.ps1                    # redeploy current version
-#   pwsh -File .\build_and_deploy.ps1 -SkipBuild         # upload the existing APK
-#   pwsh -File .\build_and_deploy.ps1 -Abi armeabi-v7a   # publish the 32-bit build
+#   pwsh -File .\build_and_deploy.ps1 -SkipBuild         # upload the existing APKs
+#   pwsh -File .\build_and_deploy.ps1 -No32Bit -NoX64    # publish only the arm64 APK
 #
 # Notes:
-#  - --split-per-abi keeps the payload ~20 MB instead of ~57 MB. Stay with one
-#    style: split APKs get derived version codes (arm64 = 2000 + build number).
+#  - --split-per-abi keeps each payload ~20 MB instead of ~57 MB for one fat
+#    APK. Split APKs get derived version codes (arm32 = 1000 + build,
+#    arm64 = 2000 + build, x64 = 4000 + build) and every release publishes
+#    all three: arm64 as the main apk_url, armeabi-v7a as apk_url_32 and
+#    x86_64 as apk_url_x64. The app stays in the family it was installed
+#    with (UpdateController.apkFor), so never publish a split build under a
+#    plain version code - devices on one style can never install the other.
 #  - Change PublicBaseUrl only if the feed host changes - it is baked into the
 #    app, so existing installs keep polling the old URL until they update.
 
@@ -25,7 +30,8 @@ param(
     [int]$VersionCode = 0,
     [string]$ReleaseNotes = '',
     [string]$ReleaseNotesFile = '',
-    [ValidateSet('arm64-v8a', 'armeabi-v7a', 'x86_64')][string]$Abi = 'arm64-v8a',
+    [switch]$No32Bit,
+    [switch]$NoX64,
     [string]$PublicBaseUrl = 'https://main.trimline.co.ke:4016/',
     [string]$RemoteDirectory = 'C:\Services\Matatu\Updates',
     [string]$HostName = 'main.trimline.co.ke',
@@ -68,8 +74,10 @@ if ($Bump) {
 $versionName = "$major.$minor.$patch"
 if ($VersionCode -gt 0) { $build = $VersionCode }
 $apkFileName = "CityHoppa-v$versionName.apk"
+$apk32FileName = "CityHoppa-v$versionName-32bit.apk"
+$apkX64FileName = "CityHoppa-v$versionName-x64.apk"
 
-Write-Host "publishing : $versionName (build $build) for $Abi"
+Write-Host "publishing : $versionName (build $build) for arm64$(if (-not $No32Bit) { ' + arm32' })$(if (-not $NoX64) { ' + x64' })"
 Write-Host "feed       : $PublicBaseUrl"
 
 # ------------------------------------------------------------- guard rails ---
@@ -94,7 +102,9 @@ try {
 }
 
 # ------------------------------------------------------------------ build ---
-$apkPath = "build\app\outputs\flutter-apk\app-$Abi-release.apk"
+$apkPath = 'build\app\outputs\flutter-apk\app-arm64-v8a-release.apk'
+$apk32Path = 'build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk'
+$apkX64Path = 'build\app\outputs\flutter-apk\app-x86_64-release.apk'
 if (-not $SkipBuild) {
     Write-Host "`n[1/3] building release APK (split per ABI)..." -ForegroundColor Green
     flutter build apk --release --split-per-abi
@@ -103,8 +113,24 @@ if (-not $SkipBuild) {
     Write-Host "`n[1/3] skipping build" -ForegroundColor Yellow
 }
 if (-not (Test-Path $apkPath)) { throw "APK not found: $apkPath" }
-$apkMb = [math]::Round((Get-Item $apkPath).Length / 1MB, 1)
-Write-Host "      $apkFileName ($apkMb MB)" -ForegroundColor Green
+# Hashes go into update.json so the app can verify a downloaded copy before
+# offering it to the installer (an interrupted download must never install).
+$apkHash = (Get-FileHash -Path $apkPath -Algorithm SHA256).Hash.ToLowerInvariant()
+Write-Host "      $apkFileName ($([math]::Round((Get-Item $apkPath).Length / 1MB, 1)) MB)" -ForegroundColor Green
+
+$apk32Hash = ''
+if (-not $No32Bit) {
+    if (-not (Test-Path $apk32Path)) { throw "APK not found: $apk32Path" }
+    $apk32Hash = (Get-FileHash -Path $apk32Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    Write-Host "      $apk32FileName ($([math]::Round((Get-Item $apk32Path).Length / 1MB, 1)) MB)" -ForegroundColor Green
+}
+
+$apkX64Hash = ''
+if (-not $NoX64) {
+    if (-not (Test-Path $apkX64Path)) { throw "APK not found: $apkX64Path" }
+    $apkX64Hash = (Get-FileHash -Path $apkX64Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    Write-Host "      $apkX64FileName ($([math]::Round((Get-Item $apkX64Path).Length / 1MB, 1)) MB)" -ForegroundColor Green
+}
 
 # ------------------------------------------------------------ update.json ---
 if ([string]::IsNullOrWhiteSpace($ReleaseNotes)) {
@@ -118,13 +144,23 @@ if ([string]::IsNullOrWhiteSpace($ReleaseNotes)) {
 }
 
 Write-Host "`n[2/3] writing update.json..." -ForegroundColor Green
-$updateJson = [ordered]@{
-    version       = $versionName
-    version_code  = $build
-    apk_url       = "${PublicBaseUrl}$apkFileName"
-    release_notes = $ReleaseNotes
-    release_date  = (Get-Date -Format 'yyyy-MM-dd')
-} | ConvertTo-Json -Depth 2
+$feed = [ordered]@{
+    version      = $versionName
+    version_code = $build
+    apk_url      = "${PublicBaseUrl}$apkFileName"
+    sha256       = $apkHash
+}
+if (-not $No32Bit) {
+    $feed['apk_url_32'] = "${PublicBaseUrl}$apk32FileName"
+    $feed['sha256_32'] = $apk32Hash
+}
+if (-not $NoX64) {
+    $feed['apk_url_x64'] = "${PublicBaseUrl}$apkX64FileName"
+    $feed['sha256_x64'] = $apkX64Hash
+}
+$feed['release_notes'] = $ReleaseNotes
+$feed['release_date'] = (Get-Date -Format 'yyyy-MM-dd')
+$updateJson = $feed | ConvertTo-Json -Depth 2
 
 $updateJsonPath = 'build\update.json'
 [IO.File]::WriteAllText((Join-Path (Get-Location) $updateJsonPath), $updateJson,
@@ -147,6 +183,24 @@ pwsh -NoProfile -File (Join-Path $PSScriptRoot 'upload-chunked.ps1') `
     -HostName $HostName -User $User -Pass $Pass -ChunkMB 8 -Parallel 3
 if ($LASTEXITCODE -ne 0) { throw 'APK upload failed' }
 
+if (-not $No32Bit) {
+    pwsh -NoProfile -File (Join-Path $PSScriptRoot 'upload-chunked.ps1') `
+        -LocalPath $apk32Path `
+        -RemoteDirectory $RemoteDirectory `
+        -RemoteName $apk32FileName `
+        -HostName $HostName -User $User -Pass $Pass -ChunkMB 8 -Parallel 3
+    if ($LASTEXITCODE -ne 0) { throw '32-bit APK upload failed' }
+}
+
+if (-not $NoX64) {
+    pwsh -NoProfile -File (Join-Path $PSScriptRoot 'upload-chunked.ps1') `
+        -LocalPath $apkX64Path `
+        -RemoteDirectory $RemoteDirectory `
+        -RemoteName $apkX64FileName `
+        -HostName $HostName -User $User -Pass $Pass -ChunkMB 8 -Parallel 3
+    if ($LASTEXITCODE -ne 0) { throw 'x64 APK upload failed' }
+}
+
 # update.json is tiny - a plain session copy is enough
 $cred = New-Object PSCredential($User, (ConvertTo-SecureString $Pass -AsPlainText -Force))
 $opts = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
@@ -166,7 +220,18 @@ Write-Host $pub.Content -ForegroundColor DarkGray
 $head = Invoke-WebRequest -Uri "${PublicBaseUrl}$apkFileName" -Method Head -UseBasicParsing -TimeoutSec 40
 $len = [int]($head.Headers['Content-Length'] | Select-Object -First 1)
 Write-Host ("apk -> HTTP {0}, {1:n1} MB" -f $head.StatusCode, ($len / 1MB)) -ForegroundColor Green
+if (-not $No32Bit) {
+    $head32 = Invoke-WebRequest -Uri "${PublicBaseUrl}$apk32FileName" -Method Head -UseBasicParsing -TimeoutSec 40
+    $len32 = [int]($head32.Headers['Content-Length'] | Select-Object -First 1)
+    Write-Host ("apk 32-bit -> HTTP {0}, {1:n1} MB" -f $head32.StatusCode, ($len32 / 1MB)) -ForegroundColor Green
+}
+if (-not $NoX64) {
+    $headX64 = Invoke-WebRequest -Uri "${PublicBaseUrl}$apkX64FileName" -Method Head -UseBasicParsing -TimeoutSec 40
+    $lenX64 = [int]($headX64.Headers['Content-Length'] | Select-Object -First 1)
+    Write-Host ("apk x64 -> HTTP {0}, {1:n1} MB" -f $headX64.StatusCode, ($lenX64 / 1MB)) -ForegroundColor Green
+}
 
 Write-Host "`nDone - $versionName is live." -ForegroundColor Cyan
+if (-not $No32Bit) { Write-Host "32-bit APK: ${PublicBaseUrl}$apk32FileName" -ForegroundColor Cyan }
 Write-Host "Devices on an older release will be offered it on their next check." -ForegroundColor Cyan
 Write-Host "Remember: installs older than 1.0.18 are signed with a different key and need one reinstall." -ForegroundColor DarkYellow

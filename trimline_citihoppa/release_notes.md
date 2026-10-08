@@ -1,7 +1,3 @@
-Version 1.0.28
-- Hire: Update Hire now saves even when you type the vehicle number without tapping a suggestion (the save used to stop silently)
-- Hire: the red "is required" hints clear as soon as you pick or fill each field
-- Hire: back-dated hires are allowed (recording yesterday's trip no longer fails with "Return date must be in the future")
-- Hire: the + button now correctly shows "New Hire" / "Create Hire"
-- Waybill: entries from Business Central refresh automatically in the background every minute, silently
-- Waybill: entries changed later in Business Central are picked up; re-saving an entry no longer creates duplicate waybill cards and trips stay attached to their entry
+Version 1.0.50
+- Receipt: the printing spinner now closes reliably the moment the receipt is sent to the printer — even when a message is showing on screen (the earlier fix could still be swallowed and leave the spinner stuck)
+- Includes 1.0.49: distribute counts today's collected amounts by transaction code (crew fees no longer filled twice), Today's Transactions popup shows the agent code, home list pull-to-refresh restored

@@ -7,6 +7,7 @@ import 'package:t_matatu/models/Header.dart';
 import 'package:t_matatu/models/Reversal.dart';
 import 'package:t_matatu/models/Transaction.dart' as tmatatu;
 import 'package:t_matatu/models/agents.dart';
+import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/reports/controller.dart';
 
 import '../models/Utils/util.dart';
@@ -84,7 +85,15 @@ class HeaderController extends GetxController {
         Get.find<HeaderController>().curTran.value.Amount =
             element.Amountedited! * -1;
       }
-      Get.find<HeaderController>().curTran.value.Description = element.Name;
+      // Crew savings carry the driver's / conductor's number in brackets,
+      // e.g. "Crew Savings(Dr)(B098)" - the same way older receipts wrote it.
+      final lineDescription = TranTypes.crewSavingsDescription(
+          element.Name,
+          TranTypes.crewNoFor(
+              element.Code,
+              Get.find<HeaderController>().currHeader.value.Crew,
+              Get.find<HeaderController>().currHeader.value.Crew2));
+      Get.find<HeaderController>().curTran.value.Description = lineDescription;
       Get.find<HeaderController>().curTran.value.Transaction_Time =
           DateTime.now();
       Get.find<HeaderController>().curTran.value.Agent_Code =
@@ -93,7 +102,7 @@ class HeaderController extends GetxController {
       final t = Get.find<HeaderController>().currTrans.where((p0) =>
           p0.OTTN == Get.find<HeaderController>().currHeader.value.Receipt_No &&
           p0.Type == element.Code &&
-          p0.Description == element.Name);
+          p0.Description == lineDescription);
 
       if (t.isEmpty) {
         Get.find<HeaderController>()

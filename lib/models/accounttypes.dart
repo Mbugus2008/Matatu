@@ -84,8 +84,11 @@ PRIMARY KEY ($col_Account_type, $col_Transaction_Type)
   }
 
   @override
-  toMap_fortable() {
-    return toJson();
+  Map<String, dynamic> toMap_fortable() {
+    // Must be a row Map — returning toJson() here made every batch insert
+    // fail with "type 'String' is not a subtype of type 'Map<String,
+    // Object?>'", so the account types never reached the local table.
+    return toMap();
   }
 
   Future<void> get_account_Types() async {

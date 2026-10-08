@@ -14,7 +14,6 @@ import 'package:t_matatu/models/summary/Tsummary.dart';
 import 'package:t_matatu/models/summary/TsummaryDetails.dart';
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/pages/Reversals/ReversalsList.dart';
-import 'package:t_matatu/pages/TwoTabScreen.dart';
 import 'package:t_matatu/providers/db.dart';
 import 'package:t_matatu/reports/Daily%20Summary.dart';
 import 'package:t_matatu/reports/controller.dart';
@@ -193,9 +192,11 @@ class CustomDrawer extends StatelessWidget {
             title: 'Vehicle Collections',
             context: context,
             onTap: () {
-              ReportController().gettransbydate(DateTime.now());
-              Get.find<ReportController>().selectedDate?.value = DateTime.now();
-              Get.to(() => const TwoTabScreen());
+              // The vehicle collections are the default home list — close
+              // the drawer and return to it instead of opening the
+              // Depot/Fuel tabs.
+              Navigator.pop(context);
+              Get.until((route) => route.isFirst);
             },
           ),
           _buildTile(

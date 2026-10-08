@@ -200,15 +200,23 @@ void main() {
 
   group('Receipt — expected cash', () {
     test('target minus M-Pesa already paid', () {
-      expect(Receipt.expectedCashAmount(6770, 2000), 4770);
+      expect(Receipt.expectedCashAmount(6770, 2000, 0), 4770);
     });
 
-    test('nothing left when M-Pesa covers the target', () {
-      expect(Receipt.expectedCashAmount(6770, 6770), 0);
+    test('target minus M-Pesa and trip expenses', () {
+      expect(Receipt.expectedCashAmount(6770, 2000, 770), 4000);
+    });
+
+    test('nothing left when M-Pesa and expenses cover the target', () {
+      expect(Receipt.expectedCashAmount(6770, 6000, 770), 0);
     });
 
     test('never negative when M-Pesa exceeds the target', () {
-      expect(Receipt.expectedCashAmount(5000, 7200), 0);
+      expect(Receipt.expectedCashAmount(5000, 7200, 0), 0);
+    });
+
+    test('expenses alone can zero it out', () {
+      expect(Receipt.expectedCashAmount(5000, 1000, 5000), 0);
     });
   });
 
@@ -217,34 +225,45 @@ void main() {
   // ═══════════════════════════════════════════════════════
 
   group('WaybillService — open trips summary', () {
-    WaybillTrip trip({int? no, double? total, DateTime? to}) =>
-        WaybillTrip(Trip_No: no, Total: total, To_Time: to);
+    WaybillTrip trip({int? no, double? total, double? expenses, DateTime? to}) =>
+        WaybillTrip(Trip_No: no, Total: total, Expenses: expenses, To_Time: to);
 
-    test('sums the totals of open trips only', () {
-      final (count, total) = WaybillService.openTripsSummary([
-        trip(no: 1, total: 2550, to: DateTime(2026, 9, 29, 10, 0)),
-        trip(no: 2, total: 3060),
-        trip(no: 3, total: 1000),
+    test('sums the totals and expenses of open trips only', () {
+      final (count, total, expenses) = WaybillService.openTripsSummary([
+        trip(
+            no: 1,
+            total: 2550,
+            expenses: 200,
+            to: DateTime(2026, 9, 29, 10, 0)),
+        trip(no: 2, total: 3060, expenses: 150),
+        trip(no: 3, total: 1000, expenses: 50),
       ]);
       expect(count, 2);
       expect(total, 4060);
+      expect(expenses, 200);
     });
 
-    test('no open trips gives (0, 0)', () {
-      final (count, total) = WaybillService.openTripsSummary([
-        trip(no: 1, total: 2550, to: DateTime(2026, 9, 29, 10, 0)),
+    test('no open trips gives zeros', () {
+      final (count, total, expenses) = WaybillService.openTripsSummary([
+        trip(
+            no: 1,
+            total: 2550,
+            expenses: 200,
+            to: DateTime(2026, 9, 29, 10, 0)),
       ]);
       expect(count, 0);
       expect(total, 0);
+      expect(expenses, 0);
     });
 
-    test('null totals count as zero', () {
-      final (count, total) = WaybillService.openTripsSummary([
+    test('null totals and expenses count as zero', () {
+      final (count, total, expenses) = WaybillService.openTripsSummary([
         trip(no: 1),
-        trip(no: 2, total: 500),
+        trip(no: 2, total: 500, expenses: 80),
       ]);
       expect(count, 2);
       expect(total, 500);
+      expect(expenses, 80);
     });
   });
 

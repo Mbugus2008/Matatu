@@ -34,10 +34,10 @@ class TransTypeController extends GetxController {
       element.eAmount.text = '0.00';
     }
 
-    // Fill in the same order the screen shows: biggest expected first.
+    // Fill in the same order the screen shows: the configured Order column.
     // "== balance" must allocate too, otherwise the remainder rolls past a
     // type that matches exactly.
-    final ordered = [...types]..sort(compareByExpectedDesc);
+    final ordered = [...types]..sort(compareByOrder);
     var left = amount;
     for (final element in ordered) {
       if (left <= 0) break;
@@ -62,6 +62,19 @@ class TransTypeController extends GetxController {
       }
     }
 
+    update();
+  }
+
+  /// Discards the working distribution on the vehicle's types — the amounts
+  /// and checks filled in by [distribute] or by hand on the distribute
+  /// screen — leaving today's collections and expected amounts untouched.
+  /// Used when the screen is closed without confirming.
+  void resetDistribution() {
+    for (final element in vehicleTrantypes) {
+      element.Amountedited = 0;
+      element.Checked = false;
+      element.eAmount.text = '0.00';
+    }
     update();
   }
 
@@ -139,8 +152,16 @@ class TransTypeController extends GetxController {
     update();
   }
 
-  /// Order used by the distribute screen and by the allocation itself:
-  /// biggest expected amount first, ties keep the configured order.
+  /// Order used by the distribute screen and by the allocation itself: the
+  /// configured Order column ascending, ties fall back to biggest expected
+  /// first so the allocation stays deterministic.
+  static int compareByOrder(TranTypes a, TranTypes b) {
+    final cmp = (a.Order ?? 0).compareTo(b.Order ?? 0);
+    if (cmp != 0) return cmp;
+    return compareByExpectedDesc(a, b);
+  }
+
+  /// Tie-break for [compareByOrder]: biggest expected amount first.
   static int compareByExpectedDesc(TranTypes a, TranTypes b) {
     final cmp = (b.VehicleAmount ?? 0).compareTo(a.VehicleAmount ?? 0);
     if (cmp != 0) return cmp;
@@ -181,7 +202,7 @@ class TransTypeController extends GetxController {
   }
 
   /// Account a crew savings type posts to: the driver's for SAVINGSCREW, the
-  /// conductor's for SAVINGSCREW2.
+  /// conductor's for SAVINGSCREW1.
   String? _crewAccountFor(String? code, String? crew, String? crew2) {
     switch (code) {
       case TranTypes.savingsCrewCode:

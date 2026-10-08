@@ -77,6 +77,36 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig hasKeystoreProperties ? signingConfigs.release : signingConfigs.debug
         }
+        debug {
+            // Debug builds share the release upload key so they can be
+            // installed over / updated by the production app on the same
+            // device (and vice versa). Without this, MIUI rejects every
+            // cross-install with "App not installed as package conflicts
+            // with an existing package".
+            signingConfig hasKeystoreProperties ? signingConfigs.release : signingConfigs.debug
+        }
+        profile {
+            // Same as debug: profile builds also run on the fleet devices.
+            signingConfig hasKeystoreProperties ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+}
+
+// Debug/profile APKs get the same version code family as the production
+// arm64 APK (2 * 1000 + build, e.g. 2038) that the fleet devices run.
+// Release family codes come from the Flutter plugin's ABI-split logic;
+// without this, a plain debug build (versionCode 38) cannot replace the
+// installed production app (2038) and `flutter run` dies with
+// INSTALL_FAILED_VERSION_DOWNGRADE. The next feed release (2039) still
+// upgrades over it, so devices are never stranded.
+// Only non-split outputs are touched — split builds keep their per-ABI codes.
+android.applicationVariants.all { variant ->
+    if (variant.buildType.name == 'debug' || variant.buildType.name == 'profile') {
+        variant.outputs.each { output ->
+            if (output.getFilter(com.android.build.VariantOutput.FilterType.ABI) == null) {
+                output.versionCodeOverride = 2000 + variant.versionCode
+            }
+        }
     }
 }
 

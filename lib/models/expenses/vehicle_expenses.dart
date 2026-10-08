@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:t_matatu/models/mappings.dart';
+import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/network/results/results.dart';
 import 'package:t_matatu/providers/db.dart';
@@ -207,6 +208,79 @@ $col_sent integer DEFAULT 0
   static Future<void> deleteLocal(String? code) async {
     if (code == null) return;
     await Get.find<db_Provider>().deletedata(table, '$col_Code = ?', [code]);
+  }
+
+  /// The trip's id — its auto-incrementing trip number (e.g. "59") — what
+  /// the journal's Vehicle No carries. BC caps that field at 10 characters,
+  /// so the long trip key can never go there. Falls back to [fallback] (the
+  /// trip key) while the number is unknown; [repairLegacyTripKeys] rewrites
+  /// such rows later.
+  static String? tripLabel({int? tripNo, String? fallback}) {
+    if ((tripNo ?? 0) > 0) return '$tripNo';
+    return fallback;
+  }
+
+  /// Rewrites pending rows whose Vehicle_No does not carry the trip id yet —
+  /// the old long trip key (BC can never accept it) or the
+  /// "<waybill>-<trip>" label from before trip ids were unique. Resolves the
+  /// trip locally and stores its id instead.
+  static Future<int> repairLegacyTripKeys() async {
+    final db = Get.find<db_Provider>();
+    final rows = await db.getdata(table, columns, '$col_sent = 0');
+    var fixed = 0;
+    for (final raw in rows) {
+      final row = Vehicle_Expenses.fromMap_db(raw);
+      final vehicleNo = row.Vehicle_No;
+      if (vehicleNo == null || vehicleNo.isEmpty) continue;
+      final label = await _tripIdForVehicleNo(vehicleNo);
+      if (label == null || label == vehicleNo) continue;
+      row.Vehicle_No = label;
+      await db.insert(table, row);
+      fixed++;
+    }
+    return fixed;
+  }
+
+  /// True when [value] already is a plain trip id — a small counter. Anything
+  /// longer that is all digits is a legacy millisecond trip key.
+  static bool isTripId(String value) =>
+      value.length <= 11 && RegExp(r'^\d+$').hasMatch(value);
+
+  /// The trip id inside a legacy "<waybill>-<trip>" label ("14-2" → "2"),
+  /// if [value] is one.
+  static String? legacyLabelTripId(String value) {
+    final match = RegExp(r'^(\d+)-(\d+)$').firstMatch(value);
+    return match?.group(2);
+  }
+
+  /// The trip id a legacy Vehicle_No points at, or null when it already is
+  /// one (or cannot be resolved). Handles all three legacy shapes: the
+  /// "<waybill>-<trip>" label, the millisecond trip key and BC's long key.
+  static Future<String?> _tripIdForVehicleNo(String vehicleNo) async {
+    if (isTripId(vehicleNo)) return null;
+    final fromLabel = legacyLabelTripId(vehicleNo);
+    if (fromLabel != null) return fromLabel;
+
+    // A legacy trip key — resolve the trip locally by its key.
+    final db = Get.find<db_Provider>();
+    final trips = await db.getdata(WaybillTrip.table, WaybillTrip.columns,
+        '${WaybillTrip.col_Key} = ?', [vehicleNo]);
+    if (trips.isEmpty) return null;
+    final trip = WaybillTrip.fromMap_db(trips.first);
+    final tripNo = trip.Trip_No;
+    return (tripNo == null || tripNo <= 0) ? null : '$tripNo';
+  }
+
+  /// Resends everything pending — after re-labelling legacy trip keys. Called
+  /// after sign-in; failures are swallowed so a dead network never blocks the
+  /// login flow.
+  static Future<void> flushPending() async {
+    try {
+      await repairLegacyTripKeys();
+      await postPending();
+    } catch (_) {
+      // Offline or page unavailable: rows stay pending for the next try.
+    }
   }
 
   /// Posts everything still pending. Returns how many rows BC accepted.

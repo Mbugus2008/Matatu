@@ -5,6 +5,7 @@ import 'package:t_matatu/controllers/TypesController.dart';
 import 'package:t_matatu/controllers/main.dart';
 import 'package:t_matatu/models/Utils/util.dart'; // Make sure this import is present
 import 'package:t_matatu/models/expenses/expenses.dart';
+import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/providers/db.dart';
@@ -26,6 +27,10 @@ class VehiclesController extends GetxController {
   final RxBool onroute = false.obs;
 
   final RxMap<String, bool> _isExpanded = <String, bool>{}.obs;
+
+  /// Ticket of the newest "today" load — see [getvehtrans]. Only the newest
+  /// load may write the shared today-state; older responses are discarded.
+  int _vehtransTicket = 0;
 
   void toggle(DepotFuel depotFuel) {
     depotFuel.On_route = !(depotFuel.On_route ?? false);
@@ -60,74 +65,105 @@ class VehiclesController extends GetxController {
   }
 
   Future<void> getvehtrans(String veh, DateTime date) async {
-    Get.find<TransTypeController>().vehicleTrantypes.forEach((element) {
+    // Selecting another vehicle while a load is still in flight used to let
+    // the previous vehicle's response land on the new vehicle's screen (its
+    // "Today" amounts and summaries stuck around). Every load takes a
+    // ticket; only the newest one may write the shared state.
+    final ticket = ++_vehtransTicket;
+    final typeController = Get.find<TransTypeController>();
+    final mainController = Get.find<MainController>();
+
+    // Fresh slate for the newly selected vehicle — no residue from the
+    // previous one while its data loads.
+    for (final element in typeController.vehicleTrantypes) {
       element.Amounttoday = 0;
-    });
-    Get.find<TransTypeController>().loading.value = true;
-    await getcurrvehicle(veh);
-    var request = Request(vehicle: veh, date: date);
-    await ApiClient()
-        .postdata("gettodayvehicletrans", request.toJson())
-        .then((r) async {
+    }
+    mainController.vehtrans.clear();
+    mainController.vehsummary.clear();
+    typeController.loading.value = true;
+
+    try {
+      // Inside the try so a failed rebuild still clears [loading] in the
+      // finally below — the spinner must never stay stuck.
+      await getcurrvehicle(veh, ticket: ticket);
+      if (ticket != _vehtransTicket) return; // a newer selection superseded us
+
+      var request = Request(vehicle: veh, date: date);
+      final r = await ApiClient()
+          .postdata("gettodayvehicletrans", request.toJson());
+      if (ticket != _vehtransTicket) return; // stale response — discard
       if (r.statusCode == 200) {
         Results<tmatatu.Trans> results =
             Results<tmatatu.Trans>.fromJson(r.body, tmatatu.Trans.fromMap);
         if (results.Code == 0) {
           if (results.Contents != null) {
-            Get.find<MainController>().vehtrans.value =
+            mainController.vehtrans.value =
                 results.Contents as List<tmatatu.Trans>;
 
-            final groupedItems = groupBy(Get.find<MainController>().vehtrans,
+            final groupedItems = groupBy(mainController.vehtrans,
                 (tmatatu.Trans item) => '${item.Description}');
-            // groupedItems.forEach((key, value) {
-            //print('Key: $key, Value: $value');
-            // });
-            final types = [...Get.find<TransTypeController>().vehicleTrantypes];
-            //  types.forEach((element) {
-            //  print('Type: ${element.Code}-${element.Account}');
-            // });
-            Get.find<MainController>().vehsummary.value =
+            final types = [...typeController.vehicleTrantypes];
+            mainController.vehsummary.value =
                 groupedItems.entries.map((entry) {
               final category = entry.key;
               final itemsInCategory = entry.value;
               final totalSum = itemsInCategory.fold(0.0,
                   (sum, item) => sum + num.tryParse(item.Amount.toString())!);
-              final expe =
-                  types.firstWhereOrNull((o) => '${o.Name}' == entry.key);
+              // Match the group to its type by the transaction code — the
+              // same key the rest of the app uses. Crew savings descriptions
+              // additionally carry the crew number in brackets.
+              final expe = TranTypes.typeForTransaction(
+                  types, itemsInCategory.first.Type, entry.key);
               final bal = (expe == null ? 0 : expe.VehicleAmount)! - totalSum;
 
               return TransSummary(
                   Type: category,
                   Amount: totalSum,
                   Expected: expe == null ? 0 : expe.VehicleAmount,
-                  balance: bal);
+                  balance: bal,
+                  agents: TransSummary.distinctAgents(
+                      itemsInCategory.map((e) => e.Agent_Code)));
             }).toList();
-            Get.find<MainController>().vehsummary.forEach((element) {
-              print('Original:${element.toString()}');
-            });
-            Get.find<TransTypeController>().vehicleTrantypes.forEach((element) {
-              print('${element.toString()}');
-              TransSummary? summary = Get.find<MainController>()
-                  .vehsummary
-                  .firstWhereOrNull((e) => e.Type == '${element.Name}');
-              print('Summary:${summary.toString()}');
-              if (summary != null) element.Amounttoday = summary.Amount;
-              print('${element.toString()}');
-            });
+            // Today's collections per type: sum every transaction row by
+            // its type code, so amounts already captured count against the
+            // type's balance and Distribute does not fill them again.
+            for (final element in typeController.vehicleTrantypes) {
+              element.Amounttoday = 0;
+            }
+            for (final trans in mainController.vehtrans) {
+              final type = TranTypes.typeForTransaction(
+                  typeController.vehicleTrantypes, trans.Type,
+                  trans.Description);
+              if (type == null) continue;
+              type.Amounttoday = (type.Amounttoday ?? 0) + (trans.Amount ?? 0);
+            }
           }
         }
       }
-      Get.find<TransTypeController>().loading.value = false;
-    });
-    update();
+    } catch (_) {
+      // Network or vehicle-rebuild hiccup: the slate stays clean; the next
+      // selection reloads.
+    } finally {
+      if (ticket == _vehtransTicket) {
+        typeController.loading.value = false;
+        update();
+      }
+    }
   }
 
-  Future<Vehicles?> getcurrvehicle(String vehicle) async {
+  /// Loads [vehicle] into [Currentvehicle] and rebuilds the vehicle's type
+  /// list. [ticket] (used by [getvehtrans]) keeps a superseded load from
+  /// overwriting the state of a vehicle the user selected after this one.
+  Future<Vehicles?> getcurrvehicle(String vehicle, {int? ticket}) async {
     final List<Map<String, dynamic>> maps = await db_Provider().getdata(
         Vehicles.table,
         Vehicles.columns,
         '${Vehicles.col_Vehicle_Number}=?',
         [vehicle]);
+
+    // A newer selection superseded this load while the DB read was in
+    // flight — leave the newer vehicle's state alone.
+    if (ticket != null && ticket != _vehtransTicket) return null;
 
     final currentVehicle = maps.map((row) {
       return Vehicles.fromMap(row);
@@ -159,6 +195,13 @@ class VehiclesController extends GetxController {
       return item.toString().contains(query);
     }).toList();
     update();
+  }
+
+  /// Re-pulls today's per-vehicle figures for the home list. Completes when
+  /// the request has been answered, so pull-to-refresh keeps spinning until
+  /// the figures are actually fresh.
+  Future<void> refreshDailyCollections() async {
+    await Vehicles().Daily_Contributions(getdate());
   }
 
   Future<void> refreshVehicleDetails(String? vehicleNumber) async {

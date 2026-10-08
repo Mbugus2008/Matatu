@@ -25,7 +25,9 @@ import 'package:t_matatu/models/member.dart';
 import 'package:t_matatu/models/route.dart';
 import 'package:t_matatu/models/trantypes.dart';
 import 'package:t_matatu/models/vehicles/DeportandFuel.dart';
+import 'package:t_matatu/models/expenses/vehicle_expenses.dart';
 import 'package:t_matatu/models/vehicles/vehicle.dart';
+import 'package:t_matatu/models/waybill/trip_comment.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/network/Apis.dart';
 import 'package:t_matatu/network/results/results.dart';
@@ -76,6 +78,10 @@ Future<void> upload() async {
   sendtrans();
   WaybillService().syncPendingWaybills();
   WaybillService().syncPendingWaybillTrips();
+  // Re-label any old trip-key rows, then send the vehicle-expense journal.
+  Vehicle_Expenses.flushPending();
+  // Trip comments (BC page TripComments) captured on the device.
+  TripComment.flushPending();
 }
 
 Future<void> sendtrans() async {

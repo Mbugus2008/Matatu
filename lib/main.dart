@@ -109,6 +109,15 @@ class MyApp extends StatelessWidget {
         primaryColor: AppColors.primaryColor,
         scaffoldBackgroundColor: AppColors.backgroundColor,
       ),
+      // Phones that ship with a larger system font (Tecno/itel/Xiaomi
+      // defaults, accessibility sizes) rendered text oversized — worst on
+      // text-dense pages like the waybill list. Keep the designed sizes:
+      // allow a little growth, never shrink below the design.
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        minScaleFactor: 1.0,
+        maxScaleFactor: 1.15,
+        child: child!,
+      ),
       home: const Login(),
       getPages: [],
     );

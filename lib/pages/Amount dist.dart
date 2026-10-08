@@ -21,6 +21,9 @@ class _DistributeState extends State<Distribute> {
   final TextEditingController recamount = TextEditingController();
   bool _confirming = false;
 
+  /// Set by [_confirm] — any other way of leaving discards the distribution.
+  bool _confirmed = false;
+
   @override
   void initState() {
     super.initState();
@@ -32,6 +35,12 @@ class _DistributeState extends State<Distribute> {
   void dispose() {
     recamount.removeListener(_refresh);
     recamount.dispose();
+    // Closed without confirming: this session's distribution must not leak
+    // into the next screen or the next receipt — reset the amounts and
+    // checks, exactly like distribute() itself starts from.
+    if (!_confirmed && Get.isRegistered<TransTypeController>()) {
+      Get.find<TransTypeController>().resetDistribution();
+    }
     super.dispose();
   }
 
@@ -98,9 +107,9 @@ class _DistributeState extends State<Distribute> {
                 final types = controller.vehicleTrantypes
                     .where((t) => t.Name != null)
                     .toList()
-                  // Biggest expected amount first, matching the order the
+                  // Configured Order column first, matching the order the
                   // allocation fills in.
-                  ..sort(TransTypeController.compareByExpectedDesc);
+                  ..sort(TransTypeController.compareByOrder);
                 return Column(
                   children: [
                     _buildSummaryStrip(types),
@@ -299,7 +308,7 @@ class _DistributeState extends State<Distribute> {
                           children: [
                             Expanded(
                               child: Text(
-                                transactionType.Name ?? '',
+                                '${transactionType.Name ?? ''}${_crewTagFor(transactionType)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -385,6 +394,16 @@ class _DistributeState extends State<Distribute> {
   String _money(num value) => NumberFormat('#,##0.00', 'en_US').format(value);
 
   String _amountText(num value) => value.toStringAsFixed(2);
+
+  /// " (A356)" for crew savings rows, so the officer sees which crew number
+  /// the line will post to.
+  String _crewTagFor(TranTypes type) {
+    final no = TranTypes.crewNoFor(
+        type.Code,
+        Get.find<HeaderController>().currHeader.value.Crew,
+        Get.find<HeaderController>().currHeader.value.Crew2);
+    return (no == null || no.isEmpty) ? '' : ' ($no)';
+  }
 
   /// Right-hand side of a card: an editable amount for the types that are
   /// entered by hand, otherwise the auto-calculated amount.
@@ -548,6 +567,7 @@ class _DistributeState extends State<Distribute> {
       Get.find<HeaderController>().createlines();
       Get.find<HeaderController>().curTran = tmatatu.Trans().obs;
       Get.find<VehiclesController>().Currentvehicle = Vehicles().obs;
+      _confirmed = true;
       Get.back();
     } catch (e) {
       _log('confirm failed: $e');

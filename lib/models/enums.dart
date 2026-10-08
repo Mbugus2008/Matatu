@@ -1,6 +1,6 @@
 enum client { Corporate, Private }
 
-enum hire_Type { None, Dropoff, Pick_and_Drop, Full_Day, Half_Day }
+enum hire_Type { None, Dropoff, Pick_and_Drop, Full_Day, Half_Day, Several_Days }
 
 enum vat_Type { None, Vatable, Non_Vatable }
 
@@ -38,6 +38,7 @@ class hire_type_desc {
     hire_Type.Pick_and_Drop: 'Pick and Drop',
     hire_Type.Full_Day: 'Full Day',
     hire_Type.Half_Day: 'Half Day',
+    hire_Type.Several_Days: 'Several Days',
   };
 }
 class client_desc {

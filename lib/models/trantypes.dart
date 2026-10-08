@@ -15,13 +15,64 @@ import '../network/results/results.dart';
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 class TranTypes implements mapping, Tomaps, AbsDbUpdates {
   /// Crew savings are separate types in Business Central: the driver's savings
-  /// and the conductor's savings.
+  /// (SAVINGSCREW) and the conductor's savings (SAVINGSCREW1).
   static const String savingsCrewCode = 'SAVINGSCREW';
-  static const String savingsCrew2Code = 'SAVINGSCREW2';
+  static const String savingsCrew2Code = 'SAVINGSCREW1';
 
   /// True for any crew savings type (driver or conductor).
   static bool isCrewSavings(String? code) =>
       code == savingsCrewCode || code == savingsCrew2Code;
+
+  /// The crew member's number a savings type posts to: the driver's for
+  /// SAVINGSCREW, the conductor's for SAVINGSCREW1. Null for other types.
+  static String? crewNoFor(String? code, String? crew, String? crew2) {
+    if (code == savingsCrewCode) return crew;
+    if (code == savingsCrew2Code) return crew2;
+    return null;
+  }
+
+  /// Description for a crew savings line: the member's number rides in
+  /// brackets, e.g. "Crew Savings(Dr)(B098)", the way the older receipts
+  /// wrote it. Text that already carries the number is left untouched.
+  static String crewSavingsDescription(String? description, String? crewNo) {
+    final desc = description ?? '';
+    final no = (crewNo ?? '').trim();
+    if (no.isEmpty || desc.endsWith('($no)')) return desc;
+    return '$desc($no)';
+  }
+
+  /// True when a transaction [description] belongs to the transaction type
+  /// [name] — crew savings carry the crew number in brackets, e.g.
+  /// "Crew Savings(Dr)(A091)" for the type "Crew Savings(Dr)". Without
+  /// this, today's crew savings never count against their type and
+  /// Distribute fills them again.
+  static bool descriptionMatchesType(String? description, String? name) {
+    final key = (description ?? '').trim();
+    final type = (name ?? '').trim();
+    if (key.isEmpty || type.isEmpty) return false;
+    return key == type || key.startsWith('$type(');
+  }
+
+  /// The type a transaction row belongs to: matched by the row's
+  /// [typeCode] when it carries one — the same key the rest of the app
+  /// uses — falling back to the [description] text only for rows without
+  /// a code. Returns null when nothing matches.
+  static TranTypes? typeForTransaction(
+      Iterable<TranTypes> types, String? typeCode, String? description) {
+    final code = (typeCode ?? '').trim();
+    if (code.isNotEmpty) {
+      for (final type in types) {
+        if ((type.Code ?? '').trim() == code) return type;
+      }
+      return null;
+    }
+    final desc = (description ?? '').trim();
+    if (desc.isEmpty) return null;
+    for (final type in types) {
+      if (descriptionMatchesType(desc, type.Name)) return type;
+    }
+    return null;
+  }
 
   String? Key;
   String? Code;

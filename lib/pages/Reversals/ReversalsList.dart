@@ -8,13 +8,19 @@ import '../../providers/db.dart';
 class ReversalListScreen extends StatefulWidget {
   final List<Reversal> reversal;
 
-  ReversalListScreen({required this.reversal, super.key});
+  const ReversalListScreen({required this.reversal, super.key});
 
   @override
   State<ReversalListScreen> createState() => _ReversalListScreenState();
 }
 
 class _ReversalListScreenState extends State<ReversalListScreen> {
+  // Same palette as the waybill/trip pages so the screen sits in the app's
+  // theme instead of the old standalone grey look.
+  static const _primaryGreen = Color(0xFF006B3F);
+  static const _surfaceGreen = Color(0xFFF6FBF4);
+  static const _outline = Color(0xFF6F7A71);
+
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
 
@@ -37,9 +43,9 @@ class _ReversalListScreenState extends State<ReversalListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F2EE),
+      backgroundColor: _surfaceGreen,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF7A7A7A),
+        backgroundColor: _primaryGreen,
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text('Reversals'),
@@ -53,7 +59,7 @@ class _ReversalListScreenState extends State<ReversalListScreen> {
         final List<Reversal> reversals = source.where(_matchesQuery).toList();
 
         return RefreshIndicator(
-          color: const Color(0xFF7A7A7A),
+          color: _primaryGreen,
           backgroundColor: Colors.white,
           onRefresh: _syncOnOpen,
           child: ListView(
@@ -95,7 +101,7 @@ class _ReversalListScreenState extends State<ReversalListScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF858585), width: 1.4),
+        border: Border.all(color: _outline, width: 1.4),
       ),
       child: TextField(
         controller: _searchController,
@@ -106,7 +112,7 @@ class _ReversalListScreenState extends State<ReversalListScreen> {
         },
         decoration: const InputDecoration(
           hintText: 'Search reversal by receipt, vehicle, account...',
-          prefixIcon: Icon(Icons.search, color: Color(0xFF6B6B6B), size: 26),
+          prefixIcon: Icon(Icons.search, color: _primaryGreen, size: 26),
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(vertical: 18),
         ),
@@ -145,7 +151,7 @@ class _ReversalListScreenState extends State<ReversalListScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F8FF),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: getTileColor(reversal.Status), width: 1.6),
         boxShadow: const [

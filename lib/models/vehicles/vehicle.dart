@@ -213,7 +213,8 @@ $col_Id_Number	text
 
   Future<void> Daily_Contributions(DateTime date) async {
     var request = Request(date: date);
-    ApiClient().postdata("Dailytrans", request.toJson()).then((r) {
+    try {
+      final r = await ApiClient().postdata("Dailytrans", request.toJson());
       if (r.statusCode == 200) {
         Results<Vehicles> results =
             Results<Vehicles>.fromJson(r.body, Vehicles.fromMap);
@@ -230,12 +231,19 @@ $col_Id_Number	text
           }
         }
       }
-    }).catchError((e, stackTrace) {
+    } catch (e, stackTrace) {
       print('[MATATU-API] Daily_Contributions error: $e');
       print('[MATATU-API] $stackTrace');
-      // Clear spinner on failure
-      Get.find<VehiclesController>().vehdailycollections.value = [];
-    });
+      // Keep the figures already on screen — a refresh hiccup must not
+      // blank the home list back to its loading spinner.
+    } finally {
+      // The home list is a GetBuilder: a completed load must announce
+      // itself, otherwise pull-to-refresh looks dead.
+      if (Get.isRegistered<VehiclesController>()) {
+        final controller = Get.find<VehiclesController>();
+        if (controller.initialized) controller.update();
+      }
+    }
   }
 
   Future<void> Daily_Veh_Contributions(DateTime date, String? vehicle) async {

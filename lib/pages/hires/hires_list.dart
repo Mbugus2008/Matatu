@@ -260,7 +260,9 @@ class HiresListScreen extends StatelessWidget {
     return Card(
       elevation: 2,
       shadowColor: Colors.black26,
-      color: hire.Key != null ? Colors.white : const Color(0xFFF2F2F2),
+      color: hire.Key == null
+          ? const Color(0xFFF2F2F2)
+          : (hire.Paid == true ? const Color(0xFFF1F8F2) : Colors.white),
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
@@ -328,6 +330,29 @@ class HiresListScreen extends StatelessWidget {
                           color: Color(0xFF5B5F61),
                           fontFamily: 'monospace'),
                     ),
+                    if ((hire.Destination ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 1),
+                            child: Icon(Icons.pin_drop,
+                                size: 14, color: Color(0xFF8A9296)),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              hire.Destination!.trim(),
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF5B5F61)),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     _dateLine(
                         Icons.play_circle, hire.Start_Date, hire.Start_Time),
@@ -370,6 +395,8 @@ class HiresListScreen extends StatelessWidget {
                   ),
                   const Text('Amount',
                       style: TextStyle(fontSize: 10, color: Color(0xFF5B5F61))),
+                  const SizedBox(height: 6),
+                  _paidPill(hire.Paid == true),
                 ],
               ),
             ],
@@ -390,6 +417,27 @@ class HiresListScreen extends StatelessWidget {
         label,
         style:
             TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+      ),
+    );
+  }
+
+  /// Payment status pill — green when paid, red while still pending.
+  Widget _paidPill(bool paid) {
+    final color = paid ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.45)),
+      ),
+      child: Text(
+        paid ? 'PAID' : 'UNPAID',
+        style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+            color: color),
       ),
     );
   }

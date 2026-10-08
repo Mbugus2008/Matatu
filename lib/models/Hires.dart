@@ -46,6 +46,9 @@ class Hires implements mapping, Tomaps, AbsDbUpdates {
   String? Incharge;
   String? Department;
   String? Driver;
+  // New BC columns (Oct 2026) - the paid flag and the distance covered.
+  bool? Paid;
+  double? Km;
   Hires({
     this.Key,
     this.Vehicle_No,
@@ -67,10 +70,12 @@ class Hires implements mapping, Tomaps, AbsDbUpdates {
     this.Incharge,
     this.Department,
     this.Driver,
+    this.Paid,
+    this.Km,
   });
   @override
   String toString() {
-    return ' $Code Vehicle_No: $Vehicle_No  Start_Date: $Start_Date Start_Time: $Start_Time Return_Date: $Return_Date Return_Time: $Return_Time Amount: $Amount Client: $Client Hire_Type: $Hire_Type Vat_Type: $Vat_Type Payment_Methods: $Payment_Methods Entry: $Entry Created_by: $Created_by Fleet_No: $Fleet_No Destination: $Destination Client_Name: $Client_Name Incharge: $Incharge Department: $Department Driver: $Driver';
+    return ' $Code Vehicle_No: $Vehicle_No  Start_Date: $Start_Date Start_Time: $Start_Time Return_Date: $Return_Date Return_Time: $Return_Time Amount: $Amount Client: $Client Hire_Type: $Hire_Type Vat_Type: $Vat_Type Payment_Methods: $Payment_Methods Entry: $Entry Created_by: $Created_by Fleet_No: $Fleet_No Destination: $Destination Client_Name: $Client_Name Incharge: $Incharge Department: $Department Driver: $Driver Paid: $Paid Km: $Km';
   }
 
   factory Hires.fromJson(String source) =>
@@ -101,6 +106,10 @@ class Hires implements mapping, Tomaps, AbsDbUpdates {
       'Incharge': Incharge,
       'Department': Department,
       'Driver': Driver,
+      // BC's WCF model is non-nullable - null would be rejected (HTTP 400),
+      // so the paid flag and km always travel with a value.
+      'Paid': Paid ?? false,
+      'Km': Km ?? 0,
     };
   }
 
@@ -154,6 +163,8 @@ class Hires implements mapping, Tomaps, AbsDbUpdates {
       Department:
           map['Department'] != null ? map['Department'] as String : null,
       Driver: map['Driver'] != null ? map['Driver'] as String : null,
+      Paid: map['Paid'] != null ? (map['Paid'] == true || map['Paid'] == 1) : null,
+      Km: map['Km'] != null ? (map['Km'] as num).toDouble() : null,
     );
   }
 
@@ -202,6 +213,8 @@ class Hires implements mapping, Tomaps, AbsDbUpdates {
       Department:
           map['Department'] != null ? map['Department'] as String : null,
       Driver: map['Driver'] != null ? map['Driver'] as String : null,
+      Paid: map['Paid'] != null ? (map['Paid'] == true || map['Paid'] == 1) : null,
+      Km: map['Km'] != null ? (map['Km'] as num).toDouble() : null,
     );
   }
 
@@ -226,6 +239,8 @@ class Hires implements mapping, Tomaps, AbsDbUpdates {
   static const String col_Incharge = 'Incharge';
   static const String col_Department = 'Department';
   static const String col_Driver = 'Driver';
+  static const String col_Paid = 'Paid';
+  static const String col_Km = 'Km';
   static const List<String> columns = [
     col_Key,
     col_Vehicle_No,
@@ -247,6 +262,8 @@ class Hires implements mapping, Tomaps, AbsDbUpdates {
     col_Incharge,
     col_Department,
     col_Driver,
+    col_Paid,
+    col_Km,
   ];
 
   static const String createtable = '''create table IF NOT EXISTS $table (
@@ -269,7 +286,9 @@ $col_Destination  text,
 $col_Client_Name  text,
 $col_Incharge  text,
 $col_Department  text,
-$col_Driver  text
+$col_Driver  text,
+$col_Paid  int,
+$col_Km  real
 
  )
 ''';
@@ -421,6 +440,8 @@ $col_Driver  text
       'Incharge': Incharge,
       'Department': Department,
       'Driver': Driver,
+      'Paid': Paid == null ? null : (Paid! ? 1 : 0),
+      'Km': Km,
     };
   }
 }

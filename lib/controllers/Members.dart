@@ -44,6 +44,28 @@ class MemberController extends GetxController {
     update();
   }
 
+  /// Picks the member currently filling [type] on a vehicle when several rows
+  /// match.
+  ///
+  /// Legacy data leaves whole piles of old drivers/conductors attached to the
+  /// same vehicle in BC, and they all sync to the device. The row NAV modified
+  /// last is the one that rides now: members carry the NAV record [Key], whose
+  /// tail grows on every modification, so the largest tail wins. Rows without
+  /// a parseable key keep the old behaviour (first match wins).
+  static Member? pickCurrentCrew(Iterable<Member> crew, Crew_type type) {
+    Member? best;
+    var bestTail = -1;
+    for (final member in crew) {
+      if (member.Crew_Type != type) continue;
+      final tail = member.keyTail;
+      if (best == null || tail > bestTail) {
+        best = member;
+        bestTail = tail;
+      }
+    }
+    return best;
+  }
+
   getcurrentcrew(String vehicle) {
     clearcurrentvehicle();
     Get.find<MemberController>().currentcrew.value =
@@ -52,20 +74,25 @@ class MemberController extends GetxController {
             .where((p0) => p0.Vehicle == vehicle)
             .toList();
 
+    // The header always mirrors the vehicle's current crew. Clear first: a
+    // reassignment that empties a role must not leave the previous number
+    // behind, or new crew-savings lines keep posting to the old member.
+    final header = Get.find<HeaderController>().currHeader.value;
+    header.Crew = null;
+    header.Crew2 = null;
+
     if (Get.find<MemberController>().currentcrew.isNotEmpty) {
-      final driver = Get.find<MemberController>()
-          .currentcrew
-          .firstWhereOrNull((po) => po.Crew_Type == Crew_type.Driver);
+      final driver = MemberController.pickCurrentCrew(
+          Get.find<MemberController>().currentcrew, Crew_type.Driver);
       if (driver != null) {
         Get.find<MemberController>().currentdriver.value = driver;
-        Get.find<HeaderController>().currHeader.value.Crew = driver.No;
+        header.Crew = driver.No;
       }
-      final cond = Get.find<MemberController>()
-          .currentcrew
-          .firstWhereOrNull((po) => po.Crew_Type == Crew_type.Conductor);
+      final cond = MemberController.pickCurrentCrew(
+          Get.find<MemberController>().currentcrew, Crew_type.Conductor);
       if (cond != null) {
         Get.find<MemberController>().currentcunductor.value = cond;
-        Get.find<HeaderController>().currHeader.value.Crew2 = cond.No;
+        header.Crew2 = cond.No;
       }
     }
     update();
@@ -113,6 +140,26 @@ class MemberController extends GetxController {
   }
 
   setcrew(String vehicle, String crew, Crew_type crew_type) async {
+    // A vehicle keeps exactly one driver and one conductor - assigning a
+    // member replaces the current holder of that role, both here and on the
+    // server. Detach the other local rows of the same role up front: legacy
+    // rows (crew piles from BC, assignments made on other devices) would
+    // otherwise stay attached, and the receipt would keep picking one of them
+    // for the crew section and the crew-savings accounts.
+    await db_Provider().updatedata(
+      Member.table,
+      {Member.col_Vehicle: null},
+      '${Member.col_Vehicle} = ? AND ${Member.col_Crew_Type} = ? AND ${Member.col_No} <> ?',
+      [vehicle, crew_type.index.toString(), crew],
+    );
+    for (final m in Get.find<MemberController>().allMembers) {
+      if (m.Vehicle == vehicle &&
+          m.Crew_Type == crew_type &&
+          m.No != crew) {
+        m.Vehicle = '';
+      }
+    }
+
     await db_Provider().updatedata(
       Member.table,
       {Member.col_Vehicle: vehicle, Member.col_Crew_Type: crew_type.index},

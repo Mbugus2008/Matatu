@@ -1,0 +1,428 @@
+OBJECT Page 50050 Tr RC
+{
+  OBJECT-PROPERTIES
+  {
+    Date=09/29/26;
+    Time=11:57:13 AM;
+    Modified=Yes;
+    Version List=NAVW113.00;
+  }
+  PROPERTIES
+  {
+    CaptionML=[@@@=Use same translation as 'Profile Description' (if applicable);
+               ENU=Summary;
+               DEA=Fakturierung];
+    PageType=RoleCenter;
+    ActionList=ACTIONS
+    {
+      { 2       ;    ;ActionContainer;
+                      ActionContainerType=HomeItems }
+      { 1000000000;1 ;Action    ;
+                      Name=Trans types;
+                      RunObject=Page 50013;
+                      Promoted=Yes;
+                      PromotedIsBig=Yes;
+                      Image=TaskList;
+                      PromotedCategory=Process }
+      { 1000000001;1 ;Action    ;
+                      Name=Users;
+                      RunObject=Page 50011 }
+      { 1000000002;1 ;Action    ;
+                      Name=Expenses;
+                      RunObject=Page 50032 }
+      { 1000000010;1 ;Action    ;
+                      Name=Fuel;
+                      CaptionML=ENU=Fuel;
+                      RunObject=Page 50036;
+                      Promoted=Yes;
+                      PromotedIsBig=Yes;
+                      Image=Filter;
+                      PromotedCategory=Process }
+      { 1000000012;1 ;Action    ;
+                      Name=Hires;
+                      RunObject=Page 50039;
+                      Promoted=Yes;
+                      PromotedIsBig=Yes;
+                      PromotedCategory=Process;
+                      PromotedOnly=Yes }
+      { 1000000013;1 ;Action    ;
+                      Name=Vehicle Categories;
+                      RunObject=Page 50063;
+                      Promoted=Yes;
+                      PromotedIsBig=Yes;
+                      Image=Category;
+                      PromotedCategory=Process }
+      { 1000000014;1 ;Action    ;
+                      Name=Reversals;
+                      RunObject=Page 50041;
+                      Promoted=Yes;
+                      PromotedIsBig=Yes;
+                      Image=SendApprovalRequest;
+                      PromotedCategory=Process }
+      { 1000000015;1 ;Action    ;
+                      Name=Routes;
+                      RunObject=Page 50044 }
+      { 1000000004;  ;ActionContainer;
+                      ActionContainerType=ActionItems }
+      { 1000000005;1 ;Action    ;
+                      Name=Transaction Matrix;
+                      RunObject=Page 50054;
+                      Promoted=Yes;
+                      Visible=ViewTransMatrix;
+                      PromotedIsBig=Yes;
+                      Image=Task;
+                      PromotedCategory=Process }
+      { 1000000006;1 ;Action    ;
+                      Name=Agent Matrix;
+                      RunObject=Page 50055;
+                      Visible=ViewAgentMatrix }
+      { 1000000007;1 ;Action    ;
+                      Name=Investor Matrix;
+                      RunObject=Page 50059;
+                      Visible=ViewInvestorMatrix }
+      { 1000000008;1 ;Action    ;
+                      Name=Vehicles Matrix;
+                      RunObject=Page 50057;
+                      Visible=ViewVehiclesMatrix }
+      { 1000000009;  ;ActionContainer;
+                      ActionContainerType=Reports }
+      { 1000000011;1 ;Action    ;
+                      Name=Collection Summary;
+                      RunObject=Report 50000;
+                      Promoted=Yes;
+                      PromotedIsBig=Yes;
+                      Image=Sales;
+                      PromotedCategory=Report;
+                      PromotedOnly=Yes }
+    }
+  }
+  CONTROLS
+  {
+    { 1   ;0   ;Container ;
+                ContainerType=RoleCenterArea }
+
+    { 9   ;1   ;Part      ;
+                AccessByPermission=TableData 17=R;
+                ApplicationArea=#Summary;
+                PagePartID=Page50051;
+                PartType=Page }
+
+    { 1000000003;1;Part   ;
+                ApplicationArea=#Daily;
+                PagePartID=Page50052;
+                PartType=Page }
+
+  }
+  CODE
+  {
+    VAR
+      ViewVehiclesMatrix@1000000000 : Boolean;
+      ViewTransMatrix@1000000002 : Boolean;
+      ViewAgentMatrix@1000000003 : Boolean;
+      ViewInvestorMatrix@1000000004 : Boolean;
+
+    BEGIN
+    END.
+  }
+}
+
+OBJECT Page 50051 Transactions Activities
+{
+  OBJECT-PROPERTIES
+  {
+    Date=04/16/25;
+    Time=[ 3:33:05 PM];
+    Modified=Yes;
+    Version List=NAVW114.00;
+  }
+  PROPERTIES
+  {
+    CaptionML=[ENU=Activities;
+               DEA=AktivitÑten];
+    SourceTable=Table50050;
+    PageType=CardPart;
+    RefreshOnActivate=Yes;
+    OnOpenPage=BEGIN
+                 UserSetup.GET(USERID);
+                 IF NOT UserSetupExt.GET(USERID) THEN BEGIN
+                   UserSetupExt.INIT;
+                   UserSetupExt."User ID":=USERID;
+                   UserSetupExt.INSERT;
+                 END;
+                 UserSetupExt.GET(USERID);
+                 ViewCrew:=UserSetupExt."View Crew";
+                 ViewMembers:=UserSetupExt."View Members";
+                 ViewRoute:=UserSetupExt."View Route";
+                 ViewVehicles:=UserSetupExt."View Vehicles";
+               END;
+
+    ActionList=ACTIONS
+    {
+      { 1000000008;  ;ActionContainer;
+                      ActionContainerType=ActionItems }
+      { 1000000009;1 ;Action    ;
+                      Name=Offload;
+                      RunObject=Page 50055;
+                      Promoted=Yes;
+                      PromotedIsBig=Yes;
+                      Image=Add;
+                      PromotedCategory=Process }
+    }
+  }
+  CONTROLS
+  {
+    { 1900000001;0;Container;
+                ContainerType=ContentArea }
+
+    { 6   ;1   ;Group     ;
+                CaptionML=[ENU=Members and Crew;
+                           DEA=Zahlungen];
+                GroupType=CueGroup }
+
+    { 9   ;2   ;Field     ;
+                ToolTipML=[ENU=Specifies the number of purchase invoices that must be paid today.;
+                           DEA=Gibt die Anzahl der Einkaufsrechnungen an, die heute bezahlt werden mÅssen.];
+                ApplicationArea=#Basic,#Suite;
+                SourceExpr=Members;
+                Visible=ViewMembers;
+                LookupPageID=M-Branch Members list;
+                DrillDownPageID=M-Branch Members list;
+                Image=Person }
+
+    { 1000000000;2;Field  ;
+                SourceExpr=Crew;
+                Visible=ViewCrew;
+                LookupPageID=M-Branch Crew;
+                DrillDownPageID=M-Branch Crew;
+                Image=None }
+
+    { 1000000001;1;Group  ;
+                CaptionML=ENU=Vehicles;
+                GroupType=CueGroup }
+
+    { 1000000002;2;Field  ;
+                SourceExpr=Vehicles;
+                Visible=ViewVehicles }
+
+    { 1000000003;1;Group  ;
+                CaptionML=ENU=Collections;
+                Visible=false;
+                GroupType=CueGroup }
+
+    { 1000000004;2;Field  ;
+                CaptionML=ENU=Total Collections;
+                SourceExpr=Total }
+
+    { 1000000005;2;Field  ;
+                SourceExpr=Offload }
+
+    { 1000000006;2;Field  ;
+                SourceExpr=Management }
+
+    { 1000000007;2;Field  ;
+                SourceExpr=Savings }
+
+    { 1000000010;1;Group  ;
+                GroupType=CueGroup }
+
+    { 1000000011;2;Field  ;
+                SourceExpr=OnRoute;
+                Visible=ViewRoute }
+
+  }
+  CODE
+  {
+    VAR
+      UserTaskManagement@1910 : Codeunit 1174;
+      ViewMembers@1000000000 : Boolean;
+      ViewCrew@1000000001 : Boolean;
+      ViewVehicles@1000000002 : Boolean;
+      ViewRoute@1000000003 : Boolean;
+      UserSetup@1000000004 : Record 91;
+      UserSetupExt@1000000005 : Record 50051;
+
+    BEGIN
+    END.
+  }
+}
+
+OBJECT Page 50052 Transactions Activities Daily
+{
+  OBJECT-PROPERTIES
+  {
+    Date=04/16/26;
+    Time=10:37:52 AM;
+    Modified=Yes;
+    Version List=NAVW114.00;
+  }
+  PROPERTIES
+  {
+    CaptionML=[ENU=Activities;
+               DEA=AktivitÑten];
+    SourceTable=Table50050;
+    PageType=CardPart;
+    RefreshOnActivate=Yes;
+    OnOpenPage=BEGIN
+                 SETFILTER("Date filter",'%1',TODAY);
+
+                 UserSetup.GET(USERID);
+                 IF NOT UserSetupExt.GET(USERID) THEN BEGIN
+                   UserSetupExt.INIT;
+                   UserSetupExt."User ID":=USERID;
+                   UserSetupExt.INSERT;
+                 END;
+                 UserSetupExt.GET(USERID);
+                 ViewOffloadParking:=UserSetupExt."View Offload Parking";
+                 ViewCash:=UserSetupExt."View Cash";
+                 ViewMpesa:=UserSetupExt."View Mpesa";
+                 ViewOffload:=UserSetupExt."View Offload";
+                 ViewManagement:=UserSetupExt."View Management";
+                 ViewSavings:=UserSetupExt."View Savings";
+                 ViewCarwash:=UserSetupExt."View Carwash";
+                 ViewDepotParking:=UserSetupExt."View Depot Parking";
+                 ViewExpenses:=UserSetupExt."View Expenses";
+                 ViewBody:=UserSetupExt."View Body";
+                 ViewInsurance:=UserSetupExt."View Insurance";
+                 ViewNCCParking:=UserSetupExt."View NCC Parking";
+                 ViewKNHParking:=UserSetupExt."View KNH Parking";
+                 ViewSavingsCrew:=UserSetupExt."View Savings Crew";
+                 ViewSecurity:=UserSetupExt."View Security";
+                 ViewSundry:=UserSetupExt."View Sundry";
+                 ViewStones:=UserSetupExt."View Stones";
+               END;
+
+  }
+  CONTROLS
+  {
+    { 1900000001;0;Container;
+                ContainerType=ContentArea }
+
+    { 1000000018;1;Group  ;
+                GroupType=CueGroup }
+
+    { 1000000004;2;Field  ;
+                CaptionML=ENU=Cash;
+                SourceExpr="Today Total";
+                Visible=ViewCash;
+                LookupPageID=Mbranch Header;
+                DrillDownPageID=Mbranch Header }
+
+    { 1000000017;2;Field  ;
+                SourceExpr=Mpesa;
+                Visible=ViewMpesa;
+                LookupPageID=Mpesa Transactions List;
+                DrillDownPageID=Mpesa Transactions List }
+
+    { 6   ;1   ;Group     ;
+                CaptionML=[ENU=Today's Collections;
+                           DEA=Zahlungen];
+                GroupType=CueGroup }
+
+    { 1000000005;2;Field  ;
+                Name=Offload;
+                SourceExpr="Offload Today";
+                Visible=ViewOffload }
+
+    { 1000000006;2;Field  ;
+                Name=Management;
+                SourceExpr="Management Today";
+                Visible=ViewManagement }
+
+    { 1000000007;2;Field  ;
+                Name=Savings;
+                SourceExpr="Savings Today";
+                Visible=ViewSavings }
+
+    { 1000000000;2;Field  ;
+                Name=CARWASH;
+                SourceExpr="CARWASH Today";
+                Visible=ViewCarwash }
+
+    { 1000000001;2;Field  ;
+                Name=DEPOT PARKING;
+                SourceExpr="DEPOT PARKING Today";
+                Visible=ViewDepotParking }
+
+    { 1000000002;2;Field  ;
+                Name=EXPENSES;
+                SourceExpr="EXPENSES Today";
+                Visible=ViewExpenses }
+
+    { 1000000003;2;Field  ;
+                Name=BODY;
+                SourceExpr="BODY Today";
+                Visible=ViewBody }
+
+    { 1000000008;2;Field  ;
+                Name=INSURANCE;
+                SourceExpr="INSURANCE Today";
+                Visible=ViewInsurance }
+
+    { 1000000009;2;Field  ;
+                Name=NCC PARKING;
+                SourceExpr="NCC PARKING Today";
+                Visible=ViewNCCParking }
+
+    { 1000000010;2;Field  ;
+                Name=KNH;
+                SourceExpr="KNH Today";
+                Visible=ViewKNHParking }
+
+    { 1000000011;2;Field  ;
+                Name=SAVINGSCREW;
+                SourceExpr="SAVINGSCREW Today";
+                Visible=ViewSavingsCrew }
+
+    { 1000000012;2;Field  ;
+                Name=SECURITY;
+                SourceExpr="SECURITY Today";
+                Visible=ViewSecurity }
+
+    { 1000000013;2;Field  ;
+                Name=STATUTORY SUNDRY;
+                SourceExpr="STATUTORY SUNDRY Today";
+                Visible=ViewSundry }
+
+    { 1000000014;2;Field  ;
+                Name=STONES;
+                SourceExpr="STONES Today";
+                Visible=ViewStones }
+
+    { 1000000015;2;Field  ;
+                Name=OFFLOAD PARKING;
+                SourceExpr="OFFLOAD PARKING Today";
+                Visible=ViewOffloadParking }
+
+  }
+  CODE
+  {
+    VAR
+      UserTaskManagement@1910 : Codeunit 1174;
+      ViewOffloadParking@1000000000 : Boolean;
+      ViewCash@1000000001 : Boolean;
+      ViewMpesa@1000000002 : Boolean;
+      ViewOffload@1000000003 : Boolean;
+      ViewManagement@1000000004 : Boolean;
+      ViewSavings@1000000005 : Boolean;
+      ViewCarwash@1000000006 : Boolean;
+      ViewDepotParking@1000000007 : Boolean;
+      ViewExpenses@1000000008 : Boolean;
+      ViewBody@1000000009 : Boolean;
+      ViewInsurance@1000000010 : Boolean;
+      ViewNCCParking@1000000011 : Boolean;
+      ViewKNHParking@1000000012 : Boolean;
+      ViewSavingsCrew@1000000013 : Boolean;
+      ViewSecurity@1000000014 : Boolean;
+      ViewSundry@1000000015 : Boolean;
+      ViewStones@1000000016 : Boolean;
+      UserSetup@1000000017 : Record 91;
+      UserSetupExt@1000000018 : Record 50051;
+
+    BEGIN
+    {
+
+    }
+    END.
+  }
+}
+

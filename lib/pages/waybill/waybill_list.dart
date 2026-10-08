@@ -5,7 +5,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:t_matatu/controllers/vehicles/vehicles.dart';
 import 'package:t_matatu/controllers/waybill_controller.dart';
+import 'package:t_matatu/models/vehicles/vehicle.dart';
 import 'package:t_matatu/models/waybill/waybill.dart';
 import 'package:t_matatu/pages/setting.dart';
 import 'package:t_matatu/pages/waybill/start_trip_sheet.dart';
@@ -38,6 +40,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
   static const _outline = Color(0xFF6F7A71);
   static const _surfaceVariant = Color(0xFFDFE4DD);
   static const _summaryBg = Color(0xFFF8FAFC);
+  static const _mpesaBlue = Color(0xFF0B5FA5);
 
   @override
   void initState() {
@@ -55,12 +58,14 @@ class _WaybillListPageState extends State<WaybillListPage> {
       // without a manual Sync tap. Silent: no spinner, the list just
       // refreshes when the sync lands.
       _controller.syncFromAPI(silent: true);
+      _refreshDailyCollections();
 
       // Keep the screen live: another device's entry, a trip closed or a
       // receipt settled server-side — refresh quietly every minute.
       _autoSyncTimer?.cancel();
       _autoSyncTimer = Timer.periodic(const Duration(minutes: 1), (_) {
         _controller.syncFromAPI(silent: true);
+        _refreshDailyCollections();
       });
     });
   }
@@ -73,11 +78,22 @@ class _WaybillListPageState extends State<WaybillListPage> {
   }
 
   List<Waybill> get _filteredBridges {
-    if (_searchQuery.isEmpty) return _controller.waybills;
-    return _controller.waybills.where((wb) {
-      return (wb.Fleet_No ?? '').toUpperCase().contains(_searchQuery) ||
-          (wb.Vehicle_No ?? '').toUpperCase().contains(_searchQuery);
-    }).toList();
+    final items = _searchQuery.isEmpty
+        ? List<Waybill>.of(_controller.waybills)
+        : _controller.waybills.where((wb) {
+            return (wb.Fleet_No ?? '')
+                    .toUpperCase()
+                    .contains(_searchQuery) ||
+                (wb.Vehicle_No ?? '').toUpperCase().contains(_searchQuery);
+          }).toList();
+    // Vehicles with open trips lead the list — they are the ones still on
+    // the road and about to be receipted; the rest keep their order.
+    final open = <Waybill>[];
+    final rest = <Waybill>[];
+    for (final wb in items) {
+      (_tripCountsFor(wb).$1 > 0 ? open : rest).add(wb);
+    }
+    return [...open, ...rest];
   }
 
   /// Opens the entry form to adjust details (target, crew, cash, ...).
@@ -117,7 +133,15 @@ class _WaybillListPageState extends State<WaybillListPage> {
     if (picked != null) {
       _controller.selectedDate.value = picked;
       _controller.reload();
+      _refreshDailyCollections();
     }
+  }
+
+  /// Pulls the day's per-vehicle collection figures (M-Pesa etc.) shown on
+  /// the cards — the same feed the vehicles home screen uses.
+  void _refreshDailyCollections() {
+    if (!Get.isRegistered<VehiclesController>()) return;
+    Vehicles().Daily_Contributions(_controller.selectedDate.value);
   }
 
   @override
@@ -135,7 +159,12 @@ class _WaybillListPageState extends State<WaybillListPage> {
                   tooltip: 'Back',
                   onPressed: () => Navigator.of(ctx).pop(),
                 )
-              : const SizedBox.shrink(),
+              : IconButton(
+                  // Root (e.g. the Controller's home) — open the drawer.
+                  icon: const Icon(Icons.menu),
+                  tooltip: 'Menu',
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
         ),
         title: const Text(
           'CityHoppa Waybill',
@@ -155,7 +184,10 @@ class _WaybillListPageState extends State<WaybillListPage> {
           _buildDateBar(),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => _controller.syncFromAPI(silent: true),
+              onRefresh: () async {
+                await _controller.syncFromAPI(silent: true);
+                _refreshDailyCollections();
+              },
               child: CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(child: _buildSummaryGrid()),
@@ -183,7 +215,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
     return Obx(() {
       final date = _controller.selectedDate.value;
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(bottom: BorderSide(color: _surfaceVariant)),
@@ -202,7 +234,10 @@ class _WaybillListPageState extends State<WaybillListPage> {
             ),
             const Spacer(),
             GestureDetector(
-              onTap: () => _controller.syncFromAPI(silent: true),
+              onTap: () {
+                _controller.syncFromAPI(silent: true);
+                _refreshDailyCollections();
+              },
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -225,38 +260,34 @@ class _WaybillListPageState extends State<WaybillListPage> {
   // ─── Summary Bento Grid ───
   Widget _buildSummaryGrid() {
     return Obx(() {
-      final trips = _controller.allTrips;
-      if (trips.isEmpty) return const SizedBox.shrink();
+      final entries = _controller.waybills;
+      if (entries.isEmpty) return const SizedBox.shrink();
 
-      // Target = all trip totals; Actual = received on closed trips.
-      final totalTarget = trips.fold<double>(0, (s, t) => s + (t.Total ?? 0));
-      final totalActual = trips
-          .where((t) => t.To_Time != null)
-          .fold<double>(0, (s, t) => s + _receivedValue(t.Amount_Received));
-      final totalShortage = totalTarget - totalActual;
+      // Real figures from the day's waybill entries (BC): the totals are
+      // exactly the sum of each card's Target / Actual / Shortage.
+      final totalTarget =
+          entries.fold<double>(0, (s, w) => s + (w.Target_Revenue ?? 0));
+      final totalActual =
+          entries.fold<double>(0, (s, w) => s + (w.Actual_Revenue ?? 0));
+      final totalShortage =
+          entries.fold<double>(0, (s, w) => s + (w.Shortage ?? 0));
 
       return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
         child: Row(
           children: [
             _summaryTile('TARGET', totalTarget, _targetGrey, _summaryBg,
                 _surfaceVariant),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             _summaryTile('ACTUAL', totalActual, _primaryGreen,
                 const Color(0xFF9DF5BD), _primaryGreen),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             _summaryTile('SHORTAGE', totalShortage, _shortageRed,
                 const Color(0xFFFFDAD6), _shortageRed),
           ],
         ),
       );
     });
-  }
-
-  /// Numeric value of Amount_Received (stored as text, may contain commas).
-  double _receivedValue(String? value) {
-    if (value == null || value.trim().isEmpty) return 0;
-    return double.tryParse(value.replaceAll(',', '').trim()) ?? 0;
   }
 
   Widget _summaryTile(
@@ -267,7 +298,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
 
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(8),
@@ -278,14 +309,14 @@ class _WaybillListPageState extends State<WaybillListPage> {
           children: [
             Text(label,
                 style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.5,
                     color: textColor)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(display,
                 style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                     color: textColor)),
@@ -298,15 +329,16 @@ class _WaybillListPageState extends State<WaybillListPage> {
   // ─── Search Bar ───
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       child: TextField(
         controller: _searchCtrl,
         decoration: InputDecoration(
           hintText: 'Search fleet or plate...',
           prefixIcon: const Icon(Icons.search, color: _outline),
           filled: true,
+          isDense: true,
           fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: _surfaceVariant),
@@ -349,7 +381,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
       }
 
       return SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 96),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, index) => _buildVehicleCard(items[index]),
@@ -373,7 +405,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
         await _controller.reload();
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
@@ -387,7 +419,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -405,7 +437,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                      fontSize: 18,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                       color: Color(0xFF181D19))),
                             ),
@@ -425,9 +457,11 @@ class _WaybillListPageState extends State<WaybillListPage> {
                                         color: _outline,
                                         letterSpacing: 1)),
                               ),
+                            const SizedBox(width: 6),
+                            _tripChip(wb),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Row(
                           children: [
                             const Icon(Icons.group, size: 16, color: _outline),
@@ -453,38 +487,47 @@ class _WaybillListPageState extends State<WaybillListPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: _summaryBg,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          _revenueRow(
-                              'Target', wb.Target_Revenue ?? 0, _targetGrey),
-                          const SizedBox(height: 4),
-                          _revenueRow(
-                              'Actual', wb.Actual_Revenue ?? 0, _actualGreen),
-                        ],
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _revenueRow('Target', wb.Target_Revenue ?? 0,
+                                  _targetGrey),
+                              const SizedBox(height: 2),
+                              _revenueRow('Actual', wb.Actual_Revenue ?? 0,
+                                  _actualGreen),
+                            ],
+                          ),
+                        ),
+                        Container(
+                            width: 1, height: 30, color: _surfaceVariant),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _revenueRow('Short', wb.Shortage ?? 0,
+                                  hasShortage ? _shortageRed : _outline),
+                              const SizedBox(height: 2),
+                              _revenueRow('Cash', wb.Cash ?? 0, _targetGrey),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    Container(width: 1, height: 40, color: _surfaceVariant),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          _revenueRow('Short', wb.Shortage ?? 0,
-                              hasShortage ? _shortageRed : _outline),
-                          const SizedBox(height: 4),
-                          _revenueRow('Cash', wb.Cash ?? 0, _targetGrey),
-                        ],
-                      ),
-                    ),
+                    const SizedBox(height: 4),
+                    Container(height: 1, color: _surfaceVariant),
+                    const SizedBox(height: 4),
+                    _mpesaRow(wb),
                   ],
                 ),
               ),
@@ -494,6 +537,70 @@ class _WaybillListPageState extends State<WaybillListPage> {
       ),
     );
   }
+
+  /// (open, closed) trip counts for the entry — matches by BC entry number
+  /// or local key.
+  (int, int) _tripCountsFor(Waybill wb) {
+    var open = 0;
+    var closed = 0;
+    for (final t in _controller.allTrips) {
+      final byEntry = wb.Entry_No != null &&
+          wb.Entry_No! > 0 &&
+          t.Weign_Bridge_id == wb.Entry_No;
+      final byKey = (wb.Key ?? '').isNotEmpty && t.Waybill_Key == wb.Key;
+      if (!byEntry && !byKey) continue;
+      if (t.To_Time == null) {
+        open++;
+      } else {
+        closed++;
+      }
+    }
+    return (open, closed);
+  }
+
+  Widget _tripChip(Waybill wb) {
+    final (open, closed) = _tripCountsFor(wb);
+    final parts = <String>[
+      if (open > 0) '$open open',
+      if (closed > 0) '$closed closed',
+    ];
+    final label = parts.isEmpty ? '0 trips' : parts.join(' · ');
+    final hasOpen = open > 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: hasOpen ? const Color(0xFFE8F1EC) : _surfaceVariant,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: hasOpen ? _primaryGreen : _outline,
+              letterSpacing: 1)),
+    );
+  }
+
+  /// M-Pesa collected for the vehicle today (same feed the vehicles home
+  /// shows) — watched so it fills in as soon as the figures load.
+  Widget _mpesaRow(Waybill wb) {
+    return Obx(() {
+      var mpesa = 0.0;
+      if (Get.isRegistered<VehiclesController>()) {
+        final list = Get.find<VehiclesController>().vehdailycollections;
+        for (final v in list) {
+          if (_normVehicle(v.Vehicle_Number) == _normVehicle(wb.Vehicle_No)) {
+            mpesa = v.Mpesa ?? 0;
+            break;
+          }
+        }
+      }
+      return _revenueRow('M-Pesa', mpesa, _mpesaBlue);
+    });
+  }
+
+  static String _normVehicle(String? value) =>
+      (value ?? '').toUpperCase().replaceAll(' ', '').trim();
 
   Widget _revenueRow(String label, double value, Color color) {
     return Row(
