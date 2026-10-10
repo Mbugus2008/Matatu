@@ -63,9 +63,7 @@ class TripComment
     return TripComment(
       Key: map['Key']?.toString(),
       Code: map['Code']?.toString(),
-      Trip_Id: map['Trip_Id'] != null
-          ? (map['Trip_Id'] as num).toInt()
-          : null,
+      Trip_Id: map['Trip_Id'] != null ? (map['Trip_Id'] as num).toInt() : null,
       Comments: map['Comments']?.toString(),
       User: map['User']?.toString(),
       Date_time: _parseDate(map['Date_time']),
@@ -112,9 +110,7 @@ class TripComment
     return TripComment(
       Key: map['Key']?.toString(),
       Code: map['Code']?.toString(),
-      Trip_Id: map['Trip_Id'] != null
-          ? (map['Trip_Id'] as num).toInt()
-          : null,
+      Trip_Id: map['Trip_Id'] != null ? (map['Trip_Id'] as num).toInt() : null,
       Comments: map['Comments']?.toString(),
       User: map['User']?.toString(),
       Date_time: _parseDate(map['Date_time']),
@@ -165,7 +161,9 @@ $col_sent integer DEFAULT 0
 
   @override
   List<DbUpdate>? updates() {
-    return [DbUpdate(version: 19, updates: [createtable])];
+    return [
+      DbUpdate(version: 19, updates: [createtable])
+    ];
   }
 
   @override
@@ -255,12 +253,13 @@ $col_sent integer DEFAULT 0
   static Future<int> postRows(List<TripComment> rows) async {
     if (rows.isEmpty) return 0;
     final payload = json.encode(rows.map((r) => r.toMap()).toList());
-    final response = await ApiClient().postdata('settripcommentsbatch', payload);
+    final response =
+        await ApiClient().postdata('settripcommentsbatch', payload);
     if (response.statusCode != 200) {
       throw Exception('Server error ${response.statusCode}');
     }
-    final results = Results<TripComment>.fromJson(
-        response.body, TripComment.fromMap);
+    final results =
+        Results<TripComment>.fromJson(response.body, TripComment.fromMap);
     if (results.Code != 0) {
       throw Exception(results.Desc ?? 'Post failed');
     }
@@ -282,8 +281,7 @@ $col_sent integer DEFAULT 0
     return synced;
   }
 
-  static TripComment? _matchLocal(
-      List<TripComment> rows, TripComment server) {
+  static TripComment? _matchLocal(List<TripComment> rows, TripComment server) {
     for (final row in rows) {
       if (server.Code != null && row.Code == server.Code) return row;
       if (server.Key != null && row.Key == server.Key) return row;

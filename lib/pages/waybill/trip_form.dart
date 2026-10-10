@@ -188,8 +188,8 @@ class _TripFormPageState extends State<TripFormPage> {
       To: widget.trip?.To,
       To_Time: _toTime == null
           ? null
-          : DateTime(now.year, now.month, now.day, _toTime!.hour,
-              _toTime!.minute),
+          : DateTime(
+              now.year, now.month, now.day, _toTime!.hour, _toTime!.minute),
       Pax_No: pax,
       Fare_Amount: fare,
       Total: pax * fare,
@@ -235,8 +235,7 @@ class _TripFormPageState extends State<TripFormPage> {
                   Row(
                     children: [
                       Expanded(
-                        child:
-                            _buildTimePicker('Departure', _fromTime, true),
+                        child: _buildTimePicker('Departure', _fromTime, true),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -291,8 +290,8 @@ class _TripFormPageState extends State<TripFormPage> {
                               size: 18, color: _primaryGreen),
                           const SizedBox(width: 8),
                           const Text('Total',
-                              style: TextStyle(
-                                  fontSize: 13, color: _mutedText)),
+                              style:
+                                  TextStyle(fontSize: 13, color: _mutedText)),
                           const Spacer(),
                           Text(
                             NumberFormat('#,##0.00').format(total),
@@ -386,8 +385,8 @@ class _TripFormPageState extends State<TripFormPage> {
               color: Color(0x33FFFFFF),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.directions_bus,
-                color: Colors.white, size: 20),
+            child:
+                const Icon(Icons.directions_bus, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -404,8 +403,8 @@ class _TripFormPageState extends State<TripFormPage> {
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: const Color(0x33FFFFFF),
                     borderRadius: BorderRadius.circular(20),
@@ -493,8 +492,7 @@ class _TripFormPageState extends State<TripFormPage> {
           icon == null ? null : Icon(icon, size: 20, color: _primaryGreen),
       filled: true,
       fillColor: _fieldFill,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,

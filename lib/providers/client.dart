@@ -69,6 +69,12 @@ class BaseClients {
     return null;
   }
 
+  /// The standard per-vehicle collections list (today's figures per
+  /// vehicle), when the client has one — Cityhoppa does. Clients without
+  /// it return null (the drawer tile then shows a fallback). [showSummary]
+  /// controls the day-summary card at the bottom of the list.
+  Widget? vehicleCollectionsList({bool showSummary = true}) => null;
+
   bool? Attach_crew = false;
   CrewToattach? Crew_to_attach = CrewToattach.Both;
 

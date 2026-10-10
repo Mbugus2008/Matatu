@@ -89,8 +89,8 @@ class VehiclesController extends GetxController {
       if (ticket != _vehtransTicket) return; // a newer selection superseded us
 
       var request = Request(vehicle: veh, date: date);
-      final r = await ApiClient()
-          .postdata("gettodayvehicletrans", request.toJson());
+      final r =
+          await ApiClient().postdata("gettodayvehicletrans", request.toJson());
       if (ticket != _vehtransTicket) return; // stale response — discard
       if (r.statusCode == 200) {
         Results<tmatatu.Trans> results =
@@ -103,8 +103,7 @@ class VehiclesController extends GetxController {
             final groupedItems = groupBy(mainController.vehtrans,
                 (tmatatu.Trans item) => '${item.Description}');
             final types = [...typeController.vehicleTrantypes];
-            mainController.vehsummary.value =
-                groupedItems.entries.map((entry) {
+            mainController.vehsummary.value = groupedItems.entries.map((entry) {
               final category = entry.key;
               final itemsInCategory = entry.value;
               final totalSum = itemsInCategory.fold(0.0,
@@ -132,7 +131,8 @@ class VehiclesController extends GetxController {
             }
             for (final trans in mainController.vehtrans) {
               final type = TranTypes.typeForTransaction(
-                  typeController.vehicleTrantypes, trans.Type,
+                  typeController.vehicleTrantypes,
+                  trans.Type,
                   trans.Description);
               if (type == null) continue;
               type.Amounttoday = (type.Amounttoday ?? 0) + (trans.Amount ?? 0);

@@ -81,9 +81,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
     final items = _searchQuery.isEmpty
         ? List<Waybill>.of(_controller.waybills)
         : _controller.waybills.where((wb) {
-            return (wb.Fleet_No ?? '')
-                    .toUpperCase()
-                    .contains(_searchQuery) ||
+            return (wb.Fleet_No ?? '').toUpperCase().contains(_searchQuery) ||
                 (wb.Vehicle_No ?? '').toUpperCase().contains(_searchQuery);
           }).toList();
     // Vehicles with open trips lead the list — they are the ones still on
@@ -509,8 +507,7 @@ class _WaybillListPageState extends State<WaybillListPage> {
                             ],
                           ),
                         ),
-                        Container(
-                            width: 1, height: 30, color: _surfaceVariant),
+                        Container(width: 1, height: 30, color: _surfaceVariant),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(

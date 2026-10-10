@@ -1,3 +1,3 @@
-Version 1.0.50
-- Receipt: the printing spinner now closes reliably the moment the receipt is sent to the printer — even when a message is showing on screen (the earlier fix could still be swallowed and leave the spinner stuck)
-- Includes 1.0.49: distribute counts today's collected amounts by transaction code (crew fees no longer filled twice), Today's Transactions popup shows the agent code, home list pull-to-refresh restored
+Version 1.0.53
+- Receipt: a vehicle's trips are now refreshed live from the server when the vehicle is picked, when the trips popup opens, and right before printing — trips started on another device are closed by the receipt too
+- Trips popup: shows today's trips with open ones first and highlighted; each trip now shows its M-Pesa and Cash amounts

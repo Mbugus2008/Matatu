@@ -95,6 +95,23 @@ class DisFuelSummary {
     return d;
   }
 
+  /// The row whose [Date] falls on the same day as [date], if present.
+  /// Dates may carry a time component, so compare year/month/day only.
+  static DisFuelSummary? pickByDate(
+      Iterable<DisFuelSummary> rows, DateTime? date) {
+    if (date == null) return null;
+    for (final r in rows) {
+      final d = r.Date;
+      if (d != null &&
+          d.year == date.year &&
+          d.month == date.month &&
+          d.day == date.day) {
+        return r;
+      }
+    }
+    return null;
+  }
+
   String toJson() => json.encode(toMap());
 
   /// Parse date from API (MM/dd/yyyy HH:mm:ss) or int milliseconds (DB)
@@ -316,17 +333,64 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
     }
   }
 
-  /// Separate share action: dispatch summary (active / total vehicles).
-  void _shareDispatch(DisFuelSummary s) {
-    if (s.Date == null) return;
-    final dateStr = DateFormat('dd MMM yyyy').format(s.Date!);
-    final dayOfWeek = DateFormat('EEEE').format(s.Date!);
+  /// Re-fetches the newest summaries before a share so the message can't go
+  /// out with figures from whenever this screen was last loaded — it stays
+  /// alive as the deport home all day. Syncs the local DB + the on-screen
+  /// row, and falls back to [fallback] when the API is unreachable.
+  Future<DisFuelSummary> _freshSummary(DisFuelSummary fallback) async {
+    try {
+      final result =
+          await _service.fetchPage().timeout(const Duration(seconds: 6));
+      final rows = result.Contents ?? [];
+      if (rows.isEmpty) return fallback;
+      for (final r in rows) {
+        await _service.save(r);
+      }
+      for (var i = 0; i < _summaries.length; i++) {
+        final fresh = DisFuelSummary.pickByDate(rows, _summaries[i].Date);
+        if (fresh != null) _summaries[i] = fresh;
+      }
+      _summaries.refresh();
+      return DisFuelSummary.pickByDate(rows, fallback.Date) ?? fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  /// Share action: dispatch summary (active / total vehicles).
+  Future<void> _shareDispatch(DisFuelSummary s) async {
+    final fresh = await _freshSummary(s);
+    if (fresh.Date == null) return;
+    final dateStr = DateFormat('dd MMM yyyy').format(fresh.Date!);
+    final dayOfWeek = DateFormat('EEEE').format(fresh.Date!);
     final text = '$dayOfWeek, $dateStr\n'
         'Dispatch Summary\n'
-        'Active Vehicles: ${s.Active_Vehicles ?? 0}\n'
-        'Total Vehicles: ${s.Total_Vehicles ?? 0}\n'
+        'Active Vehicles: ${fresh.Active_Vehicles ?? 0}\n'
+        'Total Vehicles: ${fresh.Total_Vehicles ?? 0}\n'
         '---\n'
-        'View Dashboard: https://services.trimline.co.ke:8094/dispatchsummary/${DateFormat('yyyy-MM-dd').format(s.Date!)}';
+        'View Dashboard: https://services.trimline.co.ke:8094/dispatchsummary/${DateFormat('yyyy-MM-dd').format(fresh.Date!)}';
+    SharePlus.instance.share(ShareParams(text: text));
+  }
+
+  /// Share action: full fuel summary for [s] (same refresh-first rule).
+  Future<void> _shareFuel(DisFuelSummary s) async {
+    final fresh = await _freshSummary(s);
+    if (fresh.Date == null) return;
+    final dateStr = DateFormat('dd MMM yyyy').format(fresh.Date!);
+    final dayOfWeek = DateFormat('EEEE').format(fresh.Date!);
+    final text = '$dayOfWeek, $dateStr\n'
+        'Collection: ${NumberFormat('#,##0.00').format(fresh.Total_Collection ?? 0)}\n'
+        'Vehicles: ${fresh.Total_Vehicles ?? 0}\n'
+        'Fuel: ${NumberFormat('#,##0.0').format(fresh.Total_Fuel_ltrs ?? 0)} L\n'
+        'Amount: ${NumberFormat('#,##0.00').format(fresh.Total_Fuels_Amount ?? 0)}\n'
+        'Paid: ${NumberFormat('#,##0.00').format(fresh.Total_Paid ?? 0)}\n'
+        'Unpaid Fuel: ${NumberFormat('#,##0.00').format((fresh.Total_Fuels_Amount ?? 0) - (fresh.Total_Paid ?? 0))}\n'
+        'Mileage: ${NumberFormat('#,##0').format(fresh.Total_Mileage ?? 0)}\n'
+        'Arrears: ${NumberFormat('#,##0.00').format(fresh.Total_Fuel_Arrears ?? 0)}\n'
+        'Net Offload: ${NumberFormat('#,##0.00').format(fresh.Net_Offload ?? 0)}\n'
+        'Active Vehicles: ${fresh.Active_Vehicles ?? 0}\n'
+        '---\n'
+        'View Dashboard: https://services.trimline.co.ke:8094/fuelsummary/${DateFormat('yyyy-MM-dd').format(fresh.Date!)}';
     SharePlus.instance.share(ShareParams(text: text));
   }
 
@@ -624,22 +688,7 @@ class _DisFuelSummaryPageState extends State<DisFuelSummaryPage> {
                         ),
                         const Spacer(),
                         GestureDetector(
-                          onTap: () {
-                            final text = '$dayOfWeek, $dateStr\n'
-                                'Collection: ${NumberFormat('#,##0.00').format(s.Total_Collection ?? 0)}\n'
-                                'Vehicles: ${s.Total_Vehicles ?? 0}\n'
-                                'Fuel: ${NumberFormat('#,##0.0').format(s.Total_Fuel_ltrs ?? 0)} L\n'
-                                'Amount: ${NumberFormat('#,##0.00').format(s.Total_Fuels_Amount ?? 0)}\n'
-                                'Paid: ${NumberFormat('#,##0.00').format(s.Total_Paid ?? 0)}\n'
-                                'Unpaid Fuel: ${NumberFormat('#,##0.00').format((s.Total_Fuels_Amount ?? 0) - (s.Total_Paid ?? 0))}\n'
-                                'Mileage: ${NumberFormat('#,##0').format(s.Total_Mileage ?? 0)}\n'
-                                'Arrears: ${NumberFormat('#,##0.00').format(s.Total_Fuel_Arrears ?? 0)}\n'
-                                'Net Offload: ${NumberFormat('#,##0.00').format(s.Net_Offload ?? 0)}\n'
-                                'Active Vehicles: ${s.Active_Vehicles ?? 0}\n'
-                                '---\n'
-                                'View Dashboard: https://services.trimline.co.ke:8094/fuelsummary/${DateFormat('yyyy-MM-dd').format(s.Date!)}';
-                            SharePlus.instance.share(ShareParams(text: text));
-                          },
+                          onTap: () => _shareFuel(s),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 6),

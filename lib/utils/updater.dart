@@ -12,8 +12,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:t_matatu/controllers/main.dart';
 
-import 'running_abi_stub.dart'
-    if (dart.library.ffi) 'running_abi_ffi.dart';
+import 'running_abi_stub.dart' if (dart.library.ffi) 'running_abi_ffi.dart';
 
 class UpdateController extends GetxController {
   var latestVersion = "".obs;
@@ -252,8 +251,7 @@ class UpdateController extends GetxController {
           validateStatus: (status) => status != null && status < 400,
         ),
       );
-      final header =
-          response.headers.value(Headers.contentLengthHeader);
+      final header = response.headers.value(Headers.contentLengthHeader);
       return header == null ? null : int.tryParse(header);
     } catch (_) {
       return null;

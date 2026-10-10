@@ -19,8 +19,8 @@ import '../models/expenses/vehicle_expenses.dart';
 import '../models/route.dart';
 import '../models/vehicles/Vehicle_crew.dart';
 import '../models/vehicles/vehicle.dart';
-import '../models/waybill/waybill.dart';
 import '../models/waybill/trip_comment.dart';
+import '../models/waybill/waybill.dart';
 import '../pages/disfuel_summary.dart';
 
 class Dbtrans {
@@ -147,6 +147,12 @@ class db_Provider extends GetxController {
     // Migration: trips edited locally are dirty until BC takes them.
     await _addColumnIfMissing(
         db, WaybillTrip.table, WaybillTrip.col_Dirty, 'INTEGER DEFAULT 0');
+    // Migration: trips carry the M-Pesa / cash split of the amount received
+    // (BC columns added 2026-10-09).
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Mpesa_Amount, 'REAL');
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Cash_amount, 'REAL');
     // Migration: new fields added to disfuel_summary
     await _addColumnIfMissing(
         db, DisFuelSummary.table, 'Total_Collection', 'REAL');
@@ -212,6 +218,12 @@ class db_Provider extends GetxController {
     // Migration: trips edited locally are dirty until BC takes them.
     await _addColumnIfMissing(
         db, WaybillTrip.table, WaybillTrip.col_Dirty, 'INTEGER DEFAULT 0');
+    // Migration: trips carry the M-Pesa / cash split of the amount received
+    // (BC columns added 2026-10-09).
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Mpesa_Amount, 'REAL');
+    await _addColumnIfMissing(
+        db, WaybillTrip.table, WaybillTrip.col_Cash_amount, 'REAL');
     // Migration: new fields for disfuel_summary
     await _addColumnIfMissing(
         db, DisFuelSummary.table, 'Total_Collection', 'REAL');

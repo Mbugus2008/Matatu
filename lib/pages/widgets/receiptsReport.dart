@@ -127,8 +127,7 @@ class receiptReport extends StatelessWidget {
                                     Flexible(
                                       child: Text(vehicle,
                                           overflow: TextOverflow.ellipsis,
-                                          style:
-                                              const TextStyle(fontSize: 12)),
+                                          style: const TextStyle(fontSize: 12)),
                                     ),
                                     Text(
                                         Get.find<ReportController>()
@@ -197,15 +196,11 @@ class receiptReport extends StatelessWidget {
                                                                     MainAxisAlignment
                                                                         .spaceBetween,
                                                                 children: [
-                                                                  Get.find<ReportController>()
-                                                                              .daystrans[
-                                                                                  index]
-                                                                              .transtions?[
-                                                                                  i]
-                                                                              .Type ==
-                                                                          "SAVINGSCREW" || Get.find<ReportController>().daystrans[index].transtions?[i].Type == "SAVINGSCREW1"
-                                                                      ? Text(
-                                                                          TranTypes.crewSavingsDescription(Get.find<ReportController>().daystrans[index].transtions?[i].Description, Get.find<ReportController>().daystrans[index].transtions?[i].Account_No),
+                                                                  Get.find<ReportController>().daystrans[index].transtions?[i].Type ==
+                                                                              "SAVINGSCREW" ||
+                                                                          Get.find<ReportController>().daystrans[index].transtions?[i].Type ==
+                                                                              "SAVINGSCREW1"
+                                                                      ? Text(TranTypes.crewSavingsDescription(Get.find<ReportController>().daystrans[index].transtions?[i].Description, Get.find<ReportController>().daystrans[index].transtions?[i].Account_No),
                                                                           style: const TextStyle(
                                                                               fontSize:
                                                                                   12))

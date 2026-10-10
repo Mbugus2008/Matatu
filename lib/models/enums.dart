@@ -1,27 +1,35 @@
 enum client { Corporate, Private }
 
-enum hire_Type { None, Dropoff, Pick_and_Drop, Full_Day, Half_Day, Several_Days }
+enum hire_Type {
+  None,
+  Dropoff,
+  Pick_and_Drop,
+  Full_Day,
+  Half_Day,
+  Several_Days
+}
 
 enum vat_Type { None, Vatable, Non_Vatable }
 
 enum payment_Methods { Cash, Bank, Paybill }
+
 enum Whos_to_blame {
-        
-        /// <remarks/>
-        _blank_,
-        
-        /// <remarks/>
-        Both,
-        
-        /// <remarks/>
-        Driver,
-        
-        /// <remarks/>
-        Conductor,
-        
-        /// <remarks/>
-        Company,
-    }
+  /// <remarks/>
+  _blank_,
+
+  /// <remarks/>
+  Both,
+
+  /// <remarks/>
+  Driver,
+
+  /// <remarks/>
+  Conductor,
+
+  /// <remarks/>
+  Company,
+}
+
 class Whos_to_blame_for_Deficiet_desc {
   static const Map<Whos_to_blame, String> desc = {
     Whos_to_blame._blank_: 'None',
@@ -31,6 +39,7 @@ class Whos_to_blame_for_Deficiet_desc {
     Whos_to_blame.Company: 'Company',
   };
 }
+
 class hire_type_desc {
   static const Map<hire_Type, String> desc = {
     hire_Type.None: 'None',
@@ -41,12 +50,14 @@ class hire_type_desc {
     hire_Type.Several_Days: 'Several Days',
   };
 }
+
 class client_desc {
   static const Map<client, String> desc = {
     client.Corporate: 'Corporate',
     client.Private: 'Private',
   };
 }
+
 class vat_type_desc {
   static const Map<vat_Type, String> desc = {
     vat_Type.None: 'None',
@@ -54,6 +65,7 @@ class vat_type_desc {
     vat_Type.Non_Vatable: 'Non Vatable',
   };
 }
+
 class payment_methods_desc {
   static const Map<payment_Methods, String> desc = {
     payment_Methods.Cash: 'Cash',

@@ -472,8 +472,8 @@ void main() {
     });
 
     test('a receipt below the first target stops there', () {
-      expect(WaybillService.allocateReceived(3000, [4000, 2000]),
-          [3000.0, 0.0]);
+      expect(
+          WaybillService.allocateReceived(3000, [4000, 2000]), [3000.0, 0.0]);
     });
 
     test('missing targets take nothing before the last trip', () {
@@ -485,6 +485,75 @@ void main() {
     });
   });
 
+  group('WaybillService — entriesToRefresh (live refresh selection)', () {
+    final today = DateTime(2026, 10, 9);
+
+    test('includes entries with open trips plus today\'s entries', () {
+      final entries = [
+        Waybill(Entry_No: 64, Key: 'k64', Date: today), // today, no trips yet
+        Waybill(Entry_No: 60, Key: 'k60', Date: DateTime(2026, 10, 7)),
+        Waybill(Entry_No: 50, Key: 'k50', Date: DateTime(2026, 10, 1)),
+      ];
+      final trips = [
+        WaybillTrip(Trip_No: 1, Weign_Bridge_id: 60, Key: 't1'), // still open
+        WaybillTrip(
+            Trip_No: 2,
+            Weign_Bridge_id: 50,
+            Key: 't2',
+            To_Time: DateTime(2026, 10, 1, 10)), // closed
+      ];
+      expect(WaybillService.entriesToRefresh(entries, trips, today), [60, 64]);
+    });
+
+    test('an old entry whose trips are all closed is skipped', () {
+      final entries = [
+        Waybill(Entry_No: 50, Key: 'k50', Date: DateTime(2026, 10, 1)),
+      ];
+      final trips = [
+        WaybillTrip(
+            Trip_No: 2,
+            Weign_Bridge_id: 50,
+            Key: 't2',
+            To_Time: DateTime(2026, 10, 1, 10)),
+      ];
+      expect(WaybillService.entriesToRefresh(entries, trips, today), isEmpty);
+    });
+
+    test('open trips matched through the waybill key count too', () {
+      final entries = [
+        Waybill(Entry_No: 66, Key: 'k66', Date: DateTime(2026, 10, 2)),
+      ];
+      final trips = [
+        WaybillTrip(Trip_No: 7, Key: 't7', Waybill_Key: 'k66'), // open, no id
+      ];
+      expect(WaybillService.entriesToRefresh(entries, trips, today), [66]);
+    });
+
+    test('entries that never reached BC are not live-read', () {
+      final entries = [
+        Waybill(Entry_No: null, Key: 'tmp', Date: today),
+      ];
+      final trips = [WaybillTrip(Trip_No: 1, Key: 't1', Waybill_Key: 'tmp')];
+      expect(WaybillService.entriesToRefresh(entries, trips, today), isEmpty);
+    });
+  });
+
+  group('WaybillService — refreshVehicleTrips dedupe', () {
+    setUp(_setupGetX);
+    tearDown(_teardownGetX);
+
+    test('concurrent calls for the same vehicle share one run', () async {
+      final a = WaybillService().refreshVehicleTrips(vehicleNo: 'KCX 111A');
+      final b = WaybillService().refreshVehicleTrips(vehicleNo: 'KCX 111A');
+      expect(identical(a, b), true);
+      await a; // let the shared run wind down inside the test
+    });
+
+    test('a blank vehicle number is a no-op', () async {
+      await WaybillService().refreshVehicleTrips(vehicleNo: '   ');
+    });
+  });
+
   group('Vehicle_Expenses — expense trip label', () {
     test('Vehicle No carries the trip id', () {
       expect(Vehicle_Expenses.tripLabel(tripNo: 59), '59');
@@ -493,8 +562,7 @@ void main() {
 
     test('falls back to the trip key while the number is unknown', () {
       expect(Vehicle_Expenses.tripLabel(fallback: 'TKEY'), 'TKEY');
-      expect(
-          Vehicle_Expenses.tripLabel(tripNo: 0, fallback: 'TKEY'), 'TKEY');
+      expect(Vehicle_Expenses.tripLabel(tripNo: 0, fallback: 'TKEY'), 'TKEY');
       expect(Vehicle_Expenses.tripLabel(), null);
     });
 
@@ -647,8 +715,7 @@ void main() {
       expect(find.text('Start Trip'), findsOneWidget);
     });
 
-    testWidgets('Start Trip FAB opens the silent-entry popup',
-        (tester) async {
+    testWidgets('Start Trip FAB opens the silent-entry popup', (tester) async {
       await tester.pumpWidget(
         const GetMaterialApp(home: WaybillListPage()),
       );

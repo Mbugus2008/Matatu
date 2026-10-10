@@ -56,26 +56,21 @@ class DashboardCues implements Tomaps<DashboardCues> {
 
   static int _i(Object? value) => value == null ? 0 : (value as num).toInt();
 
-  static List<int> _ints(Object? value) => value is List
-      ? value.map((e) => (e as num).toInt()).toList()
-      : const [];
+  static List<int> _ints(Object? value) =>
+      value is List ? value.map((e) => (e as num).toInt()).toList() : const [];
 
   static List<double> _nums(Object? value) => value is List
       ? value.map((e) => (e as num).toDouble()).toList()
       : const [];
 
   static List<CashierCue> _cashiers(Object? value) => value is List
-      ? value
-          .whereType<Map>()
-          .map((e) => CashierCue.fromMap(e))
-          .toList()
+      ? value.whereType<Map>().map((e) => CashierCue.fromMap(e)).toList()
       : const [];
 
   factory DashboardCues.fromMap(Map<String, dynamic> map) {
     return DashboardCues()
-      ..Date = map['Date'] != null
-          ? DateTime.tryParse(map['Date'].toString())
-          : null
+      ..Date =
+          map['Date'] != null ? DateTime.tryParse(map['Date'].toString()) : null
       ..Cash = _d(map['Cash'])
       ..Mpesa = _d(map['Mpesa'])
       ..Offload = _d(map['Offload'])

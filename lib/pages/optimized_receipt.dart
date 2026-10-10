@@ -255,6 +255,14 @@ class _ReceiptState extends State<Receipt> {
           receiptNo: receiptNo,
           agent: header.Agent,
         );
+        // Pull the vehicle's trips live before closing: anything started on
+        // another device (or still unsynced here) must close with this
+        // receipt too — that is what makes a two-or-more-trip close complete.
+        try {
+          await WaybillService()
+              .refreshVehicleTrips(vehicleNo: vehicleNo)
+              .timeout(const Duration(seconds: 12));
+        } catch (_) {}
         final closed = await WaybillService().closeOpenTrips(
           vehicleNo: vehicleNo,
           receiptNo: receiptNo,
@@ -374,8 +382,7 @@ class _ReceiptState extends State<Receipt> {
   bool get _isCityHoppa =>
       Get.find<MainController>().config?.value.clientId == 'CITYHOPPER';
 
-  Future<(int, double, double, double?)> _metricsFutureFor(
-      String vehicleNo) {
+  Future<(int, double, double, double?)> _metricsFutureFor(String vehicleNo) {
     if (_metricsVehicle != vehicleNo || _metricsFuture == null) {
       _metricsVehicle = vehicleNo;
       _metricsFuture = _loadMetrics(vehicleNo);
@@ -383,10 +390,16 @@ class _ReceiptState extends State<Receipt> {
     return _metricsFuture!;
   }
 
-  Future<(int, double, double, double?)> _loadMetrics(
-      String vehicleNo) async {
-    final open = await WaybillService()
-        .openTripsSummaryForVehicle(vehicleNo: vehicleNo);
+  Future<(int, double, double, double?)> _loadMetrics(String vehicleNo) async {
+    // Live first (bounded): trips started on other devices must count too.
+    // Offline or slow networks quietly fall back to the local copy.
+    try {
+      await WaybillService()
+          .refreshVehicleTrips(vehicleNo: vehicleNo)
+          .timeout(const Duration(seconds: 6));
+    } catch (_) {}
+    final open =
+        await WaybillService().openTripsSummaryForVehicle(vehicleNo: vehicleNo);
     final vehicle = _findVehicle(vehicleNo);
     final mpesa = await MpesaTransactionService().paidSinceLastReceipt(
       vehicleNo: vehicleNo,
@@ -448,8 +461,8 @@ class _ReceiptState extends State<Receipt> {
             child: InkWell(
               onTap: () => _showVehicleTripsSheet(vehicleNo),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0, vertical: 12.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
                 child: Column(
                   children: [
                     Row(
@@ -459,7 +472,8 @@ class _ReceiptState extends State<Receipt> {
                               waiting ? '—' : '$openCount', Icons.timelapse),
                         ),
                         Expanded(
-                          child: _buildMetric('Target',
+                          child: _buildMetric(
+                              'Target',
                               waiting ? '—' : money.format(target),
                               Icons.flag_outlined),
                         ),
@@ -492,8 +506,8 @@ class _ReceiptState extends State<Receipt> {
                         const SizedBox(width: 4),
                         Text(
                           'Tap to view trips & comments',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey[500]),
+                          style:
+                              TextStyle(fontSize: 11, color: Colors.grey[500]),
                         ),
                       ],
                     ),
@@ -513,8 +527,7 @@ class _ReceiptState extends State<Receipt> {
         Icon(icon, size: 18, color: const Color(0xFF006B3F)),
         const SizedBox(height: 4),
         Text(value,
-            style:
-                const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
         Text(label,
             style: const TextStyle(fontSize: 11, color: Color(0xFF5B5F61)),
             textAlign: TextAlign.center),
@@ -522,9 +535,9 @@ class _ReceiptState extends State<Receipt> {
     );
   }
 
-  /// Opens the trips popup for the selected vehicle: every trip recorded for
-  /// it — open and closed — with its stats and its comments. The CityHoppa
-  /// metrics card (the trips widget) brings this up on touch.
+  /// Opens the trips popup for the selected vehicle: today's trips — open
+  /// first — with their stats, M-Pesa / cash split and comments. The
+  /// CityHoppa metrics card (the trips widget) brings this up on touch.
   void _showVehicleTripsSheet(String vehicleNo) {
     final vehicle = vehicleNo.trim();
     if (vehicle.isEmpty) {
@@ -631,6 +644,9 @@ class _ReceiptState extends State<Receipt> {
       }
       memberController.getcurrentcrew(selection.displayText);
       headerController.currHeader.value.Vehicle = selection.displayText;
+      // Pull the vehicle's trips live right away: the metrics card, the
+      // trips sheet and the post-print close join this same refresh.
+      WaybillService().refreshVehicleTrips(vehicleNo: selection.displayText);
       Get.find<VehiclesController>()
           .getvehtrans(selection.displayText, DateTime.now());
       // The officer's next step is typing the amount — move the focus there
@@ -685,9 +701,9 @@ class _ReceiptState extends State<Receipt> {
                 // number (plate). _vehicleNoController can hold the fleet
                 // number, and refreshing with that key erased the crew below
                 // the vehicle and unloaded the current vehicle entirely.
-                final vehicleNo =
-                    (currentVehicle?.Vehicle_Number ?? _vehicleNoController.text)
-                        .trim();
+                final vehicleNo = (currentVehicle?.Vehicle_Number ??
+                        _vehicleNoController.text)
+                    .trim();
                 await Get.to(() => CrewAssignment(vehicle: currentVehicle));
                 if (vehicleNo.isEmpty) return;
                 // Re-read the vehicle's crew after the assignment so new
@@ -1239,8 +1255,9 @@ class _ReceiptState extends State<Receipt> {
   }
 }
 
-/// Bottom sheet listing a vehicle's trips with their details and comments —
-/// opened by touching the CityHoppa metrics card on the receipt page.
+/// Bottom sheet listing a vehicle's trips (today's, open ones first) with
+/// their details, M-Pesa / cash split and comments — opened by touching the
+/// CityHoppa metrics card on the receipt page.
 class _VehicleTripsSheet extends StatefulWidget {
   final String vehicleNo;
 
@@ -1279,8 +1296,32 @@ class _VehicleTripsSheetState extends State<_VehicleTripsSheet> {
       });
     }
     try {
-      final trips =
-          await WaybillService().tripsForVehicle(vehicleNo: widget.vehicleNo);
+      // Live first (bounded) so the sheet shows trips started on other
+      // devices; offline falls back to whatever is stored locally.
+      try {
+        await WaybillService()
+            .refreshVehicleTrips(vehicleNo: widget.vehicleNo)
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {}
+      final trips = List<WaybillTrip>.of(await WaybillService()
+          .tripsForVehicle(
+              vehicleNo: widget.vehicleNo, onDate: DateTime.now()));
+      // Open trips on top — they are what the officer still expects back —
+      // then the rest by start time. Today only: earlier days are history.
+      trips.sort((a, b) {
+        if (a.isOpen != b.isOpen) return a.isOpen ? -1 : 1;
+        final af = a.From_Time;
+        final bf = b.From_Time;
+        if (af != null && bf != null) {
+          final c = af.compareTo(bf);
+          if (c != 0) return c;
+        } else if (af != null) {
+          return -1;
+        } else if (bf != null) {
+          return 1;
+        }
+        return (a.Trip_No ?? 0).compareTo(b.Trip_No ?? 0);
+      });
       final comments = await TripComment.forTrips(
           trips.map((t) => t.Trip_No ?? 0).where((n) => n > 0).toList());
       if (!mounted) return;
@@ -1419,9 +1460,8 @@ class _VehicleTripsSheetState extends State<_VehicleTripsSheet> {
                       Text(
                         _loading
                             ? 'Loading…'
-                            : '${trips.length} trip(s) · $openCount open',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey[600]),
+                            : '${trips.length} trip(s) today · $openCount open',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -1433,8 +1473,8 @@ class _VehicleTripsSheetState extends State<_VehicleTripsSheet> {
                   style: FilledButton.styleFrom(
                     backgroundColor: _startGreen,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     textStyle: const TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w700),
                     shape: RoundedRectangleBorder(
@@ -1516,14 +1556,20 @@ class _VehicleTripsSheetState extends State<_VehicleTripsSheet> {
     final comment = _comments[trip.Trip_No ?? 0];
     final commentText = (comment?.Comments ?? '').trim();
     final received = _received(trip);
+    final mpesaAmount = trip.Mpesa_Amount ?? 0;
+    final cashAmount = trip.Cash_amount ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        // Open trips stand out — light green, matching the OPEN chip.
+        color: trip.isOpen ? const Color(0xFFF1F8E9) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color:
+              trip.isOpen ? const Color(0xFFA5D6A7) : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1531,8 +1577,7 @@ class _VehicleTripsSheetState extends State<_VehicleTripsSheet> {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(6),
@@ -1548,8 +1593,7 @@ class _VehicleTripsSheetState extends State<_VehicleTripsSheet> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: trip.isOpen
                       ? const Color(0xFFE8F5E9)
@@ -1561,9 +1605,7 @@ class _VehicleTripsSheetState extends State<_VehicleTripsSheet> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: trip.isOpen
-                        ? const Color(0xFF2E7D32)
-                        : Colors.grey,
+                    color: trip.isOpen ? const Color(0xFF2E7D32) : Colors.grey,
                   ),
                 ),
               ),
@@ -1591,6 +1633,21 @@ class _VehicleTripsSheetState extends State<_VehicleTripsSheet> {
                 'Received',
                 received > 0 ? money.format(received) : '-',
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _tripStat(
+                'M-Pesa',
+                mpesaAmount > 0 ? money.format(mpesaAmount) : '-',
+              ),
+              const SizedBox(width: 32),
+              _tripStat(
+                'Cash',
+                cashAmount > 0 ? money.format(cashAmount) : '-',
+              ),
+              const Spacer(),
             ],
           ),
           if (commentText.isNotEmpty) ...[

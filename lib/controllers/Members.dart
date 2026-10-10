@@ -153,9 +153,7 @@ class MemberController extends GetxController {
       [vehicle, crew_type.index.toString(), crew],
     );
     for (final m in Get.find<MemberController>().allMembers) {
-      if (m.Vehicle == vehicle &&
-          m.Crew_Type == crew_type &&
-          m.No != crew) {
+      if (m.Vehicle == vehicle && m.Crew_Type == crew_type && m.No != crew) {
         m.Vehicle = '';
       }
     }

@@ -27,8 +27,7 @@ void main() {
     });
 
     test('never appends twice', () {
-      expect(
-          TranTypes.crewSavingsDescription('Crew Savings(Dr)(B098)', 'B098'),
+      expect(TranTypes.crewSavingsDescription('Crew Savings(Dr)(B098)', 'B098'),
           'Crew Savings(Dr)(B098)');
     });
 
@@ -43,8 +42,7 @@ void main() {
   group('TranTypes.descriptionMatchesType', () {
     test('plain descriptions match their type name', () {
       expect(TranTypes.descriptionMatchesType('Offload', 'Offload'), isTrue);
-      expect(
-          TranTypes.descriptionMatchesType('Offload Parking', 'Offload'),
+      expect(TranTypes.descriptionMatchesType('Offload Parking', 'Offload'),
           isFalse);
     });
 
@@ -67,7 +65,8 @@ void main() {
           TranTypes.descriptionMatchesType(
               'Crew Savings(Dr)(A091)', 'Crew (Conductor)'),
           isFalse);
-      expect(TranTypes.descriptionMatchesType('Offload', 'Management'), isFalse);
+      expect(
+          TranTypes.descriptionMatchesType('Offload', 'Management'), isFalse);
     });
 
     test('empty values never match', () {
@@ -109,8 +108,8 @@ void main() {
       expect(
           TranTypes.typeForTransaction(types, null, 'Crew Savings(Dr)(A091)'),
           same(driverSavings));
-      expect(TranTypes.typeForTransaction(types, '  ', 'Parking'),
-          same(parking));
+      expect(
+          TranTypes.typeForTransaction(types, '  ', 'Parking'), same(parking));
     });
 
     test('nothing to match gives null', () {

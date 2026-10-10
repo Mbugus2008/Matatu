@@ -26,6 +26,7 @@ class Vehicles implements mapping, Tomaps, AbsDbUpdates {
   double? Penalty;
   double? Parking;
   String? Fleet_No;
+
   /// M-Pesa till (paybill) number the vehicle's transactions land on.
   String? Till_No;
   double? Offload = 0;

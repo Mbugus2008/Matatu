@@ -150,27 +150,36 @@ class Cityhoppa extends BaseClients {
       case 8: // Manager - the collections dashboard is their home screen.
         return const DashboardCuesView();
       default:
-        return GetBuilder<VehiclesController>(
-          builder: (controller) {
-            if (controller.vehdailycollections.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return Column(
-              children: [
-                _buildSearchField(controller),
-                Expanded(
-                  // Pull-to-refresh re-pulls today's per-vehicle figures.
-                  child: RefreshIndicator(
-                    onRefresh: () => controller.refreshDailyCollections(),
-                    child: _buildVehicleList(controller),
-                  ),
-                ),
-                _buildSummaryCard(controller),
-              ],
-            );
-          },
-        );
+        return vehicleCollectionsList();
     }
+  }
+
+  /// The default home list: today's per-vehicle collection figures with
+  /// search, pull-to-refresh and the day summary card. Also opened from the
+  /// drawer's "Vehicle Collections" tile (via [VehicleCollectionsView]),
+  /// which shows the list without the summary.
+  @override
+  Widget vehicleCollectionsList({bool showSummary = true}) {
+    return GetBuilder<VehiclesController>(
+      builder: (controller) {
+        if (controller.vehdailycollections.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return Column(
+          children: [
+            _buildSearchField(controller),
+            Expanded(
+              // Pull-to-refresh re-pulls today's per-vehicle figures.
+              child: RefreshIndicator(
+                onRefresh: () => controller.refreshDailyCollections(),
+                child: _buildVehicleList(controller),
+              ),
+            ),
+            if (showSummary) _buildSummaryCard(controller),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildSearchField(VehiclesController controller) {

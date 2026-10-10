@@ -9,8 +9,8 @@ void main() {
     });
 
     test('trims codes and drops empty ones', () {
-      expect(TransSummary.distinctAgents([' AGNES ', '', null, '  ']),
-          ['AGNES']);
+      expect(
+          TransSummary.distinctAgents([' AGNES ', '', null, '  ']), ['AGNES']);
     });
 
     test('no codes gives an empty list', () {

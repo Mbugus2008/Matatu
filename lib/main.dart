@@ -10,7 +10,6 @@ import 'package:t_matatu/pages/login.dart';
 import 'package:t_matatu/providers/AppConfig.dart';
 import 'package:t_matatu/providers/colors.dart';
 
-
 const simplePeriodicTask =
     "be.tramckrijte.workmanagerExample.simplePeriodicTask";
 const simplePeriodic1HourTask =
@@ -27,20 +26,15 @@ class MyAppLifecycleObserver extends WidgetsBindingObserver {
 
 class start {
   start(AppConfig clientId) {
+    init().then((value) {
+      Get.find<MainController>().config?.value = clientId;
+      AppConfig().init(clientId);
 
-  
-        init().then((value) { 
-    Get.find<MainController>().config?.value = clientId;
-    AppConfig().init(clientId);
+      Get.find<MainController>()
+          .CurrentClient
+          ?.value
+          .init(); //Inistialize client dependent processeses
 
-   
-   
-    Get.find<MainController>()
-        .CurrentClient
-        ?.value
-        .init(); //Inistialize client dependent processeses
-
-    
       initializedata();
 
       // Workmanager().initialize(
@@ -58,7 +52,6 @@ class start {
   }
 
   Future<void> initiate() async {
-    
     if (Platform.isAndroid) {
       [
         Permission.location,
@@ -66,12 +59,11 @@ class start {
         Permission.bluetooth,
         Permission.bluetoothConnect,
         Permission.bluetoothScan,
-       
       ].request().then((status) async {
         await init().then((value) {
           initializedata();
-   // After app starts, check for updates
-     
+          // After app starts, check for updates
+
           // Workmanager().initialize(
           //   callbackDispatcher,
           //   isInDebugMode: true,
@@ -103,8 +95,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Matatu',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: AppColors.primaryColor),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primaryColor),
         useMaterial3: true,
         primaryColor: AppColors.primaryColor,
         scaffoldBackgroundColor: AppColors.backgroundColor,

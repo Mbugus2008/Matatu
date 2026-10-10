@@ -166,9 +166,7 @@ class _DashboardCuesViewState extends State<DashboardCuesView> {
 
   Widget _sectionTitle(String text) => Text(text,
       style: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-          color: Colors.grey[800]));
+          fontSize: 15, fontWeight: FontWeight.w700, color: Colors.grey[800]));
 
   BoxDecoration get _cardDecoration => BoxDecoration(
         color: Colors.white,
@@ -235,7 +233,8 @@ class _DashboardCuesViewState extends State<DashboardCuesView> {
   }
 
   Widget _legendRow(Color color, String label, double value, double total) {
-    final pct = total > 0 ? '  (${(value / total * 100).toStringAsFixed(0)}%)' : '';
+    final pct =
+        total > 0 ? '  (${(value / total * 100).toStringAsFixed(0)}%)' : '';
     return Row(
       children: [
         Container(
@@ -245,8 +244,7 @@ class _DashboardCuesViewState extends State<DashboardCuesView> {
         const SizedBox(width: 8),
         Expanded(
           child: Text('$label$pct',
-              style: const TextStyle(
-                  fontSize: 12.5, color: Color(0xFF3F4941))),
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFF3F4941))),
         ),
         Text(_fmt(value),
             style: TextStyle(
@@ -292,8 +290,7 @@ class _DashboardCuesViewState extends State<DashboardCuesView> {
                 Text(caption,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        TextStyle(fontSize: 9.5, color: Colors.grey[500])),
+                    style: TextStyle(fontSize: 9.5, color: Colors.grey[500])),
             ],
           ),
         ),
@@ -458,9 +455,11 @@ class _DashboardCuesViewState extends State<DashboardCuesView> {
       title: 'Fuel · today',
       stats: [
         ('Amount', _fmt(cues.FuelToday), _fuelAmber),
-        ('Litres',
-            NumberFormat('#,##0.##').format(cues.FuelLitresToday),
-            const Color(0xFF161D1F)),
+        (
+          'Litres',
+          NumberFormat('#,##0.##').format(cues.FuelLitresToday),
+          const Color(0xFF161D1F)
+        ),
       ],
       chart: _miniBars(values: cues.FuelByDay, color: _fuelAmber),
     );
@@ -547,8 +546,9 @@ class _DashboardCuesViewState extends State<DashboardCuesView> {
 
   Widget _buildHeader(DashboardCues cues) {
     final day = cues.Date ?? DateTime.now();
-    final updated =
-        _updatedAt == null ? '' : '  ·  updated ${DateFormat('HH:mm').format(_updatedAt!)}';
+    final updated = _updatedAt == null
+        ? ''
+        : '  ·  updated ${DateFormat('HH:mm').format(_updatedAt!)}';
     return Row(
       children: [
         const Icon(Icons.today, size: 18, color: _primaryGreen),
@@ -587,12 +587,12 @@ class _DashboardCuesViewState extends State<DashboardCuesView> {
               size: 20, color: _primaryGreen),
           const SizedBox(width: 10),
           const Expanded(
-            child: Text('Vehicles on route today',
-                style: TextStyle(fontSize: 14)),
+            child:
+                Text('Vehicles on route today', style: TextStyle(fontSize: 14)),
           ),
           Text('$count',
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w700)),
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         ],
       ),
     );

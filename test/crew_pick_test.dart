@@ -39,8 +39,8 @@ void main() {
         row('A903', Crew_type.Driver, '20;x==8;341322180;'),
         row('A261', Crew_type.Driver, '20;x==8;341322230;'),
       ];
-      expect(MemberController.pickCurrentCrew(crew, Crew_type.Driver)?.No,
-          'A261');
+      expect(
+          MemberController.pickCurrentCrew(crew, Crew_type.Driver)?.No, 'A261');
     });
 
     test('ignores rows of the other crew type', () {
@@ -48,8 +48,8 @@ void main() {
         row('A999', Crew_type.Driver, '20;x==8;341000000;'),
         row('B999', Crew_type.Conductor, '20;x==8;342000000;'),
       ];
-      expect(MemberController.pickCurrentCrew(crew, Crew_type.Driver)?.No,
-          'A999');
+      expect(
+          MemberController.pickCurrentCrew(crew, Crew_type.Driver)?.No, 'A999');
       expect(MemberController.pickCurrentCrew(crew, Crew_type.Conductor)?.No,
           'B999');
     });
@@ -59,8 +59,8 @@ void main() {
         row('A903', Crew_type.Driver, null),
         row('A261', Crew_type.Driver, null),
       ];
-      expect(MemberController.pickCurrentCrew(crew, Crew_type.Driver)?.No,
-          'A903');
+      expect(
+          MemberController.pickCurrentCrew(crew, Crew_type.Driver)?.No, 'A903');
     });
 
     test('returns null when nobody of that type is attached', () {

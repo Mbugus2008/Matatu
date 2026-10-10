@@ -92,7 +92,8 @@ void main() {
       );
       final row = comment.toMap_fortable();
       expect(row['sent'], 1);
-      expect(row['Date_time'], DateTime(2026, 10, 5, 10, 0).millisecondsSinceEpoch);
+      expect(row['Date_time'],
+          DateTime(2026, 10, 5, 10, 0).millisecondsSinceEpoch);
 
       final back = TripComment.fromMap_db(row);
       expect(back.Trip_Id, 7);

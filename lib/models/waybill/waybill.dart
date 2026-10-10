@@ -66,6 +66,7 @@ DateTime? _parseServerDate(dynamic value) {
   }
   return parsed;
 }
+
 class Waybill extends Tomaps implements mapping {
   String? Key;
   String? Vehicle_No;
@@ -278,6 +279,13 @@ class WaybillTrip extends Tomaps implements mapping {
   /// Route description of [From] (e.g. "Kencom - Kawangware"). NAV stores it
   /// on the trip for reporting; filled from the local route list.
   String? Description;
+
+  /// M-Pesa portion of [Amount_Received] — BC's Mpesa_Amount column (added
+  /// 2026-10-09). Filled by closes/receipt settlements that split the money.
+  double? Mpesa_Amount;
+
+  /// Cash portion of [Amount_Received] — BC's Cash_amount column.
+  double? Cash_amount;
   bool sent = false;
 
   /// Local key of the parent waybill entry. Used to link a trip saved before
@@ -310,6 +318,8 @@ class WaybillTrip extends Tomaps implements mapping {
     this.Expenses,
     this.Comments,
     this.Description,
+    this.Mpesa_Amount,
+    this.Cash_amount,
     this.sent = false,
     this.Waybill_Key,
   });
@@ -333,6 +343,8 @@ class WaybillTrip extends Tomaps implements mapping {
       'Expenses': Expenses,
       'Comments': Comments,
       'Description': Description,
+      'Mpesa_Amount': Mpesa_Amount,
+      'Cash_amount': Cash_amount,
     };
   }
 
@@ -354,6 +366,8 @@ class WaybillTrip extends Tomaps implements mapping {
       Expenses: (map['Expenses'] as num?)?.toDouble(),
       Comments: map['Comments'] as String?,
       Description: map['Description'] as String?,
+      Mpesa_Amount: (map['Mpesa_Amount'] as num?)?.toDouble(),
+      Cash_amount: (map['Cash_amount'] as num?)?.toDouble(),
     );
   }
 
@@ -385,6 +399,8 @@ class WaybillTrip extends Tomaps implements mapping {
       'Expenses': Expenses,
       'Comments': Comments,
       'Description': Description,
+      'Mpesa_Amount': Mpesa_Amount,
+      'Cash_amount': Cash_amount,
       'sent': sent ? 1 : 0,
       'Dirty': dirty ? 1 : 0,
       'Waybill_Key': Waybill_Key,
@@ -410,6 +426,8 @@ class WaybillTrip extends Tomaps implements mapping {
   static const String col_Expenses = 'Expenses';
   static const String col_Comments = 'Comments';
   static const String col_Description = 'Description';
+  static const String col_Mpesa_Amount = 'Mpesa_Amount';
+  static const String col_Cash_amount = 'Cash_amount';
   static const String col_Dirty = 'Dirty';
   static const String col_sent = 'sent';
 
@@ -431,6 +449,8 @@ class WaybillTrip extends Tomaps implements mapping {
     col_Expenses,
     col_Comments,
     col_Description,
+    col_Mpesa_Amount,
+    col_Cash_amount,
     col_Dirty,
     col_sent,
   ];
@@ -454,6 +474,8 @@ class WaybillTrip extends Tomaps implements mapping {
       $col_Expenses REAL,
       $col_Comments TEXT,
       $col_Description TEXT,
+      $col_Mpesa_Amount REAL,
+      $col_Cash_amount REAL,
       $col_Dirty INTEGER DEFAULT 0,
       $col_sent INTEGER DEFAULT 0
     )
@@ -1014,9 +1036,8 @@ class WaybillService {
     try {
       final rows = await db_Provider()
           .getdata(WaybillTrip.table, const [WaybillTrip.col_Trip_No]);
-      numbers.addAll(rows
-          .map((row) => row[WaybillTrip.col_Trip_No])
-          .whereType<int>());
+      numbers.addAll(
+          rows.map((row) => row[WaybillTrip.col_Trip_No]).whereType<int>());
     } catch (_) {
       // No local rows (or no DB) — the stored counter still carries on.
     }
@@ -1065,13 +1086,10 @@ class WaybillService {
       final trips = <WaybillTrip>[];
       for (final t in tripRows.map(WaybillTrip.fromMap_db)) {
         for (final e in entries) {
-          final sameEntry =
-              (e.Entry_No != null &&
+          final sameEntry = (e.Entry_No != null &&
                   e.Entry_No! > 0 &&
                   t.Weign_Bridge_id == e.Entry_No) ||
-              (e.Key != null &&
-                  e.Key!.isNotEmpty &&
-                  t.Waybill_Key == e.Key);
+              (e.Key != null && e.Key!.isNotEmpty && t.Waybill_Key == e.Key);
           if (sameEntry) {
             trips.add(t);
             break;
@@ -1084,16 +1102,125 @@ class WaybillService {
     }
   }
 
-  /// Every trip recorded for [vehicleNo] across its entries — open and closed
-  /// — ordered by trip number. Drives the receipt page's trip-details popup.
-  Future<List<WaybillTrip>> tripsForVehicle({required String vehicleNo}) async {
+  /// Per-vehicle refresh bookkeeping for [refreshVehicleTrips]: the last
+  /// refresh start (short throttle window) and the run in flight, so the
+  /// receipt page's selection, metrics card, trips sheet and post-print
+  /// settle run all share one refresh instead of racing each other.
+  static final Map<String, DateTime> _vehicleTripsRefreshedAt = {};
+  static final Map<String, Future<void>> _vehicleTripsRefreshing = {};
+
+  /// Entry numbers worth a live re-read before a vehicle's trips are shown
+  /// or closed: entries with at least one open trip (any day — an overnight
+  /// trip is still on the road) plus today's entries (a trip may have been
+  /// started on another device today). Only synced entries (Entry_No > 0)
+  /// can be live-read from the API. Pure so the rule stays unit-testable.
+  static List<int> entriesToRefresh(
+      Iterable<Waybill> entries, Iterable<WaybillTrip> trips, DateTime today) {
+    final openEntryNos = <int>{};
+    final openKeys = <String>{};
+    for (final t in trips) {
+      if (!t.isOpen) continue;
+      final no = t.Weign_Bridge_id;
+      if (no != null && no > 0) openEntryNos.add(no);
+      final key = (t.Waybill_Key ?? '').trim();
+      if (key.isNotEmpty) openKeys.add(key);
+    }
+    final out = <int>{};
+    for (final e in entries) {
+      final no = e.Entry_No;
+      final key = (e.Key ?? '').trim();
+      final hasOpen = (no != null && no > 0 && openEntryNos.contains(no)) ||
+          (key.isNotEmpty && openKeys.contains(key));
+      final d = e.Date;
+      final isToday = d != null &&
+          d.year == today.year &&
+          d.month == today.month &&
+          d.day == today.day;
+      if (!hasOpen && !isToday) continue;
+      if (no != null && no > 0) out.add(no);
+    }
+    return out.toList()..sort();
+  }
+
+  /// Live refresh for the receipt page: brings [vehicleNo]'s trips up to date
+  /// with the server before they are displayed or closed —
+  ///   1. the waybill + trip deltas (changes made on other devices land
+  ///      locally), then
+  ///   2. a live re-read of every entry that could still have trips on the
+  ///      road, merged with the local rows exactly like the waybill page.
+  /// Never throws: offline or slow networks simply keep the local copy.
+  /// A refresh already in flight for the vehicle is joined, not duplicated,
+  /// so the selection, the metrics card, the sheet and the close all share
+  /// one run.
+  Future<void> refreshVehicleTrips({required String vehicleNo}) {
+    final vehicle = vehicleNo.trim().toUpperCase();
+    if (vehicle.isEmpty) return Future<void>.value();
+
+    // Join a refresh that is already running for this vehicle.
+    final inFlight = _vehicleTripsRefreshing[vehicle];
+    if (inFlight != null) return inFlight;
+
+    final now = DateTime.now();
+    final last = _vehicleTripsRefreshedAt[vehicle];
+    if (last != null && now.difference(last).inSeconds < 8) {
+      // Refreshed moments ago — the local copy is still fresh.
+      return Future<void>.value();
+    }
+    _vehicleTripsRefreshedAt[vehicle] = now;
+
+    final future = _refreshVehicleTripsInner(vehicle).whenComplete(() {
+      _vehicleTripsRefreshing.remove(vehicle);
+    });
+    _vehicleTripsRefreshing[vehicle] = future;
+    return future;
+  }
+
+  Future<void> _refreshVehicleTripsInner(String vehicle) async {
+    try {
+      await pullModifiedWaybills();
+    } catch (_) {}
+    try {
+      await pullModifiedTrips();
+    } catch (_) {}
+
+    try {
+      final db = db_Provider();
+      final wbRows = await db.getdata(Waybill.table, Waybill.columns);
+      final entries = wbRows
+          .map(Waybill.fromMap_db)
+          .where((w) => (w.Vehicle_No ?? '').trim().toUpperCase() == vehicle)
+          .toList();
+      if (entries.isEmpty) return;
+
+      final tripRows = await db.getdata(WaybillTrip.table, WaybillTrip.columns);
+      final trips = tripRows.map(WaybillTrip.fromMap_db).toList();
+
+      for (final entryNo in entriesToRefresh(entries, trips, DateTime.now())) {
+        try {
+          await getTrips(entryNo);
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  /// Every trip recorded for [vehicleNo] across its entries — open and
+  /// closed. When [onDate] is given only trips of that day's waybills are
+  /// returned (the receipt page shows today only). Ordered by trip number.
+  Future<List<WaybillTrip>> tripsForVehicle(
+      {required String vehicleNo, DateTime? onDate}) async {
     final vehicle = vehicleNo.trim().toUpperCase();
     if (vehicle.isEmpty) return const [];
     try {
       final db = db_Provider();
       final wbRows = await db.getdata(Waybill.table, Waybill.columns);
       final entries = wbRows.map(Waybill.fromMap_db).where((w) {
-        return (w.Vehicle_No ?? '').trim().toUpperCase() == vehicle;
+        if ((w.Vehicle_No ?? '').trim().toUpperCase() != vehicle) return false;
+        if (onDate == null) return true;
+        final d = w.Date;
+        return d != null &&
+            d.year == onDate.year &&
+            d.month == onDate.month &&
+            d.day == onDate.day;
       }).toList();
       if (entries.isEmpty) return const [];
 
@@ -1101,13 +1228,10 @@ class WaybillService {
       final trips = <WaybillTrip>[];
       for (final t in tripRows.map(WaybillTrip.fromMap_db)) {
         for (final e in entries) {
-          final sameEntry =
-              (e.Entry_No != null &&
+          final sameEntry = (e.Entry_No != null &&
                   e.Entry_No! > 0 &&
                   t.Weign_Bridge_id == e.Entry_No) ||
-              (e.Key != null &&
-                  e.Key!.isNotEmpty &&
-                  t.Waybill_Key == e.Key);
+              (e.Key != null && e.Key!.isNotEmpty && t.Waybill_Key == e.Key);
           if (sameEntry) {
             trips.add(t);
             break;
@@ -1528,9 +1652,7 @@ class WaybillService {
         trip.sent = true;
         trip.dirty = false;
         await db.insert(WaybillTrip.table, trip);
-      } else if ((result.Desc ?? '')
-          .toLowerCase()
-          .contains('already exists')) {
+      } else if ((result.Desc ?? '').toLowerCase().contains('already exists')) {
         // BC already has this trip — an earlier attempt reached NAV but the
         // app never recorded the result. Adopt BC's copy so the trip stops
         // retrying and later edits (close trip, expenses) update in place.
@@ -1548,8 +1670,8 @@ class WaybillService {
       final entryNo = trip.Weign_Bridge_id;
       if (entryNo == null || entryNo <= 0) return;
 
-      final response = await _api
-          .postdata('waybilltrips', json.encode({'waybillId': entryNo}));
+      final response = await _api.postdata(
+          'waybilltrips', json.encode({'waybillId': entryNo}));
       final result =
           Results<WaybillTrip>.fromJson(response.body, WaybillTrip.fromMap);
       if (result.Code != 0 || result.Contents == null) return;
@@ -1565,9 +1687,7 @@ class WaybillService {
 
       final db = db_Provider();
       final oldKey = trip.Key;
-      if (match.Key != null &&
-          match.Key!.isNotEmpty &&
-          match.Key != oldKey) {
+      if (match.Key != null && match.Key!.isNotEmpty && match.Key != oldKey) {
         if (oldKey != null) {
           await db.deletedata(
               WaybillTrip.table, '${WaybillTrip.col_Key} = ?', [oldKey]);
@@ -1629,8 +1749,8 @@ class WaybillService {
         // The stamp is written as UTC wall time with no zone suffix; parsing
         // it as local would shift the window by the device's offset (3h in
         // EAT) and re-fetch everything modified in that span each round.
-        final parsed = DateTime.tryParse(
-            stored.endsWith('Z') ? stored : '${stored}Z');
+        final parsed =
+            DateTime.tryParse(stored.endsWith('Z') ? stored : '${stored}Z');
         if (parsed != null) since = parsed.toUtc();
       }
 
@@ -1676,11 +1796,11 @@ class WaybillService {
               WaybillTrip.table,
               WaybillTrip.columns,
               '${WaybillTrip.col_Weign_Bridge_id} = ? AND '
-                  '${WaybillTrip.col_Trip_No} = ? AND '
-                  '${WaybillTrip.col_Key} != ? AND '
-                  '${WaybillTrip.col_sent} = 1 AND '
-                  '(${WaybillTrip.col_Dirty} = 0 OR '
-                  '${WaybillTrip.col_Dirty} IS NULL)',
+              '${WaybillTrip.col_Trip_No} = ? AND '
+              '${WaybillTrip.col_Key} != ? AND '
+              '${WaybillTrip.col_sent} = 1 AND '
+              '(${WaybillTrip.col_Dirty} = 0 OR '
+              '${WaybillTrip.col_Dirty} IS NULL)',
               [
                 server.Weign_Bridge_id!,
                 server.Trip_No!,
@@ -1698,8 +1818,8 @@ class WaybillService {
 
       // Two minutes of overlap so rows changed mid-sync are never missed;
       // merging is idempotent.
-      await main.savePreference(_lastTripSyncKey,
-          stamp(nowUtc.subtract(const Duration(minutes: 2))));
+      await main.savePreference(
+          _lastTripSyncKey, stamp(nowUtc.subtract(const Duration(minutes: 2))));
       return merged;
     } catch (_) {
       // Offline or BC rejected the read — the next sync tries again.
@@ -1725,8 +1845,8 @@ class WaybillService {
       if (stored != null && stored.isNotEmpty) {
         // Written as UTC wall time with no zone suffix — parse it as UTC so
         // the window is not shifted by the device's offset.
-        final parsed = DateTime.tryParse(
-            stored.endsWith('Z') ? stored : '${stored}Z');
+        final parsed =
+            DateTime.tryParse(stored.endsWith('Z') ? stored : '${stored}Z');
         if (parsed != null) since = parsed.toUtc();
       }
 
@@ -1797,8 +1917,8 @@ class WaybillService {
 
       server.sent = (server.Entry_No ?? 0) > 0;
       if (local.Key != null && local.Key != server.Key) {
-        await db.deletedata(
-            Waybill.table, '${Waybill.col_Key} = ?', [local.Key!]);
+        await db
+            .deletedata(Waybill.table, '${Waybill.col_Key} = ?', [local.Key!]);
       }
       await db.insert(Waybill.table, server);
 
@@ -1812,7 +1932,7 @@ class WaybillService {
             Waybill.table,
             Waybill.columns,
             '${Waybill.col_Vehicle_No} = ? AND ${Waybill.col_Date} = ? AND '
-                '${Waybill.col_Key} != ? AND ${Waybill.col_sent} = 1',
+            '${Waybill.col_Key} != ? AND ${Waybill.col_sent} = 1',
             [
               server.Vehicle_No!,
               server.Date!.millisecondsSinceEpoch,
@@ -1821,8 +1941,8 @@ class WaybillService {
         for (final dupe in dupes) {
           final dupeKey = dupe[Waybill.col_Key];
           if (dupeKey is String && dupeKey.isNotEmpty) {
-            await db.deletedata(
-                Waybill.table, '${Waybill.col_Key} = ?', [dupeKey]);
+            await db
+                .deletedata(Waybill.table, '${Waybill.col_Key} = ?', [dupeKey]);
           }
         }
       }
@@ -1846,7 +1966,7 @@ class WaybillService {
             WaybillTrip.table,
             WaybillTrip.columns,
             '${WaybillTrip.col_Weign_Bridge_id} = ? AND '
-                '${WaybillTrip.col_Trip_No} = ?',
+            '${WaybillTrip.col_Trip_No} = ?',
             [server.Weign_Bridge_id!, server.Trip_No!]);
         if (rows.isNotEmpty) return WaybillTrip.fromMap_db(rows.first);
       }

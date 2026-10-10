@@ -137,7 +137,8 @@ void main() {
           // Second conductor on the same vehicle — the first one wins.
           _member('A400', 'Mary Wanjiku', Crew_type.Conductor,
               vehicle: 'KAA 001A'),
-          _member('B100', 'Peter Otieno', Crew_type.Driver, vehicle: 'KBB 002B'),
+          _member('B100', 'Peter Otieno', Crew_type.Driver,
+              vehicle: 'KBB 002B'),
         ]),
         permanent: true,
       );
@@ -172,8 +173,7 @@ void main() {
     test('prefers the member attached to the given vehicle', () {
       // Same name on two vehicles — the vehicle decides.
       Get.find<MemberController>().allMembers.add(
-            _member('B200', 'John Doe', Crew_type.Driver,
-                vehicle: 'KBB 002B'),
+            _member('B200', 'John Doe', Crew_type.Driver, vehicle: 'KBB 002B'),
           );
       expect(crewNumberFor('John Doe', vehicle: 'KBB 002B'), 'B200');
     });
@@ -225,7 +225,8 @@ void main() {
   // ═══════════════════════════════════════════════════════
 
   group('WaybillService — open trips summary', () {
-    WaybillTrip trip({int? no, double? total, double? expenses, DateTime? to}) =>
+    WaybillTrip trip(
+            {int? no, double? total, double? expenses, DateTime? to}) =>
         WaybillTrip(Trip_No: no, Total: total, Expenses: expenses, To_Time: to);
 
     test('sums the totals and expenses of open trips only', () {
@@ -315,8 +316,7 @@ void main() {
       expect(open.isReceipted, isFalse);
     });
 
-    test('mark payload carries Key, Posted_ReceiptNo, Receipted_At, agent',
-        () {
+    test('mark payload carries Key, Posted_ReceiptNo, Receipted_At, agent', () {
       final txn =
           MpesaTransaction(Key: 'rec-1', Loan_No: 'KCQ779P', Paid_In: 250);
       final map = txn.toMarkMap(receiptNo: '1759197123456789', agent: 'pau');
@@ -361,8 +361,8 @@ void main() {
         From: '46 - KEN',
         Description: 'Kencom - Kawangware',
       );
-      expect(WaybillTrip.fromMap(trip.toMap()).Description,
-          'Kencom - Kawangware');
+      expect(
+          WaybillTrip.fromMap(trip.toMap()).Description, 'Kencom - Kawangware');
       expect(WaybillTrip.fromMap_db(trip.toMap_fortable()).Description,
           'Kencom - Kawangware');
     });
@@ -461,8 +461,10 @@ void main() {
       await tester.tap(find.text('Select route').first);
       await tester.pumpAndSettle();
 
-      expect(find.text('No routes available. Check the connection, then '
-          'try again.'), findsOneWidget);
+      expect(
+          find.text('No routes available. Check the connection, then '
+              'try again.'),
+          findsOneWidget);
     });
   });
 }

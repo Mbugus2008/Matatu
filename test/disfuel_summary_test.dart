@@ -207,6 +207,40 @@ void main() {
   });
 
   // ═══════════════════════════════════════════════════════
+  // pickByDate (share-time refresh matching)
+  // ═══════════════════════════════════════════════════════
+
+  group('DisFuelSummary.pickByDate', () {
+    test('matches the row on the same day, ignoring time-of-day', () {
+      final rows = [
+        _sample(key: 'A', date: DateTime(2026, 10, 8, 9, 30)),
+        _sample(key: 'B', date: DateTime(2026, 10, 9, 14, 45)),
+      ];
+      final hit = DisFuelSummary.pickByDate(rows, DateTime(2026, 10, 9));
+      expect(hit?.Key, 'B');
+    });
+
+    test('returns null when no row matches the day', () {
+      final rows = [_sample(date: DateTime(2026, 10, 8))];
+      expect(DisFuelSummary.pickByDate(rows, DateTime(2026, 10, 9)), isNull);
+    });
+
+    test('returns null for a null date', () {
+      final rows = [_sample(date: DateTime(2026, 10, 9))];
+      expect(DisFuelSummary.pickByDate(rows, null), isNull);
+    });
+
+    test('skips rows with null dates', () {
+      final rows = [
+        DisFuelSummary(Key: 'X', Date: null),
+        _sample(key: 'Y', date: DateTime(2026, 10, 9)),
+      ];
+      final hit = DisFuelSummary.pickByDate(rows, DateTime(2026, 10, 9));
+      expect(hit?.Key, 'Y');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════
   // RESULTS PARSING TESTS
   // ═══════════════════════════════════════════════════════
 

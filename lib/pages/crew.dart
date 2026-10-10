@@ -74,10 +74,8 @@ class _CrewAssignmentState extends State<CrewAssignment> {
       // Use the controller's picks — the same "most recently assigned row"
       // the receipt shows under the vehicle. Re-picking by list order here
       // loaded DIFFERENT crew than the screen that opened this page.
-      Member? attached(Member? member) => (member == null ||
-              (member.No ?? '').trim().isEmpty)
-          ? null
-          : member;
+      Member? attached(Member? member) =>
+          (member == null || (member.No ?? '').trim().isEmpty) ? null : member;
       driver ??= attached(memberController.currentdriver.value);
       conductor ??= attached(memberController.currentcunductor.value);
     }
